@@ -44,6 +44,17 @@ export default function Dashboard() {
         )}
       </section>
 
+      {stats?.lr_by_tier && stats.lr_by_tier.length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold text-gray-300 mb-2">Your Lightroom ratings vs focus tier <span className="text-gray-500 font-normal">({stats.lr_rated} rated)</span></h2>
+          <table className="text-xs text-gray-300">
+            <thead><tr><th className="text-left pr-4 text-gray-500">focus tier</th>{[0, 1, 2, 3, 4, 5].map((r) => <th key={r} className="px-2 text-gray-500">LR {r}★</th>)}</tr></thead>
+            <tbody>{[0, 1, 2].map((t) => (
+              <tr key={t}><td className="pr-4">{t}</td>{[0, 1, 2, 3, 4, 5].map((r) => <td key={r} className="px-2 text-center tabular-nums">{stats.lr_by_tier?.find((x) => x.tier === t && x.rating === r)?.n ?? ''}</td>)}</tr>
+            ))}</tbody>
+          </table>
+        </section>
+      )}
       {health && (
         <section className="text-xs text-gray-500">
           photos: <code>{health.photos_root}</code> · state: <code>{health.workdir}</code> · model server: <code>{health.ollama ?? 'n/a'}</code>

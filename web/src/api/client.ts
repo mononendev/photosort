@@ -24,7 +24,22 @@ export interface ImageSummary {
   people_count?: number | null;
   description?: string | null;
   error?: string | null;
+  lr_rating?: number | null;   // rating from an existing sidecar next to the file (informational)
+  lr_label?: string | null;
+  truth_tier?: number | null;  // your exported ground truth for calibration
+  truth_rating?: number | null;
+  truth_label?: string | null;
 }
+
+export interface TruthMatrixRow { truth: number; pred: number; n: number }
+export interface TruthSummary {
+  images_with_truth: number; with_tier: number;
+  local: { matrix: TruthMatrixRow[]; accuracy: number | null };
+  vlm: { matrix: TruthMatrixRow[]; accuracy: number | null };
+  suggested: { tier2_min?: { value: number; balanced_accuracy: number }; tier1_min?: { value: number; balanced_accuracy: number } };
+  mapping: { label_tiers: Record<string, number>; rating_tiers: Record<string, number | null> } | null;
+}
+export interface TruthImportResult { verdicts: number; matched: number; unmatched: number; summary: TruthSummary }
 
 export interface Person {
   box: number[]; head: number[]; head_src: string; torso: number[]; upper: number[]; conf: number;
@@ -72,6 +87,8 @@ export interface JobOptions {
 export interface Stats {
   tracked: number; analyzed: number; tagged: number; errors: number; review: number; keepers: number;
   tiers: { tier0: number; tier1: number; tier2: number };
+  lr_rated?: number;
+  lr_by_tier?: { tier: number | null; rating: number; n: number }[];
 }
 
 export interface Health {
@@ -88,7 +105,8 @@ export interface ImagesPage { total: number; offset: number; items: ImageSummary
 
 export interface ImageFilters {
   folder?: string; recursive?: boolean; tier?: number; keeper?: boolean; subject?: string; status?: string;
-  review?: boolean; q?: string; sort?: string; offset?: number; limit?: number;
+  review?: boolean; lr_rating?: number; lr_label?: string; truth_tier?: number; truth_mismatch?: boolean;
+  q?: string; sort?: string; offset?: number; limit?: number;
 }
 
 export interface ExportRequest { name: string; folder?: string; link?: string; xmp?: boolean; focus_source?: string; tree?: boolean }
@@ -148,6 +166,17 @@ export const api = {
     request<Record<string, unknown>>('/api/config', { method: 'PUT', body: JSON.stringify({ values }) }),
   rescore: () => request<{ changed: number }>('/api/rescore', { method: 'POST' }),
   calibration: (n = 48) => request<Calibration>(`/api/calibration${qs({ n })}`),
+  truth: () => request<TruthSummary>('/api/truth'),
+  truthClear: () => request<{ cleared: number }>('/api/truth', { method: 'DELETE' }),
+  truthImport: (dir: string, folder = '') =>
+    request<TruthImportResult>('/api/truth/import', { method: 'POST', body: JSON.stringify({ dir, folder }) }),
+  truthUpload: async (files: FileList, folder = ''): Promise<TruthImportResult> => {
+    const fd = new FormData();
+    Array.from(files).forEach((f) => fd.append('files', f));
+    const res = await fetch(`/api/truth/upload${folder ? `?folder=${encodeURIComponent(folder)}` : ''}`, { method: 'POST', body: fd });
+    if (!res.ok) throw new ApiError(res.status, await res.text());
+    return res.json();
+  },
   exportRun: (e: ExportRequest) => request<ExportResult>('/api/export', { method: 'POST', body: JSON.stringify(e) }),
   exports: () => request<{ name: string; path: string; mtime: number }[]>('/api/exports'),
 };

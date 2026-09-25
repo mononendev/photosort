@@ -94,6 +94,11 @@ class JobRunner(threading.Thread):
             stems = {f.with_suffix("").as_posix() for f in files if f.suffix.lower() not in I.RAW_EXT}
             files = [f for f in files if f.suffix.lower() not in I.RAW_EXT or f.with_suffix("").as_posix() not in stems]
         self.db.add_paths(files)
+        from . import sidecar
+        where_new = " OR ".join("path = ? OR path LIKE ?" for _ in paths)
+        p_new = [x for p in paths for x in (str(p), str(p).rstrip("/") + "/%")]
+        if paths:
+            sidecar.ingest(self.db, self.db.rows(f"({where_new}) AND lr_json IS NULL", p_new))
         if self._cancelled(jid):
             return self._finish(jid, "cancelled")
 

@@ -34,7 +34,9 @@ def cmd_scan(args):
         jpg_stems = {p.with_suffix("").as_posix() for p in paths if p.suffix.lower() not in I.RAW_EXT}
         paths = [p for p in paths if p.suffix.lower() not in I.RAW_EXT or p.with_suffix("").as_posix() not in jpg_stems]
     n = db.add_paths(paths)
-    print(f"found {len(paths)} images, {n} new; total tracked {db.count()}")
+    from . import sidecar
+    m = sidecar.ingest(db, db.rows("lr_json IS NULL"))
+    print(f"found {len(paths)} images, {n} new ({m} with Lightroom sidecars); total tracked {db.count()}")
 
 
 def cmd_local(args):

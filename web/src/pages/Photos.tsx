@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { api, thumbUrl } from '../api/client';
 import type { ImageFilters } from '../api/client';
-import { TierBadge, Stars, StatusDot } from '../components/TierBadge';
+import { TierBadge, Stars, StatusDot, LrBadge } from '../components/TierBadge';
 import ImageDetail from '../components/ImageDetail';
 
 const SUBJECTS = ['rider_action', 'rider_posed', 'group', 'crowd_spectators', 'gear_board', 'venue_scenery', 'other', 'no_people'];
@@ -19,6 +19,9 @@ export default function Photos() {
     subject: sp.get('subject') ?? undefined,
     status: sp.get('status') ?? undefined,
     review: sp.get('review') ? true : undefined,
+    lr_rating: sp.get('lr_rating') ? Number(sp.get('lr_rating')) : undefined,
+    truth_tier: sp.get('truth_tier') ? Number(sp.get('truth_tier')) : undefined,
+    truth_mismatch: sp.get('truth_mismatch') ? true : undefined,
     q: sp.get('q') ?? undefined,
     sort: sp.get('sort') ?? 'path',
     offset: Number(sp.get('offset') ?? 0),
@@ -67,9 +70,13 @@ export default function Photos() {
           <option value="">any status</option><option value="pending">pending</option><option value="analyzed">analyzed</option><option value="tagged">tagged</option><option value="error">error</option>
         </select>
         <label className="text-xs text-gray-400 flex items-center gap-1"><input type="checkbox" checked={!!filters.review} onChange={(e) => set('review', e.target.checked ? '1' : undefined)} /> needs review</label>
+        <label className="text-xs text-gray-400 flex items-center gap-1"><input type="checkbox" checked={!!filters.truth_mismatch} onChange={(e) => set('truth_mismatch', e.target.checked ? '1' : undefined)} /> ≠ ground truth</label>
+        <select value={filters.lr_rating ?? ''} onChange={(e) => set('lr_rating', e.target.value)} className={sel}>
+          <option value="">any LR rating</option>{[0, 1, 2, 3, 4, 5].map((r) => <option key={r} value={r}>LR {r}★</option>)}
+        </select>
         <input value={filters.q ?? ''} onChange={(e) => set('q', e.target.value)} placeholder="search keywords / name" className={`${sel} w-56`} />
         <select value={filters.sort} onChange={(e) => set('sort', e.target.value)} className={sel}>
-          <option value="path">by path</option><option value="newest">newest</option><option value="score">by score</option><option value="sharpness">by sharpness</option>
+          <option value="path">by path</option><option value="newest">newest</option><option value="score">by score</option><option value="sharpness">by sharpness</option><option value="lr">by your LR rating</option>
         </select>
         <span className="ml-auto text-xs text-gray-500">{isFetching ? 'loading…' : `${total} photos`}</span>
       </div>
@@ -79,12 +86,13 @@ export default function Photos() {
           <button key={it.id ?? it.rel} onClick={() => it.id && setOpen(it.id)} className="group text-left rounded-lg overflow-hidden border border-gray-800 bg-gray-900 hover:border-gray-600">
             <div className="aspect-[3/2] bg-gray-950 relative">
               {it.id && it.status !== 'pending' ? <img src={thumbUrl(it.id)} alt="" loading="lazy" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-700 text-xs">pending</div>}
-              <div className="absolute top-1 left-1 flex gap-1"><TierBadge tier={it.focus_tier} small />{it.review && <span className="rounded bg-amber-900/80 text-amber-200 px-1 text-[10px]">review</span>}{it.overridden && <span className="rounded bg-purple-900/80 text-purple-200 px-1 text-[10px]">edited</span>}</div>
+              <div className="absolute top-1 left-1 flex gap-1"><TierBadge tier={it.focus_tier} small />{it.truth_tier !== null && it.truth_tier !== undefined && <span className={`rounded px-1 text-[10px] ${it.truth_tier === it.focus_tier ? 'bg-emerald-900/80 text-emerald-200' : 'bg-red-900/80 text-red-200'}`} title="your ground truth">T{it.truth_tier}</span>}{it.review && <span className="rounded bg-amber-900/80 text-amber-200 px-1 text-[10px]">review</span>}{it.overridden && <span className="rounded bg-purple-900/80 text-purple-200 px-1 text-[10px]">edited</span>}</div>
               {it.keeper === false && <div className="absolute inset-0 bg-black/40" />}
             </div>
             <div className="px-2 py-1.5 text-xs">
               <div className="flex items-center gap-1"><StatusDot status={it.status} /><span className="truncate text-gray-300">{it.name}</span></div>
               <div className="flex items-center justify-between mt-0.5"><span className="text-gray-500 truncate">{it.subject !== 'unknown' ? it.subject : ''}</span><Stars n={it.quality_score} /></div>
+              <div className="flex items-center justify-end mt-0.5"><LrBadge rating={it.lr_rating} label={it.lr_label} /></div>
             </div>
           </button>
         ))}

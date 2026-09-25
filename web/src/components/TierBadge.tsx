@@ -22,3 +22,14 @@ export function StatusDot({ status }: { status: string }) {
   };
   return <span className={`inline-block w-2 h-2 rounded-full ${c[status] ?? 'bg-gray-600'}`} title={status} />;
 }
+
+export function LrBadge({ rating, label }: { rating?: number | null; label?: string | null }) {
+  if (!rating && !label) return null;
+  const colors: Record<string, string> = { Red: 'bg-red-700', Yellow: 'bg-yellow-600', Green: 'bg-green-700', Blue: 'bg-blue-700', Purple: 'bg-purple-700' };
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] text-gray-300" title="your Lightroom rating / label">
+      <span className="rounded bg-gray-800 px-1">LR {rating ? '★'.repeat(rating) : '–'}</span>
+      {label && <span className={`w-2 h-2 rounded-full ${colors[label] ?? 'bg-gray-500'}`} title={label} />}
+    </span>
+  );
+}

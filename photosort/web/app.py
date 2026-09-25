@@ -5,12 +5,12 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .. import __version__, config, images as I, schema, sort as sorter
+from .. import __version__, config, images as I, schema, sort as sorter, truth
 from ..db import DB
 from ..pipeline import JobRunner
 
@@ -35,6 +35,11 @@ class OverrideIn(BaseModel):
 
 class ConfigIn(BaseModel):
     values: dict
+
+
+class TruthImportIn(BaseModel):
+    dir: str                      # folder on the photos or data volume containing .xmp/.xml/.csv/.zip
+    folder: str = ""              # only match images under this photos subfolder
 
 
 class ExportIn(BaseModel):
@@ -78,6 +83,8 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
     def summary(row) -> dict:
         rec = sorter.final_record(row, cfg.get("focus_source", "vlm"))
         local = json.loads(row["local_json"]) if row["local_json"] else None
+        lr = json.loads(row["lr_json"]) if row["lr_json"] else {}
+        tr = json.loads(row["truth_json"]) if row["truth_json"] else {}
         return {
             "id": row["id"], "path": row["path"], "rel": rel(row["path"]), "name": Path(row["path"]).name,
             "folder": rel(row["folder"] or str(Path(row["path"]).parent)),
@@ -87,6 +94,8 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             "review": rec["review"], "subject": rec["subject"], "composition": rec["composition"],
             "quality_score": rec["quality_score"], "keeper": rec["keeper"], "overridden": rec["overridden"],
             "people_count": rec["people_count"], "description": rec["description"], "error": row["error"],
+            "lr_rating": lr.get("rating"), "lr_label": lr.get("label"),
+            "truth_tier": tr.get("focus_tier"), "truth_rating": tr.get("rating"), "truth_label": tr.get("label"),
         }
 
     # ---- health / stats -----------------------------------------------------
@@ -110,7 +119,12 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         return {"tracked": db.count(), "analyzed": db.count("local_json IS NOT NULL"), "tagged": db.count("vlm_json IS NOT NULL"),
                 "errors": db.count("error IS NOT NULL"), "review": db.count("local_json IS NOT NULL AND vlm_json IS NOT NULL AND json_extract(local_json,'$.local_tier') != json_extract(vlm_json,'$.focus_tier')"),
                 "tiers": {f"tier{k}": v for k, v in tiers.items()},
-                "keepers": db.count("json_extract(vlm_json,'$.keeper') = 1")}
+                "keepers": db.count("json_extract(vlm_json,'$.keeper') = 1"),
+                "lr_rated": db.count("json_extract(lr_json,'$.rating') > 0"),
+                "lr_by_tier": [dict(r) for r in c.execute(
+                    "SELECT COALESCE(json_extract(override_json,'$.focus_tier'), json_extract(vlm_json,'$.focus_tier'), json_extract(local_json,'$.local_tier')) tier, "
+                    "json_extract(lr_json,'$.rating') rating, COUNT(*) n FROM images WHERE local_json IS NOT NULL AND json_extract(lr_json,'$.rating') IS NOT NULL "
+                    "GROUP BY tier, rating ORDER BY tier, rating")]}
 
     # ---- browse -----------------------------------------------------------------
     @app.get("/api/tree")
@@ -189,6 +203,8 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
     @app.get("/api/images")
     def list_images(folder: str = "", recursive: bool = True, tier: Optional[int] = None, keeper: Optional[bool] = None,
                     subject: Optional[str] = None, status: Optional[str] = None, review: Optional[bool] = None,
+                    lr_rating: Optional[int] = None, lr_label: Optional[str] = None,
+                    truth_tier: Optional[int] = None, truth_mismatch: Optional[bool] = None,
                     q: Optional[str] = None, sort: str = "path", offset: int = 0, limit: int = Query(60, le=500)):
         where, params = ["1"], []
         if folder:
@@ -214,10 +230,20 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             where.append("json_extract(vlm_json,'$.primary_subject') = ?"); params.append(subject)
         if review:
             where.append("local_json IS NOT NULL AND vlm_json IS NOT NULL AND json_extract(local_json,'$.local_tier') != json_extract(vlm_json,'$.focus_tier')")
+        if lr_rating is not None:
+            where.append("json_extract(lr_json,'$.rating') = ?"); params.append(lr_rating)
+        if lr_label:
+            where.append("json_extract(lr_json,'$.label') = ?"); params.append(lr_label)
+        if truth_tier is not None:
+            where.append("json_extract(truth_json,'$.focus_tier') = ?"); params.append(truth_tier)
+        if truth_mismatch:
+            where.append("json_extract(truth_json,'$.focus_tier') IS NOT NULL AND local_json IS NOT NULL AND "
+                         "json_extract(truth_json,'$.focus_tier') != COALESCE(json_extract(override_json,'$.focus_tier'), json_extract(vlm_json,'$.focus_tier'), json_extract(local_json,'$.local_tier'))")
         if q:
             where.append("(path LIKE ? OR vlm_json LIKE ?)"); params += [f"%{q}%", f"%{q}%"]
         order = {"path": "path", "newest": "id DESC", "score": "json_extract(vlm_json,'$.quality_score') DESC, path",
-                 "sharpness": "json_extract(local_json,'$.primary_head_sharp') DESC"}.get(sort, "path")
+                 "sharpness": "json_extract(local_json,'$.primary_head_sharp') DESC",
+                 "lr": "json_extract(lr_json,'$.rating') DESC, path"}.get(sort, "path")
         w = " AND ".join(where)
         total = db.count(w, params)
         rows = db.rows(w, params, order=order, limit=limit, offset=offset)
@@ -312,6 +338,53 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         idx = np.linspace(0, len(vals) - 1, min(n, len(vals))).astype(int)
         return {"count": len(vals), "percentiles": {f"p{q}": round(float(np.percentile(arr, q)), 4) for q in (5, 10, 25, 50, 75, 90, 95)},
                 "thresholds": cfg["focus"], "samples": [{"id": vals[i][1], "sharp": vals[i][0], "tier": vals[i][2]} for i in idx]}
+
+    # ---- ground truth -----------------------------------------------------------------
+    def truth_summary():
+        c = db.conn
+        n = db.count("truth_json IS NOT NULL")
+        with_tier = db.count("json_extract(truth_json,'$.focus_tier') IS NOT NULL")
+        def matrix(col):
+            return [dict(r) for r in c.execute(
+                f"SELECT json_extract(truth_json,'$.focus_tier') truth, {col} pred, COUNT(*) n FROM images "
+                f"WHERE json_extract(truth_json,'$.focus_tier') IS NOT NULL AND {col} IS NOT NULL GROUP BY truth, pred")]
+        local_m = matrix("json_extract(local_json,'$.local_tier')")
+        vlm_m = matrix("json_extract(vlm_json,'$.focus_tier')")
+        def acc(m):
+            tot = sum(r["n"] for r in m); ok = sum(r["n"] for r in m if r["truth"] == r["pred"])
+            return round(ok / tot, 3) if tot else None
+        pairs = [(r[0], int(r[1])) for r in c.execute(
+            "SELECT json_extract(local_json,'$.primary_head_sharp'), json_extract(truth_json,'$.focus_tier') FROM images "
+            "WHERE json_extract(truth_json,'$.focus_tier') IS NOT NULL AND json_extract(local_json,'$.primary_head_sharp') IS NOT NULL")]
+        return {"images_with_truth": n, "with_tier": with_tier, "local": {"matrix": local_m, "accuracy": acc(local_m)},
+                "vlm": {"matrix": vlm_m, "accuracy": acc(vlm_m)}, "suggested": truth.suggest_thresholds(pairs),
+                "mapping": cfg.get("truth")}
+
+    @app.get("/api/truth")
+    def get_truth():
+        return truth_summary()
+
+    @app.post("/api/truth/upload")
+    async def truth_upload(files: list[UploadFile] = File(...), folder: str = ""):
+        pairs = [(f.filename or "x", await f.read()) for f in files]
+        verdicts = truth.parse_files(pairs)
+        res = truth.apply(db, verdicts, cfg, str(safe_path(folder)) if folder else None)
+        return {**res, "summary": truth_summary()}
+
+    @app.post("/api/truth/import")
+    def truth_import(t: TruthImportIn):
+        d = Path(t.dir)
+        if not d.is_absolute():
+            d = photos_root / t.dir if (photos_root / t.dir).exists() else workdir / t.dir
+        if not d.is_dir():
+            raise HTTPException(404, f"no such directory: {d}")
+        verdicts = truth.load_dir(d)
+        res = truth.apply(db, verdicts, cfg, str(safe_path(t.folder)) if t.folder else None)
+        return {**res, "summary": truth_summary()}
+
+    @app.delete("/api/truth")
+    def truth_clear():
+        return {"cleared": db.clear_truth()}
 
     # ---- export -----------------------------------------------------------------------
     @app.post("/api/export")

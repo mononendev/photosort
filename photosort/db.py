@@ -40,7 +40,7 @@ CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state);
 """
 MIGRATIONS = [
     ("images", "folder", "TEXT"), ("images", "override_json", "TEXT"),
-    ("images", "local_at", "REAL"), ("images", "vlm_at", "REAL"),
+    ("images", "local_at", "REAL"), ("images", "vlm_at", "REAL"), ("images", "lr_json", "TEXT"), ("images", "truth_json", "TEXT"),
 ]
 
 
@@ -109,6 +109,18 @@ class DB:
             c.execute("UPDATE images SET vlm_json=?, vlm_usage=?, error=?, vlm_at=? WHERE id=?",
                       (json.dumps(data) if data else None, json.dumps(usage) if usage else None, error,
                        time.time() if data else None, img_id))
+
+    def set_lr(self, img_id: int, data: Optional[dict]):
+        with self.lock, self.conn as c:
+            c.execute("UPDATE images SET lr_json=? WHERE id=?", (json.dumps(data) if data else "{}", img_id))
+
+    def set_truth(self, img_id: int, data: Optional[dict]):
+        with self.lock, self.conn as c:
+            c.execute("UPDATE images SET truth_json=? WHERE id=?", (json.dumps(data) if data else None, img_id))
+
+    def clear_truth(self) -> int:
+        with self.lock, self.conn as c:
+            return c.execute("UPDATE images SET truth_json=NULL WHERE truth_json IS NOT NULL").rowcount
 
     def set_override(self, img_id: int, data: Optional[dict]):
         with self.lock, self.conn as c:

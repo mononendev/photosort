@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, cropUrl, frameUrl } from '../api/client';
-import { TierBadge, Stars } from './TierBadge';
+import { TierBadge, Stars, LrBadge } from './TierBadge';
 
 function Row({ k, v }: { k: string; v: React.ReactNode }) {
   return (
@@ -37,6 +37,8 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
           <Stars n={data?.quality_score} />
           {data?.keeper ? <span className="text-xs text-emerald-300">keeper</span> : data?.keeper === false ? <span className="text-xs text-gray-500">cull</span> : null}
           {data?.overridden && <span className="text-xs text-purple-300">overridden</span>}
+          <LrBadge rating={data?.lr_rating} label={data?.lr_label} />
+          {data?.truth_tier !== null && data?.truth_tier !== undefined && <span className="text-xs text-gray-300">truth: tier {data.truth_tier}{data.truth_rating ? ` · ${data.truth_rating}★` : ''}{data.truth_label ? ` · ${data.truth_label}` : ''}</span>}
           <span className="ml-auto flex gap-2">
             {onNav && <button onClick={() => onNav(-1)} className="px-2 text-gray-400 hover:text-white">←</button>}
             {onNav && <button onClick={() => onNav(1)} className="px-2 text-gray-400 hover:text-white">→</button>}

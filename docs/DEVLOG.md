@@ -1,6 +1,9 @@
-# Image Review Harness — Status
+# Dev log
 
-> 2026-09-25 (later): pivoted to running everything in-cluster with a web UI. See "In-cluster app" below; the CLI sections still apply for cloud-batch runs.
+A working journal kept while building photosort: decisions, provider research, measurements, and what
+the first real runs showed, in the order they happened. Older entries mention a `deploy/` directory and a
+k8s Job; those were replaced by the in-cluster web app (see [DEPLOY.md](DEPLOY.md)). For how to use the
+project, start with the [README](../README.md).
 
 Goal: cull and tag ~20,000 event photos (20 MP, fast cameras, lenses near wide open)
 into three focus tiers, plus subject, composition, keywords, adjectives, and
@@ -207,3 +210,16 @@ treat subject/composition as hints until calibrated; keywords/remarks are usable
 - Consider a bigger model for subject labels if the 4B stays shaky (qwen3-vl:8b fits at concurrency 1).
 - Calibrate focus thresholds on real 20 MP frames (defaults are placeholders).
 - Push this repo to GitHub so CI takes over builds/deploys (the workflow expects the same secrets as stasharr).
+
+### AF points → primary subject (2026-09-25)
+- `photosort/af.py` reads Canon AFInfo2/AFInfo3 (MakerNote 0x0026/0x003C) natively through exifread
+  (`details=True` exposes it as "MakerNote Tag 0x0026"); exiftool is a fallback if installed (CR3). Points are
+  scaled from AFImageWidth/Height to the frame and rotated by EXIF Orientation. Only selected / in-focus points are
+  stored; "active" = the in-focus ones, else the selected ones.
+- `local.pick_primary`: the person the active points land on (head hit 2, torso 1.5, body 1, scaled by overlap and
+  centering) leads `people`, ahead of prominence, when score >= `af.min_score` (0.5). `primary_by` records which
+  rule won; the VLM context says so. `rescore` backfills AF on old rows and re-picks the primary (crop stays stale
+  until a local re-run).
+- UNVERIFIED on a real CR2: layout decoded from ExifTool's documented format with synthetic tests only. The y sign
+  (`af.y_up`, default true = Cartesian) is the likeliest thing to be wrong: if AF boxes appear mirrored top/bottom,
+  set `af.y_up: false`.

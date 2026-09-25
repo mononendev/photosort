@@ -11,3 +11,4 @@ web/dist/
 dev-data/*.heic
 .tickets/
 *.onnx
+photosort_data/

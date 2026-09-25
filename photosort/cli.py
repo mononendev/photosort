@@ -145,7 +145,7 @@ def cmd_estimate(args):
     without = (len(rows) - with_crop) if rows else n - with_crop
     print(f"{n} images pending ({with_crop} with a subject crop). Batch price is what you pay; interactive shown for reference.")
     print(f"{'model':26s} {'in tokens':>12s} {'out tokens':>11s} {'interactive':>12s} {'batch':>9s}")
-    print(f"{'ollama (local, qwen3-vl)':26s} {'-':>12s} {'-':>11s} {'free':>12s} {'free':>9s}   (GPU time instead; see STATUS.md)")
+    print(f"{'ollama (local, qwen3-vl)':26s} {'-':>12s} {'-':>11s} {'free':>12s} {'free':>9s}   (GPU time instead; see docs/DEVLOG.md)")
     for m in backends.PRICES:
         b = backends.get("gemini" if m.startswith("gemini") else "anthropic")
         e = b.estimate(m, with_crop, without, cfg)

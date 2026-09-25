@@ -5,7 +5,7 @@ FROM python:3.11-slim AS base
 ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 \
     YOLO_CONFIG_DIR=/tmp/yolo MPLCONFIGDIR=/tmp/mpl
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libglib2.0-0 libgomp1 ca-certificates tzdata \
+ && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libgomp1 ca-certificates tzdata \
  && rm -rf /var/lib/apt/lists/*
 RUN groupadd -g 568 photosort && useradd -u 568 -g 568 -M -d /app -s /usr/sbin/nologin photosort
 WORKDIR /app
@@ -17,7 +17,11 @@ COPY pyproject.toml ./
 COPY photosort ./photosort
 RUN pip install .
 # Pre-fetch weights so the pod needs no egress at runtime.
-RUN mkdir -p /app/weights && cd /app/weights && python -c "from ultralytics import YOLO; YOLO('yolo11n-pose.pt')"
+# ultralytics pulls in opencv-python, which shares the cv2/ directory with the headless build
+# (a partial uninstall breaks both): remove both, then install headless once.
+RUN pip uninstall -y opencv-python opencv-python-headless && pip install opencv-python-headless \
+ && python -c "import cv2; print('cv2', cv2.__version__)" \
+ && mkdir -p /app/weights && cd /app/weights && python -c "from ultralytics import YOLO; YOLO('yolo11n-pose.pt')" && ls -la /app/weights
 
 FROM deps AS production
 ARG VERSION=dev

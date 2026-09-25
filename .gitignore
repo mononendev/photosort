@@ -1,0 +1,12 @@
+.venv/
+.venv-old/
+__pycache__/
+*.pyc
+photosort_work/
+web/node_modules/
+web/dist/
+*.pt
+.ci/chart/charts/
+.ci/chart/Chart.lock
+dev-data/*.heic
+.tickets/

@@ -1,0 +1,132 @@
+mononen-library-chart:
+  global:
+    namespace: production
+    env: prd
+    domain: adoah.dev
+    security:
+      enabled: false
+    imageDefaults:
+      pullSecrets:
+        - name: harbor
+
+  components:
+    photosort:
+      enabled: true
+      primaryComponent: true
+      generate:
+        deployment: true
+        service: true
+        ingress: true
+        hpa: false
+        pdb: false
+        serviceaccount: false
+      containers:
+        - name: photosort-ui
+          image:
+            repository: registry.adoah.dev/projects/photosort-ui
+          ports:
+            - name: http
+              containerPort: 80
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      service:
+        port: 80
+        targetPort: 80
+      ingress:
+        className: nginx
+        annotations:
+          cert-manager.io/cluster-issuer: letsencrypt-production
+          nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10"
+          external-dns.alpha.kubernetes.io/target: "lb.adoah.dev"
+          external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
+          external-dns/is-public: "true"
+        internal:
+          tls:
+            - secretName: photosort-tls
+              hosts:
+                - photosort.adoah.dev
+
+    # API + job worker. Shares the RTX 4000 cooperatively (runtimeClassName + nodeAffinity,
+    # NO nvidia.com/gpu resource request) exactly like the stasharr transcoder, so it schedules
+    # alongside ollama's hard reservation. YOLO needs ~500 MB of VRAM; falls back to CPU if the
+    # device isn't visible.
+    api:
+      enabled: true
+      fullnameOverride: photosort-api
+      replicaCount: 1           # single SQLite state on an RWO volume: never scale this
+      security:
+        enabled: true
+        podSecurityContext:
+          runAsUser: 568
+          runAsGroup: 568
+          fsGroup: 568
+      generate:
+        deployment: true
+        service: true
+        ingress: false
+        hpa: false
+        pdb: false
+        serviceaccount: false
+      runtimeClassName: nvidia
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: nvidia.com/gpu
+                    operator: Exists
+      containers:
+        - name: photosort-api
+          image:
+            repository: registry.adoah.dev/projects/photosort-api
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PHOTOSORT_WORKDIR
+              value: "/data"
+            - name: PHOTOSORT_PHOTOS
+              value: "/photos"
+            - name: OLLAMA_HOST
+              value: "http://ollama.production.svc.cluster.local:11434"
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "all"
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: "compute,utility"
+          resources:
+            requests:
+              cpu: 500m
+              memory: 2Gi
+            limits:
+              cpu: 8000m
+              memory: 12Gi
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          volumeMounts:
+            # Photos are read-only (photos-ro-claim is a ROX CephFS volume of /photos).
+            - name: photos
+              mountPath: /photos
+              readOnly: true
+            # State, frame/crop/thumb cache (~0.5 MB per image) and exports.
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: photos
+          persistentVolumeClaim:
+            claimName: photos-ro-claim
+            readOnly: true
+        - name: data
+          persistentVolumeClaim:
+            claimName: photosort-data-claim
+      service:
+        port: 8080
+        targetPort: 8080

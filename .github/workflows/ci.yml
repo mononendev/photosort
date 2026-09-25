@@ -1,0 +1,114 @@
+name: CI/CD
+
+on:
+  push:
+    branches: ["**"]
+
+env:
+  REGISTRY: registry.adoah.dev
+
+jobs:
+  test-py:
+    runs-on: [homelab]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: pip install -e . pytest
+      - name: Test
+        run: pytest -q tests
+
+  test-web:
+    runs-on: [homelab]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Install
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck and build
+        working-directory: web
+        run: pnpm run build
+      - name: Lint
+        working-directory: web
+        run: pnpm run lint
+
+  build-api:
+    needs: [test-py, test-web]
+    runs-on: [homelab]
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set version
+        id: version
+        run: echo "version=${{ github.ref_name }}-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+      - name: Install buildctl
+        run: |
+          BUILDKIT_VERSION=$(curl -s https://api.github.com/repos/moby/buildkit/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+          curl -fsSL "https://github.com/moby/buildkit/releases/download/${BUILDKIT_VERSION}/buildkit-${BUILDKIT_VERSION}.linux-amd64.tar.gz" \
+            | sudo tar -xz -C /usr/local bin/buildctl
+      - name: Build and push API image
+        run: |
+          buildctl \
+            --tlscacert "$BUILDKIT_CLIENT_CA" --tlscert "$BUILDKIT_CLIENT_CERT" --tlskey "$BUILDKIT_CLIENT_KEY" \
+            --tlsservername buildkit.adoah.dev \
+          build \
+            --frontend dockerfile.v0 \
+            --local context=. --local dockerfile=docker \
+            --opt filename=api.Dockerfile --opt target=production \
+            --opt build-arg:VERSION=${{ steps.version.outputs.version }} \
+            --opt build-arg:GIT_SHA=${{ github.sha }} \
+            --opt build-arg:BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+            --output type=image,name=${{ env.REGISTRY }}/projects/photosort-api:${{ steps.version.outputs.version }},push=true
+
+  build-ui:
+    needs: [test-py, test-web]
+    runs-on: [homelab]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set version
+        id: version
+        run: echo "version=${{ github.ref_name }}-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+      - name: Install buildctl
+        run: |
+          BUILDKIT_VERSION=$(curl -s https://api.github.com/repos/moby/buildkit/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+          curl -fsSL "https://github.com/moby/buildkit/releases/download/${BUILDKIT_VERSION}/buildkit-${BUILDKIT_VERSION}.linux-amd64.tar.gz" \
+            | sudo tar -xz -C /usr/local bin/buildctl
+      - name: Build and push UI image
+        run: |
+          buildctl \
+            --tlscacert "$BUILDKIT_CLIENT_CA" --tlscert "$BUILDKIT_CLIENT_CERT" --tlskey "$BUILDKIT_CLIENT_KEY" \
+            --tlsservername buildkit.adoah.dev \
+          build \
+            --frontend dockerfile.v0 \
+            --local context=. --local dockerfile=docker \
+            --opt filename=ui.Dockerfile --opt target=production \
+            --opt build-arg:VERSION=${{ steps.version.outputs.version }} \
+            --opt build-arg:GIT_SHA=${{ github.sha }} \
+            --opt build-arg:BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+            --output type=image,name=${{ env.REGISTRY }}/projects/photosort-ui:${{ steps.version.outputs.version }},push=true
+
+  deploy:
+    needs: [build-api, build-ui]
+    if: github.ref_name == 'master' || github.ref_name == 'main'
+    runs-on: [homelab]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Helm
+        run: curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      - name: Deploy with Helm
+        run: |
+          helm repo add mononen-charts https://mononen.github.io/charts/
+          helm repo update
+          helm dependency update .ci/chart
+          helm upgrade --install photosort .ci/chart \
+            --namespace production \
+            --set mononen-library-chart.global.imageDefaults.tag=${{ needs.build-api.outputs.version }}

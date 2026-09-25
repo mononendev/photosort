@@ -1,0 +1,2 @@
+[console_scripts]
+photosort = photosort.cli:main

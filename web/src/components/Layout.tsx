@@ -43,7 +43,7 @@ export default function Layout() {
           </nav>
           <div className="ml-auto flex items-center gap-3 text-xs text-gray-400">
             {active && (
-              <NavLink to="/jobs" className="flex items-center gap-2">
+              <NavLink to={`/jobs/${active.id}`} className="flex items-center gap-2">
                 <span className="inline-block w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
                 job #{active.id} {active.stage} {active.done}/{active.total}
                 {queued > 0 && <span className="text-gray-500">+{queued} queued</span>}

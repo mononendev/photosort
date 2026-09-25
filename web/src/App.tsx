@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Browse from './pages/Browse';
 import Photos from './pages/Photos';
 import Jobs from './pages/Jobs';
+import JobDetail from './pages/JobDetail';
 import Export from './pages/Export';
 import Calibrate from './pages/Calibrate';
 
@@ -20,6 +21,7 @@ export default function App() {
             <Route path="/browse/*" element={<Browse />} />
             <Route path="/photos" element={<Photos />} />
             <Route path="/jobs" element={<Jobs />} />
+            <Route path="/jobs/:id" element={<JobDetail />} />
             <Route path="/export" element={<Export />} />
             <Route path="/calibrate" element={<Calibrate />} />
           </Route>

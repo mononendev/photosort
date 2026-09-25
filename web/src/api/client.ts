@@ -120,6 +120,44 @@ export interface Job {
   id: number; created: number; started: number | null; finished: number | null;
   state: JobState; stage: string; paths: string[]; options: JobOptions;
   total: number; done: number; errors: number; message: string | null; rate?: number | null; eta_s?: number | null;
+  /** Per-stage timings and settings, filled in as the job reaches each stage (empty for jobs from before this was recorded) */
+  stages: Partial<Record<'scan' | 'local' | 'vlm', JobStage>>;
+}
+export interface JobStage {
+  started: number; finished?: number; total?: number; done?: number; errors?: number; files?: number;
+  workers?: number; device?: string | null; backend?: string; model?: string; concurrency?: number; base_url?: string | null;
+}
+export interface VlmUsage {
+  in?: number | null; out?: number | null; seconds?: number; model?: string;
+  prefill_s?: number; decode_s?: number; tok_s?: number | null;
+}
+export interface StageStats {
+  n: number; errors: number; avg_s: number; p50_s: number; p95_s: number; max_s: number;
+  rate: number | null; recent_rate: number | null;
+  tokens_in: number; tokens_out: number; tok_s: number | null; recent_tok_s: number | null;
+  avg_in: number | null; avg_out: number | null; avg_prefill_s: number | null; avg_decode_s: number | null;
+}
+export interface ActiveItem { id: number; path: string; name: string; rel: string; stage: string; started: number; elapsed: number; has_thumb: boolean }
+export interface JobDetail extends Job {
+  stats: Partial<Record<'local' | 'vlm', StageStats>>;
+  series: { t: number; stage: string; s: number; err: boolean; tok_s: number | null; out: number | null }[];
+  active: ActiveItem[];
+  now: number;   // server clock, for elapsed times
+  runner: { device: string | null; backend: string; model: string | null; base_url: string | null; workers: number; vlm_concurrency: number };
+}
+export interface JobItem {
+  id: number; image_id: number; stage: 'local' | 'vlm'; started: number; finished: number; seconds: number;
+  error: string | null; usage: VlmUsage | null; name: string | null; rel: string | null; has_crop: boolean;
+  local?: { local_tier: number; local_reason: string; n_people: number; primary_eye_sharp: number | null;
+    primary_eye_hf: number | null; primary_head_sharp: number | null; primary_by?: string };
+  vlm?: { focus_tier: number; primary_subject: string; composition: string; quality_score: number; keeper: boolean;
+    description: string; keywords: string[] };
+}
+export interface JobItemsPage { total: number; offset: number; items: JobItem[] }
+export interface VlmRequest {
+  backend: string; model: string; system: string; context: string;
+  images: { label: string; url: string; bytes: number }[];
+  request: Record<string, unknown> | null; build_error: string | null;
 }
 export interface JobOptions {
   vlm?: boolean; skip_tier0?: boolean; rescan?: boolean; retry_errors?: boolean; concurrency?: number; model?: string | null;
@@ -203,6 +241,11 @@ export const api = {
   job: (id: number) => request<Job>(`/api/jobs/${id}`),
   createJob: (paths: string[], options: JobOptions) =>
     request<Job>('/api/jobs', { method: 'POST', body: JSON.stringify({ paths, ...options }) }),
+  jobDetail: (id: number) => request<JobDetail>(`/api/jobs/${id}/detail`),
+  jobItems: (id: number, f: { stage?: string; errors?: boolean; offset?: number; limit?: number }) =>
+    request<JobItemsPage>(`/api/jobs/${id}/items${qs(f)}`),
+  vlmRequest: (id: number, backend?: string, model?: string) =>
+    request<VlmRequest>(`/api/images/${id}/vlm-request${qs({ backend, model })}`),
   cancelJob: (id: number) => request<Job>(`/api/jobs/${id}/cancel`, { method: 'POST' }),
   config: () => request<Record<string, unknown>>('/api/config'),
   putConfig: (values: Record<string, unknown>) =>

@@ -521,6 +521,8 @@ def run_local(db, cfg: dict, cache_dir: Path, ids_paths: list[tuple[int, str]], 
     def work(img_id, path):
         if should_stop and should_stop():
             return img_id, None
+        if hasattr(progress, "start"):
+            progress.start(img_id, path)
         res = analyze(Path(path), cfg, det, faces)
         write_cache(cache_dir, img_id, res)
         return img_id, res.data
@@ -536,9 +538,13 @@ def run_local(db, cfg: dict, cache_dir: Path, ids_paths: list[tuple[int, str]], 
                     continue  # stopped
                 db.set_local(img_id, data)
                 n_ok += 1
+                err = None
             except Exception as e:  # keep going; record the failure
-                db.set_local(i, None, f"local: {type(e).__name__}: {e}")
+                err = f"local: {type(e).__name__}: {e}"
+                db.set_local(i, None, err)
                 n_err += 1
+            if hasattr(progress, "finish"):
+                progress.finish(i, err)
             if progress:
                 progress.update(1)
     return n_ok, n_err

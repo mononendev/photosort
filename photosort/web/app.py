@@ -66,6 +66,10 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
     def _start():
         runner.start()
 
+    @app.on_event("shutdown")
+    def _stop():
+        runner.shutdown()
+
     # ---- helpers ------------------------------------------------------------
     def rel(p: str) -> str:
         try:
@@ -104,7 +108,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         dev = runner._detector.device if runner._detector else None
         return {"ok": True, "version": __version__, "photos_root": str(photos_root), "workdir": str(workdir),
                 "models_dir": str(config.models_dir()),
-                "device": dev, "backend": cfg.get("backend"), "ollama": cfg.get("base_url"), "current_job": runner.current}
+                "device": dev, "backend": cfg.get("backend"), "ollama": cfg.get("base_url"), "current_job": db.running_job()}
 
     @app.get("/api/stats")
     def stats():
@@ -164,6 +168,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         d = dict(j)
         d["paths"] = json.loads(d.pop("paths_json") or "[]")
         d["options"] = json.loads(d.pop("options_json") or "{}")
+        d["stages"] = json.loads(d.pop("stages_json", None) or "{}")
         if d["started"] and d["done"] and d["state"] == "running":
             el = time.time() - d["started"]
             d["rate"] = round(d["done"] / el, 2) if el else None
@@ -189,15 +194,92 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             raise HTTPException(404)
         return job_out(j)
 
+    def stage_stats(rows: list) -> dict:
+        """Timing and token figures for one stage's finished items (oldest first)."""
+        import numpy as np
+        secs = np.array([r["seconds"] for r in rows if r["seconds"] is not None and not r["failed"]] or [0.0])
+        us = [json.loads(r["usage_json"]) for r in rows if r["usage_json"]]
+        tin = sum(u.get("in") or 0 for u in us)
+        tout = sum(u.get("out") or 0 for u in us)
+        decode = sum(u.get("decode_s") or 0 for u in us)
+        recent = us[-10:]
+        rdec = sum(u.get("decode_s") or 0 for u in recent)
+        span = rows[-1]["finished"] - rows[0]["started"] if rows else 0
+        last = rows[-20:]
+        lspan = last[-1]["finished"] - last[0]["finished"] if len(last) > 1 else 0
+        with_prefill = [u["prefill_s"] for u in us if u.get("prefill_s") is not None]
+        return {
+            "n": len(rows), "errors": sum(1 for r in rows if r["failed"]),
+            "avg_s": round(float(secs.mean()), 2), "p50_s": round(float(np.percentile(secs, 50)), 2),
+            "p95_s": round(float(np.percentile(secs, 95)), 2), "max_s": round(float(secs.max()), 2),
+            "rate": round(len(rows) / span, 3) if span > 0 else None,                      # images/s over the stage
+            "recent_rate": round((len(last) - 1) / lspan, 3) if lspan > 0 else None,      # images/s over the last 20
+            "tokens_in": tin, "tokens_out": tout,
+            "tok_s": round(tout / decode, 1) if decode else None,                         # decode tokens/s, whole stage
+            "recent_tok_s": round(sum(u.get("out") or 0 for u in recent) / rdec, 1) if rdec else None,
+            "avg_in": round(tin / len(us)) if us else None, "avg_out": round(tout / len(us)) if us else None,
+            "avg_prefill_s": round(sum(with_prefill) / len(with_prefill), 2) if with_prefill else None,
+            "avg_decode_s": round(decode / len(us), 2) if us else None,
+        }
+
+    @app.get("/api/jobs/{job_id}/detail")
+    def job_detail(job_id: int, points: int = 300):
+        """Everything the job page shows except the item list: stage timings, per-stage throughput and tokens,
+        the images in flight right now, and a per-image series for the charts."""
+        j = db.job(job_id)
+        if not j:
+            raise HTTPException(404)
+        out = job_out(j)
+        rows = db.job_item_timings(job_id)
+        by_stage: dict[str, list] = {}
+        for r in rows:
+            by_stage.setdefault(r["stage"], []).append(r)
+        out["stats"] = {st: stage_stats(rs) for st, rs in by_stage.items()}
+        series = []
+        for r in rows[-points:]:
+            u = json.loads(r["usage_json"]) if r["usage_json"] else {}
+            series.append({"t": r["finished"], "stage": r["stage"], "s": r["seconds"], "err": bool(r["failed"]),
+                           "tok_s": u.get("tok_s"), "out": u.get("out")})
+        out["series"] = series
+        now = out["now"] = time.time()
+        active = [dict(a) for a in db.in_flight(job_id)] if out["state"] in ("running", "cancelling") else []
+        out["active"] = [{**a, "name": Path(a["path"]).name, "rel": rel(a["path"]), "elapsed": round(now - a["started"], 1),
+                          "has_thumb": (cache / f"{a['id']}_thumb.jpg").exists()} for a in active]
+        out["runner"] = {"device": runner._detector.device if runner._detector else None,
+                         "backend": cfg.get("backend"), "model": cfg.get("model"), "base_url": cfg.get("base_url"),
+                         "workers": cfg.get("workers"), "vlm_concurrency": cfg.get("vlm_concurrency")}
+        return out
+
+    def item_out(r) -> dict:
+        local = json.loads(r["local_json"]) if r["local_json"] else None
+        vlm = json.loads(r["vlm_json"]) if r["vlm_json"] else None
+        d = {"id": r["id"], "image_id": r["image_id"], "stage": r["stage"], "started": r["started"],
+             "finished": r["finished"], "seconds": r["seconds"], "error": r["error"],
+             "usage": json.loads(r["usage_json"]) if r["usage_json"] else None,
+             "name": Path(r["path"]).name if r["path"] else None, "rel": rel(r["path"]) if r["path"] else None,
+             "has_crop": bool(local and local.get("n_people"))}
+        if local:
+            d["local"] = {k: local.get(k) for k in ("local_tier", "local_reason", "n_people", "primary_eye_sharp",
+                                                    "primary_eye_hf", "primary_head_sharp", "primary_by")}
+        if vlm:
+            d["vlm"] = {k: vlm.get(k) for k in ("focus_tier", "primary_subject", "composition", "quality_score",
+                                                "keeper", "description", "keywords")}
+        return d
+
+    @app.get("/api/jobs/{job_id}/items")
+    def job_items(job_id: int, stage: Optional[str] = None, errors: bool = False, offset: int = 0,
+                  limit: int = Query(50, le=500)):
+        if not db.job(job_id):
+            raise HTTPException(404)
+        return {"total": db.job_item_count(job_id, stage, errors), "offset": offset,
+                "items": [item_out(r) for r in db.job_items(job_id, stage, errors, limit, offset)]}
+
     @app.post("/api/jobs/{job_id}/cancel")
     def cancel_job(job_id: int):
         j = db.job(job_id)
         if not j:
             raise HTTPException(404)
-        if j["state"] == "queued":
-            db.update_job(job_id, state="cancelled", finished=time.time())
-        elif j["state"] == "running":
-            db.update_job(job_id, state="cancelling")
+        db.cancel_job(job_id)
         return job_out(db.job(job_id))
 
     # ---- images -------------------------------------------------------------------
@@ -261,6 +343,52 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
                 "override": json.loads(r["override_json"]) if r["override_json"] else None,
                 "usage": json.loads(r["vlm_usage"]) if r["vlm_usage"] else None,
                 "final": sorter.final_record(r, cfg.get("focus_source", "vlm"))}
+
+    @app.get("/api/images/{img_id}/vlm-request")
+    def vlm_request(img_id: int, backend: Optional[str] = None, model: Optional[str] = None):
+        """The request the vision model gets for this image, as the backend builds it, with image bytes
+        replaced by their size. Built from the current cache and config, so it matches what was sent as long
+        as neither changed since."""
+        from .. import backends
+        from ..backends import Item
+        r = db.row(img_id)
+        if not r or not r["local_json"]:
+            raise HTTPException(404, "not analyzed")
+        fp, cp = cache / f"{img_id}.jpg", cache / f"{img_id}_crop.jpg"
+        if not fp.exists():
+            raise HTTPException(404, "frame not in cache")
+        bname = backend or cfg.get("backend", "ollama")
+        try:
+            be = backends.get(bname, cfg.get("base_url"))
+        except SystemExit as e:
+            raise HTTPException(400, str(e))
+        mname = model or cfg.get("model") or be.default_model
+        context = schema.context_text(json.loads(r["local_json"]))
+        item = Item(str(img_id), fp.read_bytes(), cp.read_bytes() if cp.exists() else None, context)
+        images = [{"label": "frame", "url": f"/media/frame/{img_id}", "bytes": fp.stat().st_size}]
+        if cp.exists():
+            images.append({"label": "crop", "url": f"/media/crop/{img_id}", "bytes": cp.stat().st_size})
+
+        def redact(v):
+            if isinstance(v, dict):
+                return {k: redact(x) for k, x in v.items()}
+            if isinstance(v, (list, tuple)):
+                return [redact(x) for x in v]
+            if isinstance(v, (bytes, bytearray)):
+                return f"<{len(v) / 1024:.0f} KB image>"
+            if isinstance(v, str) and len(v) > 4000 and " " not in v:
+                return f"<base64 image, {len(v) * 3 / 4 / 1024:.0f} KB>"
+            return v
+
+        build = getattr(be, "build_request", None) or getattr(be, "build_params", None)
+        request, build_error = None, None
+        if build:
+            try:
+                request = json.loads(json.dumps(redact(build(item, mname, cfg)), default=str))
+            except Exception as e:  # e.g. the cloud SDK isn't installed here
+                build_error = f"{type(e).__name__}: {e}"
+        return {"backend": bname, "model": mname, "system": schema.SYSTEM_PROMPT, "context": context,
+                "images": images, "request": request, "build_error": build_error}
 
     @app.patch("/api/images/{img_id}")
     def override(img_id: int, o: OverrideIn):

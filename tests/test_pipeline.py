@@ -85,3 +85,89 @@ def test_job_over_1500_selected_files_runs(tmp_path, monkeypatch):
     r.run_job(db.job(jid))
     j = db.job(jid)
     assert (j["state"], j["done"], j["total"]) == ("done", 1500, 1500)
+
+
+def test_vlm_items_recorded_with_usage_and_stages(tmp_path, monkeypatch):
+    db, r, photos = _runner(tmp_path, monkeypatch, vlm_rows_done=False)
+    jid = db.add_job([str(photos)], {"vlm": True})
+    r.run_job(db.job(jid))
+    items = db.job_items(jid, stage="vlm")
+    assert len(items) == 2 and all(i["error"] is None and i["seconds"] >= 0 for i in items)
+    assert db.job_item_count(jid) == 2 and db.in_flight(jid) == []
+    stages = json.loads(db.job(jid)["stages_json"])
+    assert list(stages) == ["scan", "local", "vlm"]
+    assert stages["vlm"]["model"] == "fake" and stages["vlm"]["done"] == 2
+    assert all("finished" in s for s in stages.values())
+
+
+def test_progress_tracks_in_flight(tmp_path):
+    db = DB(tmp_path / "db.sqlite")
+    jid = db.add_job([], {})
+    p = pipeline._Progress(db, jid, "local")
+    p.start(7, "/x/a.jpg")
+    assert [(a["id"], a["stage"]) for a in db.in_flight(jid)] == [(7, "local")] and db.job_item_count(jid) == 0
+    p.finish(7, "boom")
+    assert db.in_flight(jid) == [] and db.job_items(jid, errors=True)[0]["error"] == "boom"
+
+
+# ---- rolling restarts: two runners on one database -----------------------------------------------------
+
+def test_second_runner_leaves_a_live_job_alone(tmp_path, monkeypatch):
+    db, old, photos = _runner(tmp_path, monkeypatch, vlm_rows_done=False)
+    jid = db.add_job([str(photos)], {"vlm": True})
+    assert db.claim_job(jid, old.owner)
+    new = pipeline.JobRunner(db, old.cfg, tmp_path, photos)
+    assert db.requeue_stale(pipeline.LEASE_TTL_S) == []          # what the new server does on its loop
+    new.run_job(db.job(jid))                                      # and it can't claim it either
+    assert db.job_lease(jid) == ("running", old.owner)
+    assert not new._job(jid, done=99) and db.job(jid)["done"] == 0
+
+
+def test_stale_claim_is_requeued_and_in_flight_dropped(tmp_path):
+    db = DB(tmp_path / "db.sqlite")
+    jid, cid = db.add_job([], {}), db.add_job([], {})
+    db.claim_job(jid, "dead"); db.claim_job(cid, "dead")
+    db.start_job_item(jid, 1, "vlm", 0.0)
+    db.cancel_job(cid)
+    db.update_job(jid, heartbeat=0.0); db.update_job(cid, heartbeat=0.0)
+    assert sorted(db.requeue_stale(pipeline.LEASE_TTL_S)) == [jid, cid]
+    assert db.job_lease(jid) == ("queued", None) and db.in_flight(jid) == []
+    assert db.job_lease(cid) == ("cancelled", None)
+
+
+def test_shutdown_mid_vlm_hands_back_and_next_runner_resumes(tmp_path, monkeypatch):
+    db, old, photos = _runner(tmp_path, monkeypatch, vlm_rows_done=False)
+    jid = db.add_job([str(photos)], {"vlm": True})
+    classify = backends.get().classify
+    calls = []
+
+    def first_then_stop(item, model, cfg):   # the server gets SIGTERM while the first image is with the model
+        calls.append(item.key)
+        old.stop_event.set()
+        return classify(item, model, cfg)
+
+    monkeypatch.setattr(backends, "get", lambda *a, **k: type("B", (), {"sync": True, "default_model": "fake",
+                                                                        "classify": staticmethod(first_then_stop)})())
+    old.run_job(db.job(jid))
+    j = db.job(jid)
+    assert (j["state"], j["owner"], j["done"], j["total"]) == ("queued", None, 1, 2)   # the in-flight image finished
+    started = j["started"]
+
+    new = pipeline.JobRunner(db, old.cfg, tmp_path, photos)
+    new._detector = object()
+    new.run_job(db.job(jid))
+    j = db.job(jid)
+    assert (j["state"], j["done"], j["total"], j["errors"]) == ("done", 2, 2, 1)
+    assert j["started"] == started and len(calls) == 2 and len(set(calls)) == 2       # nothing tagged twice
+    assert db.job_item_count(jid, "vlm") == 2 and "finished" in json.loads(j["stages_json"])["vlm"]
+
+
+def test_runner_that_lost_its_job_writes_nothing(tmp_path, monkeypatch):
+    db, old, photos = _runner(tmp_path, monkeypatch, vlm_rows_done=False)
+    jid = db.add_job([str(photos)], {"vlm": True})
+    db.claim_job(jid, old.owner)
+    db.update_job(jid, heartbeat=0.0)
+    db.requeue_stale(pipeline.LEASE_TTL_S)
+    db.claim_job(jid, "new-server")
+    old._stopped(jid); old._finish(jid, "done")
+    assert db.job_lease(jid) == ("running", "new-server")

@@ -32,8 +32,18 @@ CREATE TABLE IF NOT EXISTS jobs (
   stage TEXT,                -- scan | local | vlm | done
   paths_json TEXT, options_json TEXT,
   total INTEGER DEFAULT 0, done INTEGER DEFAULT 0, errors INTEGER DEFAULT 0,
-  message TEXT
+  message TEXT,
+  owner TEXT, heartbeat REAL -- the worker running it and when it last said so (see JobRunner)
 );
+CREATE TABLE IF NOT EXISTS job_items (
+  id INTEGER PRIMARY KEY,
+  job_id INTEGER, image_id INTEGER,
+  stage TEXT,                -- local | vlm
+  started REAL, finished REAL, seconds REAL,   -- finished is NULL while the image is in flight
+  error TEXT,
+  usage_json TEXT            -- vlm token usage and timings
+);
+CREATE INDEX IF NOT EXISTS idx_job_items ON job_items(job_id, id);
 CREATE INDEX IF NOT EXISTS idx_batch ON images(batch_id);
 CREATE INDEX IF NOT EXISTS idx_folder ON images(folder);
 CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state);
@@ -41,6 +51,8 @@ CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state);
 MIGRATIONS = [
     ("images", "folder", "TEXT"), ("images", "override_json", "TEXT"),
     ("images", "local_at", "REAL"), ("images", "vlm_at", "REAL"), ("images", "lr_json", "TEXT"), ("images", "truth_json", "TEXT"),
+    ("jobs", "stages_json", "TEXT"),   # per-stage timings and settings, written as the job moves through them
+    ("jobs", "owner", "TEXT"), ("jobs", "heartbeat", "REAL"),
 ]
 
 
@@ -54,7 +66,7 @@ class DB:
         with self.lock:
             c = self.conn
             c.executescript(SCHEMA)
-            cols = {t: {r[1] for r in c.execute(f"PRAGMA table_info({t})")} for t in ("images",)}
+            cols = {t: {r[1] for r in c.execute(f"PRAGMA table_info({t})")} for t in ("images", "jobs")}
             for table, col, typ in MIGRATIONS:
                 if col not in cols[table]:
                     c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
@@ -194,11 +206,105 @@ class DB:
     def next_queued_job(self) -> Optional[sqlite3.Row]:
         return self.conn.execute("SELECT * FROM jobs WHERE state='queued' ORDER BY id LIMIT 1").fetchone()
 
-    def update_job(self, job_id: int, **fields):
+    def update_job(self, job_id: int, where_owner: Optional[str] = None, **fields) -> bool:
+        """With where_owner, only writes while that worker still holds the job, and says whether it did."""
         cols = ", ".join(f"{k}=?" for k in fields)
+        q, params = f"UPDATE jobs SET {cols} WHERE id=?", [*fields.values(), job_id]
+        if where_owner is not None:
+            q += " AND owner=?"; params.append(where_owner)
         with self.lock, self.conn as c:
-            c.execute(f"UPDATE jobs SET {cols} WHERE id=?", (*fields.values(), job_id))
+            return c.execute(q, params).rowcount > 0
 
-    def job_state(self, job_id: int) -> Optional[str]:
-        r = self.conn.execute("SELECT state FROM jobs WHERE id=?", (job_id,)).fetchone()
-        return r["state"] if r else None
+    # A worker holds a job while it keeps the heartbeat fresh. During a rolling restart two workers share this
+    # database: the new one leaves a job alone while the old one is still beating, and picks it up once the old
+    # one hands it back (clean shutdown) or its heartbeat goes stale (killed).
+    def claim_job(self, job_id: int, owner: str) -> bool:
+        with self.lock, self.conn as c:
+            ok = c.execute("UPDATE jobs SET state='running', owner=?, heartbeat=? WHERE id=? AND state='queued'",
+                           (owner, time.time(), job_id)).rowcount > 0
+            if ok:  # images the previous worker had in flight never finished
+                c.execute("DELETE FROM job_items WHERE job_id=? AND finished IS NULL", (job_id,))
+            return ok
+
+    def heartbeat(self, job_id: int, owner: str) -> bool:
+        return self.update_job(job_id, where_owner=owner, heartbeat=time.time())
+
+    def job_lease(self, job_id: int) -> tuple[Optional[str], Optional[str]]:
+        r = self.conn.execute("SELECT state, owner FROM jobs WHERE id=?", (job_id,)).fetchone()
+        return (r["state"], r["owner"]) if r else (None, None)
+
+    def requeue_stale(self, ttl: float) -> list[int]:
+        """Running jobs whose worker went quiet go back in the queue; ones being cancelled end as cancelled."""
+        cutoff, now = time.time() - ttl, time.time()
+        with self.lock, self.conn as c:
+            stale = [r["id"] for r in c.execute(
+                "SELECT id FROM jobs WHERE state IN ('running','cancelling') AND (heartbeat IS NULL OR heartbeat < ?)", (cutoff,))]
+            for jid in stale:
+                c.execute("UPDATE jobs SET state = CASE state WHEN 'cancelling' THEN 'cancelled' ELSE 'queued' END, "
+                          "stage = CASE state WHEN 'cancelling' THEN 'done' ELSE 'queued' END, "
+                          "finished = CASE state WHEN 'cancelling' THEN ? ELSE finished END, owner=NULL, heartbeat=NULL, "
+                          "message = CASE state WHEN 'cancelling' THEN message ELSE 'requeued: its worker stopped responding' END "
+                          "WHERE id=?", (now, jid))
+                c.execute("DELETE FROM job_items WHERE job_id=? AND finished IS NULL", (jid,))
+            return stale
+
+    def cancel_job(self, job_id: int):
+        with self.lock, self.conn as c:
+            c.execute("UPDATE jobs SET state = CASE state WHEN 'queued' THEN 'cancelled' ELSE 'cancelling' END, "
+                      "finished = CASE state WHEN 'queued' THEN ? ELSE finished END "
+                      "WHERE id=? AND state IN ('queued','running')", (time.time(), job_id))
+
+    def running_job(self) -> Optional[int]:
+        r = self.conn.execute("SELECT id FROM jobs WHERE state IN ('running','cancelling') ORDER BY id LIMIT 1").fetchone()
+        return r["id"] if r else None
+
+    def start_job_item(self, job_id: int, image_id: int, stage: str, started: float) -> int:
+        with self.lock, self.conn as c:
+            return c.execute("INSERT INTO job_items(job_id,image_id,stage,started) VALUES(?,?,?,?)",
+                             (job_id, image_id, stage, started)).lastrowid
+
+    def finish_job_item(self, item_id: int, finished: float, error: Optional[str] = None, usage: Optional[dict] = None):
+        with self.lock, self.conn as c:
+            c.execute("UPDATE job_items SET finished=?, seconds=round(? - started, 3), error=?, usage_json=? WHERE id=?",
+                      (finished, finished, error, json.dumps(usage) if usage else None, item_id))
+
+    def add_job_item(self, job_id: int, image_id: int, stage: str, started: float, finished: float,
+                     error: Optional[str] = None, usage: Optional[dict] = None):
+        with self.lock, self.conn as c:
+            c.execute("INSERT INTO job_items(job_id,image_id,stage,started,finished,seconds,error,usage_json) VALUES(?,?,?,?,?,?,?,?)",
+                      (job_id, image_id, stage, started, finished, round(finished - started, 3), error,
+                       json.dumps(usage) if usage else None))
+
+    def in_flight(self, job_id: int) -> list[sqlite3.Row]:
+        return self.conn.execute(
+            "SELECT ji.image_id AS id, ji.stage, ji.started, i.path FROM job_items ji LEFT JOIN images i ON i.id = ji.image_id "
+            "WHERE ji.job_id = ? AND ji.finished IS NULL ORDER BY ji.started", (job_id,)).fetchall()
+
+    def job_finished_images(self, job_id: int, stage: str) -> tuple[set[int], int]:
+        """Images this job already got through in a stage (by an earlier worker, when resuming), and how many failed."""
+        rows = self.conn.execute("SELECT image_id, error IS NOT NULL AS failed FROM job_items "
+                                 "WHERE job_id = ? AND stage = ? AND finished IS NOT NULL", (job_id, stage)).fetchall()
+        return {r["image_id"] for r in rows}, sum(r["failed"] for r in rows)
+
+    def job_items(self, job_id: int, stage: Optional[str] = None, errors: bool = False,
+                  limit: int = 50, offset: int = 0) -> list[sqlite3.Row]:
+        """Newest first, joined with the image's path and current results."""
+        where, params = ["ji.job_id = ?", "ji.finished IS NOT NULL"], [job_id]
+        if stage:
+            where.append("ji.stage = ?"); params.append(stage)
+        if errors:
+            where.append("ji.error IS NOT NULL")
+        return self.conn.execute(
+            "SELECT ji.*, i.path, i.local_json, i.vlm_json, i.override_json FROM job_items ji "
+            f"LEFT JOIN images i ON i.id = ji.image_id WHERE {' AND '.join(where)} ORDER BY ji.finished DESC LIMIT ? OFFSET ?",
+            (*params, int(limit), int(offset))).fetchall()
+
+    def job_item_count(self, job_id: int, stage: Optional[str] = None, errors: bool = False) -> int:
+        q = "SELECT COUNT(*) FROM job_items WHERE job_id = ? AND finished IS NOT NULL" + (" AND stage = ?" if stage else "") + (" AND error IS NOT NULL" if errors else "")
+        return self.conn.execute(q, (job_id, stage) if stage else (job_id,)).fetchone()[0]
+
+    def job_item_timings(self, job_id: int) -> list[sqlite3.Row]:
+        """Every item's stage, finish time, duration, error flag and usage, oldest first, for stats and charts."""
+        return self.conn.execute("SELECT stage, started, finished, seconds, error IS NOT NULL AS failed, usage_json "
+                                 "FROM job_items WHERE job_id = ? AND finished IS NOT NULL ORDER BY finished", (job_id,)).fetchall()
+

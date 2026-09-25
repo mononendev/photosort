@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type { Job, JobOptions } from '../api/client';
@@ -31,12 +32,12 @@ export default function JobRow({ job, compact }: { job: Job; compact?: boolean }
   return (
     <div className="rounded-lg border border-gray-800 bg-gray-900 p-3">
       <div className="flex items-center gap-3 text-sm">
-        <span className="text-gray-500">#{job.id}</span>
+        <Link to={`/jobs/${job.id}`} className="text-gray-500 hover:text-blue-300">#{job.id}</Link>
         <span className={`font-medium ${STATE_CLASS[job.state]}`}>{job.state}</span>
         <span className="text-gray-400">{job.stage}</span>
-        <span className="text-gray-300 truncate flex-1" title={job.paths.join('\n')}>
+        <Link to={`/jobs/${job.id}`} className="text-gray-300 truncate flex-1 hover:text-blue-300" title={`${job.paths.join('\n')}\n\nOpen job details`}>
           {job.paths.map((p) => p.split('/').slice(-2).join('/')).join(', ')}
-        </span>
+        </Link>
         <Tip tip={<>Progress of the current stage ({job.stage === 'done' ? 'the last stage that had work' : job.stage}). The local stage counts images analyzed; the vlm stage counts images sent to the vision model. The note below keeps the local stage's summary.</>} className="text-gray-400 tabular-nums">{job.done}/{job.total}</Tip>
         {job.errors > 0 && <Tip tip="Images that failed in the local or vision stage, both added up. Filter Photos by status = error for the messages; resume retries them." className="text-red-400">{job.errors} err</Tip>}
         {live && job.rate ? <span className="text-gray-500">{job.rate}/s · eta {fmtEta(job.eta_s)}</span> : null}

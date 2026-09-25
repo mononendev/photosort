@@ -259,10 +259,10 @@ def local_tier(primary: Optional[dict], others: list[dict], thr: dict, prior: Op
         if prior and prior.get("motion_risk") == "high" and _grade(primary, thr, shake_margin) < 2:
             return 1, "borderline_sharp_slow_shutter"
         return 2, "primary_eyes_sharp" if on_eyes else "primary_head_sharp"
+    if g == 1:  # the primary's own grade names the reason; a sharp bystander only rescues a missed primary
+        return 1, "primary_eyes_soft" if on_eyes else "primary_soft"
     if any(_grade(o, thr) == 2 for o in others):
         return 1, "secondary_person_sharp"
-    if g == 1:
-        return 1, "primary_eyes_soft" if on_eyes else "primary_soft"
     return 0, "nothing_sharp"
 
 

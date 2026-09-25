@@ -108,23 +108,28 @@ class JobRunner(threading.Thread):
         cond = "local_json IS NULL" if not opts.get("rescan") else "1"
         rows = self.db.rows(f"({where_paths}) AND ({cond})", params) if paths else []
         self.db.update_job(jid, stage="local", total=len(rows), done=0)
+        local_err, local_note = 0, "local: nothing new"
         if rows:
             from .local import run_local
             prog = _Progress(self.db, jid)
-            ok, err = run_local(self.db, self.cfg, self.cache_dir, [(r["id"], r["path"]) for r in rows],
-                                self.device, prog, lambda: self._cancelled(jid), self.detector())
-            self.db.update_job(jid, done=prog.n, errors=err)
+            ok, local_err = run_local(self.db, self.cfg, self.cache_dir, [(r["id"], r["path"]) for r in rows],
+                                      self.device, prog, lambda: self._cancelled(jid), self.detector())
+            self.db.update_job(jid, done=prog.n, errors=local_err)
+            local_note = f"local {prog.n}/{len(rows)}"
+        self.db.update_job(jid, message=local_note)
         if self._cancelled(jid):
             return self._finish(jid, "cancelled")
 
         # 3) vlm stage
         if opts.get("vlm", True):
-            self.run_vlm(jid, where_paths, params, opts)
+            self.run_vlm(jid, where_paths, params, opts, local_err, local_note)
             if self._cancelled(jid):
                 return self._finish(jid, "cancelled")
         self._finish(jid, "done")
 
-    def run_vlm(self, jid: int, where_paths: str, params: list, opts: dict):
+    def run_vlm(self, jid: int, where_paths: str, params: list, opts: dict, local_err: int = 0, local_note: str = ""):
+        """Counters switch to the vlm stage only when it has work, so a local-only re-analysis keeps its
+        own done/total; errors from both stages add up. The message keeps the local stage's summary."""
         from . import backends
         from .backends import Item
         bname = opts.get("backend") or self.cfg.get("backend", "ollama")
@@ -137,9 +142,11 @@ class JobRunner(threading.Thread):
         rows = self.db.rows(f"({where_paths}) AND {cond}", params)
         if opts.get("skip_tier0", False):
             rows = [r for r in rows if json.loads(r["local_json"])["local_tier"] > 0]
-        self.db.update_job(jid, stage="vlm", total=len(rows), done=0, errors=0, message=f"{bname}/{model}")
+        prefix = f"{local_note} · " if local_note else ""
         if not rows:
+            self.db.update_job(jid, message=f"{prefix}{bname}/{model}: nothing new to tag")
             return
+        self.db.update_job(jid, stage="vlm", total=len(rows), done=0, message=f"{prefix}{bname}/{model}")
         prog = _Progress(self.db, jid)
         errors = 0
         conc = int(opts.get("concurrency") or self.cfg.get("vlm_concurrency", 1))
@@ -165,7 +172,7 @@ class JobRunner(threading.Thread):
                     self.db.set_vlm(int(res.key), None, res.usage, res.error)
                     errors += 1
                 prog.update(1)
-        self.db.update_job(jid, done=prog.n, errors=errors)
+        self.db.update_job(jid, done=prog.n, errors=local_err + errors)
 
     def _finish(self, jid: int, state: str):
         self.db.update_job(jid, state=state, stage="done", finished=time.time())

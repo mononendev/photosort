@@ -38,7 +38,7 @@ opencv-python==5.0.0.93
 opencv-python-headless==5.0.0.93
 packaging==26.3
 # Editable Git install with no remote (photosort==0.1.0)
--e /Users/mononen/Programming/image-review-harness
+-e .
 pillow==12.3.0
 pillow_heif==1.8.0
 polars==1.44.2

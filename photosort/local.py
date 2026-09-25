@@ -129,9 +129,11 @@ class FaceLandmarks:
             self._tls.net = cv2.FaceDetectorYN.create(str(weights_path(self.weights)), "", (320, 320), self.conf)
         return self._tls.net
 
-    def eyes(self, rgb: np.ndarray, head: tuple, W: int, H: int) -> Optional[tuple]:
-        """((x, y) right eye, (x, y) left eye, score) in full-frame pixels for the face nearest the head box
-        center, or None. The search window is the head box grown to 3x so a coarse box still contains the face."""
+    def face(self, rgb: np.ndarray, head: tuple, W: int, H: int) -> Optional[dict]:
+        """The face nearest the head box center, in full-frame pixels, or None: {"eyes": [right, left],
+        "score", "box": [x0, y0, x1, y1], "lm": [right eye, left eye, nose, right mouth, left mouth],
+        "search": the window searched}. The window is the head box grown to 3x so a coarse box still
+        contains the face."""
         x0, y0, x1, y1 = head
         side = max(x1 - x0, y1 - y0)
         cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
@@ -155,7 +157,15 @@ class FaceLandmarks:
         if dist(f) > side * k:  # nearest face belongs to someone else
             return None
         to_full = lambda x, y: (sx0 + float(x) / k, sy0 + float(y) / k)
-        return to_full(f[4], f[5]), to_full(f[6], f[7]), float(f[14])
+        lm = [to_full(f[i], f[i + 1]) for i in range(4, 14, 2)]
+        bx0, by0 = to_full(f[0], f[1])
+        return {"eyes": lm[:2], "score": float(f[14]), "lm": lm,
+                "box": [bx0, by0, bx0 + float(f[2]) / k, by0 + float(f[3]) / k], "search": [sx0, sy0, sx1, sy1]}
+
+    def eyes(self, rgb: np.ndarray, head: tuple, W: int, H: int) -> Optional[tuple]:
+        """((x, y) right eye, (x, y) left eye, score) for the face nearest the head box, or None."""
+        f = self.face(rgb, head, W, H)
+        return (f["eyes"][0], f["eyes"][1], f["score"]) if f else None
 
 
 def eye_band(e1, e2, W: int, H: int) -> Optional[tuple]:
@@ -216,6 +226,9 @@ def _person_regions(det: dict, scale: float, W: int, H: int) -> dict:
 
     return {
         "box": _clamp_box((x0, y0, x1, y1), W, H),
+        # COCO-17 pose keypoints as [x, y, confidence] in full-res pixels, for the UI overlay
+        "kp": [[round(kp[i][0] * scale), round(kp[i][1] * scale), round(float(kpc[i]), 3)] for i in range(len(kp))]
+        if kp is not None and kpc is not None else None,
         "head": _clamp_box(head, W, H), "head_src": head_src,
         "torso": _clamp_box(torso, W, H),
         "upper": _clamp_box(upper, W, H),
@@ -276,9 +289,9 @@ class LocalResult:
 def _eye_metrics(r: dict, det: dict, scale: float, rgb: np.ndarray, gray: np.ndarray, W: int, H: int,
                  faces: Optional[FaceLandmarks]):
     """Locate the eyes (face landmarks first, then confident pose eye keypoints) and score the eye band."""
-    found = faces.eyes(rgb, r["head"], W, H) if faces is not None else None
+    found = faces.face(rgb, r["head"], W, H) if faces is not None else None
     if found:
-        e1, e2, src = found[0], found[1], "face"
+        e1, e2, src = found["eyes"][0], found["eyes"][1], "face"
     else:
         pe = _pose_eyes(det, scale)
         e1, e2, src = (pe[0], pe[1], "pose") if pe else (None, None, None)
@@ -288,6 +301,10 @@ def _eye_metrics(r: dict, det: dict, scale: float, rgb: np.ndarray, gray: np.nda
     r.update({"eyes": [[round(e1[0]), round(e1[1])], [round(e2[0]), round(e2[1])]] if lap is not None else None,
               "eye_src": src if lap is not None else None, "eye": band if lap is not None else None,
               "sharp_eye": lap, "hf_eye": hf_ratio(region) if lap is not None else None})
+    # What the face model saw, kept for the UI overlay even when the band ended up unusable.
+    r["face"] = None if not found else {
+        "box": [round(v) for v in found["box"]], "search": list(found["search"]), "score": round(found["score"], 3),
+        "lm": [[round(x), round(y)] for x, y in found["lm"]]}
 
 
 def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandmarks] = None) -> LocalResult:
@@ -313,7 +330,7 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
             "sharp_torso": sharpness(_region(gray, r["torso"])),
             "sharp_body": sharpness(_region(gray, r["box"])),
         })
-        r["priority"] = area_frac * (1 - 0.5 * center_dist) * (0.5 + 0.5 * r["conf"])
+        r["priority"] = round(area_frac * (1 - 0.5 * center_dist) * (0.5 + 0.5 * r["conf"]), 5)
         r["_det"] = d
         people.append(r)
         mask[bx[1]:bx[3], bx[0]:bx[2]] = False
@@ -351,7 +368,8 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
     data = {
         "width": W, "height": H, "orientation": "portrait" if H > W else "landscape",
         "n_people": len(people),
-        "people": [{k: (rnd(v) if k.startswith(("sharp", "hf_")) else v) for k, v in p.items() if k != "priority"} for p in people[:6]],
+        "people": [{k: (rnd(v) if k.startswith(("sharp", "hf_")) else v) for k, v in p.items()} for p in people[:6]],
+        "mask_boxes": [p["box"] for p in people],  # every person, masked out of the background metric
         "bg_sharp": rnd(bg_sharp), "global_sharp": rnd(global_sharp),
         "primary_head_sharp": rnd(primary["sharp_head"]) if primary else None,
         "primary_body_sharp": rnd(primary["sharp_body"]) if primary else None,

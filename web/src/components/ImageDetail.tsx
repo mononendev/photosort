@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, cropUrl, frameUrl } from '../api/client';
+import { api, cropUrl } from '../api/client';
 import { TierBadge, Stars, LrBadge } from './TierBadge';
 import Tip from './Tip';
+import FrameOverlay from './FrameOverlay';
+import { FocusMath, PersonInspector } from './PersonInspector';
+import { DEFAULT_LAYERS, LAYERS } from '../lib/pose';
+import type { Layer } from '../lib/pose';
 import { METRIC_TIPS, TIER_MEANING, explainDisagree, explainFinal, explainLocal, explainPrior } from '../lib/explain';
 
 function Row({ k, v, tip }: { k: string; v: React.ReactNode; tip?: React.ReactNode }) {
@@ -14,11 +18,31 @@ function Row({ k, v, tip }: { k: string; v: React.ReactNode; tip?: React.ReactNo
   );
 }
 
+function stored<T>(key: string, fallback: T): T {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) as T : fallback; } catch { return fallback; }
+}
+function store(key: string, v: unknown) {
+  try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* private window */ }
+}
+
 export default function ImageDetail({ id, onClose, onNav }: { id: number; onClose: () => void; onNav?: (dir: 1 | -1) => void }) {
   const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ['image', id], queryFn: () => api.image(id) });
   const { data: cfg } = useQuery({ queryKey: ['config'], queryFn: api.config, staleTime: 30_000 });
   const [note, setNote] = useState('');
+  const [layers, setLayers] = useState<Set<Layer>>(() => new Set(stored<Layer[]>('detail.layers', DEFAULT_LAYERS)));
+  const [showMath, setShowMath] = useState<boolean>(() => stored('detail.math', false));
+  const [sel, setSel] = useState({ id, person: 0 });   // the inspected person resets when navigating to another image
+  const person = sel.id === id ? sel.person : 0;
+  const setPerson = (i: number) => setSel({ id, person: i });
+  const toggle = (k: Layer) => setLayers((cur) => {
+    const n = new Set(cur);
+    if (n.has(k)) n.delete(k); else n.add(k);
+    store('detail.layers', [...n]);
+    return n;
+  });
+  const needDebug = (layers.has('heatmap') || showMath) && !!data?.local;
+  const dbg = useQuery({ queryKey: ['focus-debug', id], queryFn: () => api.focusDebug(id), enabled: needDebug, staleTime: 5 * 60_000, retry: false });
   const ov = useMutation({
     mutationFn: (o: Parameters<typeof api.override>[1]) => api.override(id, o),
     onSuccess: () => {
@@ -30,6 +54,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
   const v = data?.vlm;
   const l = data?.local;
   const p = l?.people?.[0];
+  const heat = dbg.data?.heatmap;
   return (
     <div className="fixed inset-0 z-50 flex" onKeyDown={(e) => { if (e.key === 'Escape') onClose(); if (e.key === 'ArrowRight') onNav?.(1); if (e.key === 'ArrowLeft') onNav?.(-1); }} tabIndex={-1}>
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
@@ -60,7 +85,22 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
         </div>
         <div className="grid md:grid-cols-[1fr_380px] gap-4 p-4">
           <div className="space-y-3">
-            <img src={frameUrl(id)} alt="" className="w-full rounded-lg bg-gray-900 object-contain max-h-[60vh]" />
+            {l && (
+              <div className="flex flex-wrap items-center gap-1 text-xs">
+                {LAYERS.map((ly) => (
+                  <Tip key={ly.key} plain tip={ly.tip}>
+                    <button onClick={() => toggle(ly.key)} className={`px-2 py-0.5 rounded border ${layers.has(ly.key) ? 'border-blue-500 bg-blue-900/40 text-gray-100' : 'border-gray-700 text-gray-500 hover:border-gray-500'}`}>{ly.label}</button>
+                  </Tip>
+                ))}
+                {layers.has('heatmap') && (dbg.isFetching ? <span className="text-gray-500 ml-1">computing…</span> : heat && (
+                  <span className="ml-2 inline-flex items-center gap-1 text-[10px] text-gray-500">
+                    soft <span className="inline-block h-2 w-20 rounded" style={{ background: 'linear-gradient(90deg,#30123b,#4686fb,#1ae4b6,#a2fc3c,#faba39,#e4460a,#7a0403)' }} /> sharp
+                    <span className="font-mono">(log₁₀ {heat.log_range[0]}…{heat.log_range[1]}, {heat.tile}px tiles)</span>
+                  </span>
+                ))}
+              </div>
+            )}
+            <FrameOverlay id={id} l={l} cfg={cfg} layers={layers} selected={person} onSelect={setPerson} heat={heat} />
             {data?.has_crop && (
               <div className="flex gap-3 items-start">
                 <img src={cropUrl(id)} alt="head crop" className="w-64 rounded-lg bg-gray-900" />
@@ -80,6 +120,15 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+            {l && <PersonInspector l={l} cfg={cfg} selected={person} onSelect={setPerson} />}
+            {l && l.people?.length > 0 && (
+              <div className="rounded-lg border border-gray-800 p-3 space-y-2">
+                <button onClick={() => { setShowMath(!showMath); store('detail.math', !showMath); }} className="text-xs uppercase tracking-wide text-gray-500 hover:text-gray-300">
+                  {showMath ? '▾' : '▸'} focus math · person #{person + 1}
+                </button>
+                {showMath && <FocusMath d={dbg.data?.people?.[person]} p={l.people[person]} loading={dbg.isFetching && !dbg.data} error={dbg.error ? String(dbg.error.message) : undefined} />}
               </div>
             )}
           </div>

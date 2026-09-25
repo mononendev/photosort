@@ -295,6 +295,25 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
     def crop(img_id: int):
         return media(img_id, "_crop")
 
+    debug_cache: dict = {}   # (id, local_json hash) -> focus_debug result; a few recent images only
+
+    @app.get("/api/images/{img_id}/focus-debug")
+    def focus_debug(img_id: int):
+        """Eye crops, Laplacian maps, FFT spectra and a sharpness heatmap, recomputed from the original file."""
+        from ..debugviz import focus_debug as _fd
+        r = db.row(img_id)
+        if not r or not r["local_json"]:
+            raise HTTPException(404, "not analyzed")
+        key = (img_id, hash(r["local_json"]))
+        if key not in debug_cache:
+            path = Path(r["path"])
+            if not path.exists():
+                raise HTTPException(404, "original file not found")
+            if len(debug_cache) >= 8:
+                debug_cache.pop(next(iter(debug_cache)))
+            debug_cache[key] = _fd(path, json.loads(r["local_json"]))
+        return debug_cache[key]
+
     # ---- config / calibration --------------------------------------------------------
     @app.get("/api/config")
     def get_config():

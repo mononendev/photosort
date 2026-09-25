@@ -119,3 +119,14 @@ def test_final_record_and_xmp(tmp_path):
     import xml.dom.minidom
     assert xml.dom.minidom.parseString(doc)  # well-formed
     assert "PhotoSort|Focus|focus_2_sharp" in doc and 'xmp:Rating="4"' in doc
+
+
+def test_debugviz_reproduces_stored_metrics():
+    from photosort import debugviz
+    rng = np.random.default_rng(0)
+    g = cv2.GaussianBlur(rng.random((120, 260)).astype(np.float32), (0, 0), 1.5)
+    lv, sv = debugviz.laplacian_view(g, local.EYE_MIN_PX), debugviz.spectrum_view(g)
+    assert abs(lv["value"] - local.sharpness(g, local.EYE_MIN_PX)) < 1e-6
+    assert sv["value"] == local.hf_ratio(g) and abs(sv["band_energy"] / sv["total_energy"] - sv["value"]) < 1e-6
+    hm = debugviz.heatmap(rng.random((400, 900)).astype(np.float32))
+    assert hm["grid"][0] * hm["tile"] <= 900 and hm["img"].startswith("data:image/png")

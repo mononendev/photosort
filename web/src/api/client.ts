@@ -50,13 +50,29 @@ export interface Person {
   sharp_head: number | null; sharp_torso: number | null; sharp_body: number | null;
   eyes?: number[][] | null; eye_src?: 'face' | 'pose' | null; eye?: number[] | null;
   sharp_eye?: number | null; hf_eye?: number | null;
+  /** COCO-17 pose keypoints [x, y, confidence] in full-res pixels (images analyzed after the overlay landed) */
+  kp?: number[][] | null;
+  /** YuNet face: box, 5 landmarks (right eye, left eye, nose, right/left mouth corner), the window it searched */
+  face?: { box: number[]; search: number[]; score: number; lm: number[][] } | null;
+  priority?: number;
+}
+
+export interface FocusView { img: string; lap_var: number; gray_var: number; eps: number; value: number; size: number[] }
+export interface SpectrumView {
+  img: string; size: number[]; band: number[]; floor: number; value: number | null;
+  profile: { edges: number[]; energy: number[] }; band_energy: number; total_energy: number;
+}
+export interface FocusDebug {
+  width: number; height: number;
+  heatmap: { img: string; tile: number; grid: number[]; cover: number[]; log_range: number[] };
+  people: { eye?: { box: number[]; img: string; laplacian: FocusView | null; spectrum: SpectrumView | null }; head?: { box: number[]; img: string; laplacian: FocusView | null } }[];
 }
 
 export interface LocalResult {
   width: number; height: number; orientation: string; n_people: number; people: Person[];
   bg_sharp: number | null; global_sharp: number | null; primary_head_sharp: number | null; primary_body_sharp: number | null;
   primary_eye_sharp?: number | null; primary_eye_hf?: number | null; primary_eye_src?: string | null;
-  crop_box: number[] | null; local_tier: number; local_reason: string;
+  crop_box: number[] | null; local_tier: number; local_reason: string; mask_boxes?: number[][];
   exif?: { camera?: string; lens?: string; f_number?: number; shutter_s?: number; iso?: number; focal_mm?: number; focal_35mm?: number; taken?: string };
   exif_prior?: { dof_risk: string | null; motion_risk: string | null; shake_stops: number | null; pupil_mm?: number | null; summary: string | null };
 }
@@ -163,6 +179,7 @@ export const api = {
   tree: (path: string) => request<Tree>(`/api/tree${qs({ path })}`),
   images: (f: ImageFilters) => request<ImagesPage>(`/api/images${qs(f as Record<string, unknown>)}`),
   image: (id: number) => request<ImageDetail>(`/api/images/${id}`),
+  focusDebug: (id: number) => request<FocusDebug>(`/api/images/${id}/focus-debug`),
   override: (id: number, o: Override & { clear?: boolean }) =>
     request<ImageDetail>(`/api/images/${id}`, { method: 'PATCH', body: JSON.stringify(o) }),
   jobs: () => request<Job[]>('/api/jobs'),

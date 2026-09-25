@@ -156,7 +156,25 @@ Repo restructured like stasharr: `web/` (React 19 + Vite + Tailwind 4 + TanStack
 - Dockerfile pitfall: ultralytics pulls `opencv-python`, which clashes with `opencv-python-headless`
   (shared `cv2/`); the image removes both and reinstalls headless.
 
+### First real run (2026-09-25): 200 CR2 files, RAW/Float Life Fest/2024/September/12
+Submitted through the API against the production Ollama. 0 errors. Model latency avg 9.8 s/img
+(prefill 2.5 s, decode 6.3 s; ~2750 in / ~213 out tokens). Local stage on CPU ≈ 0.5 img/s incl.
+CR2 embedded-preview decode.
+```
+tagged 200
+subjects {'crowd_spectators': 83, 'no_people': 20, 'group': 14, 'rider_posed': 73, 'rider_action': 10}
+composition {'half_body': 9, 'full_body': 191}
+keepers 165 | scores {1: 31, 2: 12, 3: 33, 4: 83, 5: 41}
+review (local!=vlm): [('IMG_1041.CR2', 1, 0), ('IMG_1053.CR2', 1, 0), ('IMG_1054.CR2', 1, 0), ('IMG_1055.CR2', 1, 0), ('IMG_1058.CR2', 1, 0), ('IMG_1198.CR2', 2, 0), ('IMG_1199.CR2', 2, 0)]
+local tiers {2: 146, 1: 34, 0: 20} | vlm tiers {2: 144, 1: 29, 0: 27}
+job elapsed 37.0 min for 200 images (11.1 s/img wall, local+vlm)
+```
+Observations: focus tiers agree between local and model on 193/200; the 4B model's *subject* labels
+are shaky on candid shots (people labelled `no_people`, `crowd_spectators` for a lone walker), so
+treat subject/composition as hints until calibrated; keywords/remarks are usable.
+
 ### Next
-- First real job through the UI (200 RAW files, Float Life Fest 2024/September/12); watch `/api/health` for `device: cuda`.
+- Upload exported known-good XMPs on the Calibrate page and check the agreement matrices.
+- Consider a bigger model for subject labels if the 4B stays shaky (qwen3-vl:8b fits at concurrency 1).
 - Calibrate focus thresholds on real 20 MP frames (defaults are placeholders).
 - Push this repo to GitHub so CI takes over builds/deploys (the workflow expects the same secrets as stasharr).

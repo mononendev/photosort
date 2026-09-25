@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import type { MouseEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -7,12 +8,22 @@ import useStore from '../hooks/useStore';
 import { StatusDot, TierBadge, Stars } from '../components/TierBadge';
 import Progress from '../components/Progress';
 
-function DirRow({ d, checked, onToggle }: { d: TreeDir; checked: boolean; onToggle: () => void }) {
+type ToggleFn = (e: MouseEvent) => void;
+
+/** Checkbox that reports the click (with shiftKey) instead of the change, and keeps shift-click from selecting text. */
+function RowCheck({ checked, onToggle }: { checked: boolean; onToggle: ToggleFn }) {
+  return (
+    <input type="checkbox" checked={checked} readOnly onClick={onToggle}
+      onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }} className="accent-blue-500" />
+  );
+}
+
+function DirRow({ d, checked, onToggle }: { d: TreeDir; checked: boolean; onToggle: ToggleFn }) {
   const done = d.vlm_done;
   const pct = d.tracked ? Math.round((done / d.tracked) * 100) : 0;
   return (
     <div className="flex items-center gap-3 px-3 py-2 border-b border-gray-800 hover:bg-gray-900/60">
-      <input type="checkbox" checked={checked} onChange={onToggle} className="accent-blue-500" />
+      <RowCheck checked={checked} onToggle={onToggle} />
       <Link to={`/browse/${d.path}`} className="text-blue-300 hover:underline truncate flex-1">📁 {d.name}</Link>
       <span className="text-xs text-gray-500 w-28 text-right">{d.images_direct} here</span>
       <div className="w-56 flex items-center gap-2">
@@ -58,6 +69,22 @@ export default function Browse() {
   const crumbs = path ? path.split('/') : [];
   const allHere = [...(data?.dirs.map((d) => d.path) ?? []), ...(data?.files.map((f) => f.rel) ?? [])];
   const allSelected = allHere.length > 0 && allHere.every((p) => selected.includes(p));
+  // Shift-click selects (or deselects) everything between the last clicked row and this one, matching
+  // the state the clicked row is switching to. The anchor resets when the folder changes.
+  const anchor = useRef<{ path: string; item: string } | null>(null);
+  const onRowClick = (item: string) => (e: MouseEvent) => {
+    const a = anchor.current;
+    const from = a && a.path === path ? allHere.indexOf(a.item) : -1;
+    const to = allHere.indexOf(item);
+    if (e.shiftKey && from >= 0 && to >= 0) {
+      const range = allHere.slice(Math.min(from, to), Math.max(from, to) + 1);
+      const on = !selected.includes(item);
+      setSelected(on ? [...new Set([...selected, ...range])] : selected.filter((p) => !range.includes(p)));
+    } else {
+      toggle(item);
+    }
+    anchor.current = { path, item };
+  };
 
   return (
     <div className="space-y-4">
@@ -79,18 +106,18 @@ export default function Browse() {
       <div className="rounded-lg border border-gray-800 bg-gray-900/40">
         <div className="flex items-center gap-3 px-3 py-2 border-b border-gray-800 text-xs text-gray-500">
           <input type="checkbox" checked={allSelected} onChange={() => (allSelected ? setSelected(selected.filter((p) => !allHere.includes(p))) : setSelected([...new Set([...selected, ...allHere])]))} className="accent-blue-500" />
-          <span className="flex-1">name</span>
+          <span className="flex-1">name <span className="text-gray-600">· shift-click to select a range</span></span>
           <span className="w-28 text-right">images</span>
           <span className="w-56">tagged / tracked</span>
         </div>
         {isLoading && <div className="p-3 text-sm text-gray-500">Loading…</div>}
         {error && <div className="p-3 text-sm text-red-400">{(error as Error).message}</div>}
         {data?.dirs.map((d) => (
-          <DirRow key={d.path} d={d} checked={selected.includes(d.path)} onToggle={() => toggle(d.path)} />
+          <DirRow key={d.path} d={d} checked={selected.includes(d.path)} onToggle={onRowClick(d.path)} />
         ))}
         {data?.files.map((f) => (
           <div key={f.rel} className="flex items-center gap-3 px-3 py-1.5 border-b border-gray-800/60 text-sm hover:bg-gray-900/60">
-            <input type="checkbox" checked={selected.includes(f.rel)} onChange={() => toggle(f.rel)} className="accent-blue-500" />
+            <RowCheck checked={selected.includes(f.rel)} onToggle={onRowClick(f.rel)} />
             <StatusDot status={f.status} />
             <button
               onClick={() => f.id && nav(`/photos?folder=${encodeURIComponent(path)}&recursive=false&open=${f.id}`)}

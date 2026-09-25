@@ -148,6 +148,13 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
             ) : (
               <p className="text-sm text-gray-500">{data?.status === 'analyzed' ? 'Not yet tagged by the vision model.' : data?.error ?? 'Not processed.'}</p>
             )}
+            {l?.af && (
+              <div className="text-xs text-gray-400">
+                <Tip tip="Read from the camera maker notes. The person under the active AF points is who the photographer meant, so they become the primary subject even when someone else is bigger or sharper; the focus tier then says whether focus actually landed on them."><span className="text-gray-500">AF:</span></Tip>{' '}
+                {l.af.mode_name}{l.af.user_placed ? '' : ' (camera-chosen)'} · {l.af.active.length} active of {l.af.n_points} points ({l.af.active_from === 'in_focus' ? 'reported focus' : 'selected'})
+                {' · '}{l.primary_by === 'af' ? <span className="text-red-300">primary subject picked by AF</span> : l.af.active.length ? 'not on any detected person, primary by prominence' : 'no active points'}
+              </div>
+            )}
             {l?.exif_prior?.summary && (
               <div className="text-xs text-gray-400">
                 <Tip tip="Read from the file's EXIF. The camera summary goes into the model's context. Motion risk can also demote a borderline local tier 2."><span className="text-gray-500">camera:</span></Tip> {l.exif_prior.summary}

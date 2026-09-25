@@ -52,6 +52,7 @@ export function OverlaySvg({ l, cfg, layers, selected, onSelect, heat, setHover,
           <rect x={bx0} y={by0} width={bx1 - bx0} height={by1 - by0} stroke={c} {...stroke(primary ? 2.5 : 1.5)}
             strokeDasharray={primary ? undefined : '6 4'} className="cursor-pointer" onClick={(e) => { e.stopPropagation(); onSelect(i); }}
             {...hv(`Person #${i + 1}${primary ? ' · primary subject' : ''}`, <>
+              {primary && l.primary_by === 'af' && <>picked because the camera’s AF points land on them (score {fmt(p.af_score ?? null)})<br /></>}
               detection conf {fmt(p.conf)} · {(p.area_frac * 100).toFixed(1)}% of frame · center distance {fmt(p.center_dist)}<br />
               priority {p.priority != null ? fmt(p.priority) : '–'} = area × (1 − ½·center dist) × (½ + ½·conf)<br />
               grade {g.grade ?? '–'} on {g.onEyes ? 'the eye band' : 'the head box'} · click to inspect
@@ -123,6 +124,21 @@ export function OverlaySvg({ l, cfg, layers, selected, onSelect, heat, setHover,
           {...hv('Person (not ranked in the top 6)', <>Found and masked out of the background, but not stored with metrics.</>)} />
       ))}
       {people.map((p, i) => personLayer(p, i)).reverse() /* primary drawn last, on top */}
+      {on('af') && l.af && l.af.points.map((pt) => {
+        const act = l.af!.active.includes(pt.i);
+        const [x0, y0, x1, y1] = pt.box;
+        return (
+          <g key={`af${pt.i}`} {...hv(`AF point ${pt.i}${l.af!.primary_point === pt.i ? ' · primary AF point' : ''}`, <>
+            {pt.in_focus ? 'reported focus' : 'did not report focus'}{pt.selected ? ' · selected' : ''} · {l.af!.mode_name}
+            {l.af!.user_placed ? ' (placed by the photographer)' : ' (the camera chose)'}<br />
+            {boxW(pt.box)}×{boxH(pt.box)} px at ({x0}, {y0}){act ? ' · picks the primary subject' : ''}
+          </>)}>
+            <rect x={x0} y={y0} width={x1 - x0} height={y1 - y0} stroke={act ? '#ef4444' : '#fca5a5'}
+              fill={act ? 'rgba(239,68,68,.18)' : 'transparent'} vectorEffect="non-scaling-stroke" strokeWidth={act ? 2 : 1.25}
+              strokeDasharray={act ? undefined : '4 3'} />
+          </g>
+        );
+      })}
     </svg>
   );
 }

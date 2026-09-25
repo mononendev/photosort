@@ -55,6 +55,8 @@ export interface Person {
   /** YuNet face: box, 5 landmarks (right eye, left eye, nose, right/left mouth corner), the window it searched */
   face?: { box: number[]; search: number[]; score: number; lm: number[][] } | null;
   priority?: number;
+  /** How strongly the camera's active AF points land on this person (head hit 2, torso 1.5, body 1 per point) */
+  af_score?: number | null;
   /** Each metric's stored terms: value = lap_var / (gray_var + eps); eye FFT ratio = band_e / total_e */
   terms?: Partial<Record<'head' | 'torso' | 'body' | 'eye', MetricTerms | null>>;
 }
@@ -72,6 +74,13 @@ export interface FocusDebug {
   people: { eye?: { box: number[]; img: string; laplacian: FocusView | null; spectrum: SpectrumView | null }; head?: { box: number[]; img: string; laplacian: FocusView | null } }[];
 }
 
+/** Camera AF points placed on the upright frame (full-res pixels). Only selected / in-focus points are stored. */
+export interface AfInfo {
+  source: string; mode: number; mode_name: string; user_placed: boolean; n_points: number; primary_point: number | null;
+  points: { i: number; box: number[]; in_focus: boolean; selected: boolean }[];
+  active: number[]; active_from: 'in_focus' | 'selected' | null;
+}
+
 export interface LocalResult {
   width: number; height: number; orientation: string; n_people: number; people: Person[];
   bg_sharp: number | null; global_sharp: number | null; primary_head_sharp: number | null; primary_body_sharp: number | null;
@@ -79,6 +88,9 @@ export interface LocalResult {
   crop_box: number[] | null; local_tier: number; local_reason: string; mask_boxes?: number[][];
   bg_terms?: MetricTerms | null; global_terms?: MetricTerms | null; eps?: number;
   exif?: { camera?: string; lens?: string; f_number?: number; shutter_s?: number; iso?: number; focal_mm?: number; focal_35mm?: number; taken?: string };
+  af?: AfInfo | null;
+  /** What picked people[0]: the camera's AF points, or prominence (size, centering, confidence) */
+  primary_by?: 'af' | 'priority';
   exif_prior?: { dof_risk: string | null; motion_risk: string | null; shake_stops: number | null; pupil_mm?: number | null; summary: string | null };
 }
 

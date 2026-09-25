@@ -72,6 +72,12 @@ def context_text(local: dict) -> str:
         lines.append(f"Camera: {local['exif_prior']['summary']}")
     if n and local.get("people"):
         p = local["people"][0]
+        af = local.get("af") or {}
+        if local.get("primary_by") == "af":
+            lines.append(f"The camera's AF points ({af.get('mode_name')}) were on this person: they are the intended "
+                         f"subject even if someone else is larger or sharper. Grade focus on them.")
+        elif af.get("active"):
+            lines.append(f"The camera's AF points ({af.get('mode_name')}) were not on any detected person.")
         lines.append(
             f"Primary subject: {p['area_frac']*100:.1f}% of frame, center at ({p['center'][0]:.2f}, {p['center'][1]:.2f}) "
             f"(0,0 = top-left). Head located by {p['head_src']}.")

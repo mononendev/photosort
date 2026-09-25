@@ -12,6 +12,7 @@ import numpy as np
 from PIL import Image
 
 from . import images as I
+from . import af as A
 from . import exif as X
 
 # COCO keypoint indices used by YOLO pose models
@@ -331,6 +332,38 @@ def _eye_metrics(r: dict, det: dict, scale: float, rgb: np.ndarray, gray: np.nda
         "lm": [[round(x), round(y)] for x, y in found["lm"]]}
 
 
+def pick_primary(people: list[dict], af: Optional[dict], cfg: dict) -> str:
+    """Order people in place, primary first; returns what chose the primary ("af" or "priority").
+
+    People are ranked by prominence (size, centering, confidence). When the camera's active AF points land on
+    someone, that person is who the photographer meant, so they lead even if smaller or softer than a bystander.
+    """
+    acfg = cfg.get("af") or {}
+    for p in people:
+        p["af_score"] = A.person_score(af, p) if af else None
+    people.sort(key=lambda p: -p["priority"])
+    if not people or not af or not acfg.get("use", True):
+        return "priority"
+    best = max(people, key=lambda p: (p["af_score"] or 0, p["priority"]))
+    if (best["af_score"] or 0) < acfg.get("min_score", 0.5):
+        return "priority"
+    people.remove(best)
+    people.insert(0, best)
+    return "af"
+
+
+def _primary_fields(primary: Optional[dict]) -> dict:
+    def rnd(v):
+        return None if v is None else round(v, 4)
+    return {
+        "primary_head_sharp": rnd(primary["sharp_head"]) if primary else None,
+        "primary_body_sharp": rnd(primary["sharp_body"]) if primary else None,
+        "primary_eye_sharp": rnd(primary.get("sharp_eye")) if primary else None,
+        "primary_eye_hf": rnd(primary.get("hf_eye")) if primary else None,
+        "primary_eye_src": primary.get("eye_src") if primary else None,
+    }
+
+
 def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandmarks] = None) -> LocalResult:
     im = I.load_rgb(path)
     W, H = im.size
@@ -374,7 +407,8 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
     global_terms = {"lap_var": float(lap.var()), "gray_var": float(gb.var()), "px": [g_small.shape[1], g_small.shape[0]]}
     global_sharp = global_terms["lap_var"] / (global_terms["gray_var"] + EPS)
 
-    people.sort(key=lambda p: -p["priority"])
+    af = A.read(path, W, H, (cfg.get("af") or {}).get("y_up", True))
+    primary_by = pick_primary(people, af, cfg)
     # Eye bands for the most prominent people only (a crowd shot can have dozens of tiny faces).
     rgb = np.asarray(im) if people else None
     for i, p in enumerate(people):
@@ -402,11 +436,8 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
         "mask_boxes": [p["box"] for p in people],  # every person, masked out of the background metric
         "bg_sharp": rnd(bg_sharp), "global_sharp": rnd(global_sharp),
         "bg_terms": _sig(bg_terms), "global_terms": _sig(global_terms), "eps": EPS,
-        "primary_head_sharp": rnd(primary["sharp_head"]) if primary else None,
-        "primary_body_sharp": rnd(primary["sharp_body"]) if primary else None,
-        "primary_eye_sharp": rnd(primary.get("sharp_eye")) if primary else None,
-        "primary_eye_hf": rnd(primary.get("hf_eye")) if primary else None,
-        "primary_eye_src": primary.get("eye_src") if primary else None,
+        **_primary_fields(primary),
+        "af": af, "primary_by": primary_by,
         "crop_box": crop_used,
         "exif": exif, "exif_prior": prior,
         "local_tier": tier, "local_reason": reason,
@@ -417,25 +448,41 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
 def rescore(db, cfg: dict, backfill_exif: bool = True) -> dict:
     """Re-derive local tiers from stored metrics with the current thresholds (no re-detection).
 
-    Rows analyzed before the EXIF prior existed get their metadata read from the file (header only, fast).
+    Rows analyzed before the EXIF prior or AF points existed get them read from the file (header only, fast),
+    and the primary person is re-picked from the AF points.
     """
-    changed = backfilled = 0
+    changed = backfilled = af_new = reordered = 0
     for r in db.rows("local_json IS NOT NULL"):
         d = json.loads(r["local_json"])
+        dirty = False
         if backfill_exif and "exif" not in d:
             d["exif"] = X.read(Path(r["path"]))
             backfilled += 1
+            dirty = True
         if "exif" in d:
             d["exif_prior"] = X.prior(d["exif"], cfg.get("exif"))
         people = d.get("people") or []
+        if backfill_exif and "af" not in d and d.get("width"):
+            d["af"] = A.read(Path(r["path"]), d["width"], d["height"], (cfg.get("af") or {}).get("y_up", True))
+            af_new += 1
+            dirty = True
+        old_first, old_by = (people[0].get("box") if people else None), d.get("primary_by")
+        d["primary_by"] = pick_primary(people, d.get("af"), cfg)
+        dirty |= d["primary_by"] != old_by
+        if people and people[0].get("box") != old_first:
+            # Stored people carry their own metrics, so the new primary's numbers are already here; only the
+            # head crop stays the old one until the next local pass.
+            d.update(_primary_fields(people[0]))
+            reordered += 1
+            dirty = True
         tier, reason = local_tier(people[0] if people else None, people[1:], cfg["focus"], d.get("exif_prior"),
                                   cfg.get("exif", {}).get("shake_margin", 1.5))
-        if tier != d.get("local_tier") or backfilled:
+        if tier != d.get("local_tier") or dirty:
             if tier != d.get("local_tier"):
                 changed += 1
             d["local_tier"], d["local_reason"] = tier, reason
             db.set_local(r["id"], d)
-    return {"changed": changed, "exif_backfilled": backfilled}
+    return {"changed": changed, "exif_backfilled": backfilled, "af_backfilled": af_new, "primary_changed": reordered}
 
 
 THUMB_LONG_EDGE = 400
@@ -456,7 +503,8 @@ def write_cache(cache_dir: Path, img_id: int, res: "LocalResult"):
 
 def run_local(db, cfg: dict, cache_dir: Path, ids_paths: list[tuple[int, str]], device: Optional[str] = None,
               progress=None, should_stop=None, detector: Optional[Detector] = None):
-    """Analyze images concurrently and store results. progress.update(1) per image; should_stop() aborts."""
+    """Analyze images concurrently and store results. progress.update(1) per image; should_stop() aborts.
+    A progress object with start(id, path) / finish(id, error) also hears when each image begins and ends."""
     cache_dir.mkdir(parents=True, exist_ok=True)
     det = detector or Detector(cfg["detect_model"], cfg["detect_long_edge"], cfg["detect_conf"], device)
     det(Image.new("RGB", (64, 64)))  # warm up / download weights before threads start

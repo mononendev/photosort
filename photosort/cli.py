@@ -125,7 +125,8 @@ def cmd_rescore(args):
     from .local import rescore
     workdir, cfg, db = _ctx(args)
     res = rescore(db, cfg)
-    print(f"rescored; {res['changed']} images changed tier, EXIF backfilled on {res['exif_backfilled']}")
+    print(f"rescored; {res['changed']} images changed tier, EXIF backfilled on {res['exif_backfilled']}, "
+          f"AF points read on {res['af_backfilled']}, primary re-picked on {res['primary_changed']}")
     _local_summary(db)
 
 

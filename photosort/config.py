@@ -74,6 +74,10 @@ DEFAULTS: dict = {
     # f-number <= wide_open_f or entrance pupil >= 40mm = "very shallow DOF"; a tier-2 sharpness below tier2_min*shake_margin is
     # demoted to tier 1 when the shutter was slow enough that motion blur is likely.
     "exif": {"crop_factor": 1.0, "wide_open_f": 2.0, "action_shutter": 1 / 500, "shake_margin": 1.5},
+    # Camera AF points (Canon maker notes): the person the active points land on becomes the primary subject,
+    # whatever their size or sharpness, when their score (head hit 2, torso 1.5, body 1 per point) >= min_score.
+    # y_up: AF y offsets count upward from center (flip if boxes draw mirrored top-to-bottom on your body).
+    "af": {"use": True, "min_score": 0.5, "y_up": True},
     # Cloud stage
     "backend": "ollama",         # ollama (local, free) | gemini | anthropic
     "model": None,               # None = backend default

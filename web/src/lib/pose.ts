@@ -19,8 +19,9 @@ export const KP_MIN_CONF = 0.3;
 export const PERSON_COLORS = ['#22d3ee', '#c084fc', '#f472b6', '#fb923c', '#a3e635', '#60a5fa'];
 export const GRADE_COLOR: Record<string, string> = { 2: '#34d399', 1: '#fbbf24', 0: '#f87171', none: '#9ca3af' };
 
-export type Layer = 'people' | 'skeleton' | 'regions' | 'eyes' | 'crop' | 'mask' | 'heatmap';
+export type Layer = 'af' | 'people' | 'skeleton' | 'regions' | 'eyes' | 'crop' | 'mask' | 'heatmap';
 export const LAYERS: { key: Layer; label: string; tip: string }[] = [
+  { key: 'af', label: 'AF points', tip: 'Where the camera was asked to focus, from the maker notes. Filled: the points that reported focus (or the selected ones when none did); outlined: selected. The person they land on is the primary subject.' },
   { key: 'people', label: 'people', tip: 'Person boxes from YOLO pose, ranked by priority. #1 is the primary subject the tier is about.' },
   { key: 'skeleton', label: 'pose', tip: 'The 17 pose keypoints and limbs. Dots fade with confidence; hollow dots are below 0.3 and ignored by the head/torso geometry.' },
   { key: 'regions', label: 'head / torso', tip: 'The head box (solid: placed from keypoints; dashed: guessed from the top of the person box) and the shoulder-to-hip torso box that get their own sharpness numbers.' },
@@ -29,7 +30,7 @@ export const LAYERS: { key: Layer; label: string; tip: string }[] = [
   { key: 'mask', label: 'bg mask', tip: 'Everything outside these boxes is the “background” whose sharpness is compared against the subject.' },
   { key: 'heatmap', label: 'sharpness map', tip: 'The same contrast-normalized Laplacian metric computed per tile over the whole frame at native resolution (log scale). Shows where the lens actually focused. Loads from the original file.' },
 ];
-export const DEFAULT_LAYERS: Layer[] = ['people', 'skeleton', 'regions', 'eyes'];
+export const DEFAULT_LAYERS: Layer[] = ['af', 'people', 'skeleton', 'regions', 'eyes'];
 
 export type Grade = { grade: number | null; onEyes: boolean; checks: ReturnType<typeof gradeBasis>['checks'] };
 

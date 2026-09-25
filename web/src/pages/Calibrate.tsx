@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, cropUrl, FOCUS_METRIC_LABEL } from '../api/client';
-import type { FocusMetric, TruthMatrixRow, TruthSummary } from '../api/client';
+import type { FocusMetric, RescoreResult, TruthMatrixRow, TruthSummary } from '../api/client';
 import Tip from '../components/Tip';
 
 const METRIC_TAB_TIP: Record<FocusMetric, string> = {
@@ -115,7 +115,9 @@ export default function Calibrate() {
           <span className="text-gray-500">tier 1 ≥</span><input value={shown(k1)} onChange={(e) => setEdits({ ...edits, [k1]: e.target.value })} className={sel} />
           <span className="text-gray-500">tier 2 ≥</span><input value={shown(k2)} onChange={(e) => setEdits({ ...edits, [k2]: e.target.value })} className={sel} />
           <button onClick={() => save.mutate({ [k1]: Number(shown(k1)), [k2]: Number(shown(k2)) })} disabled={save.isPending} className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40">save + re-score</button>
-          {save.data && <span className="text-gray-400">{save.data.changed} images changed tier</span>}
+          {save.isPending && <span className="text-gray-500">re-scoring…</span>}
+          {save.data && <RescoreSummary r={save.data} />}
+          {save.error && <span className="text-red-400">re-score failed: {String((save.error as Error).message ?? save.error)}</span>}
         </div>
       )}
       <div className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(150px,1fr))]">
@@ -127,5 +129,14 @@ export default function Calibrate() {
         ))}
       </div>
     </div>
+  );
+}
+
+function RescoreSummary({ r }: { r: RescoreResult }) {
+  return (
+    <span className="text-gray-400">
+      {r.changed} images changed tier · AF points read on {r.af_backfilled} · primary re-picked on {r.primary_changed}
+      {r.errors > 0 && <span className="text-amber-400" title={r.first_error ?? ''}> · {r.errors} failed (hover for the first)</span>}
+    </span>
   );
 }

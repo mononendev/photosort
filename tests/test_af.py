@@ -116,3 +116,29 @@ def test_real_1dx_cr2_if_present():
         pytest.skip("local CR2 sample not present (dev-data/cr2 is gitignored)")
     got = af.read(p, 3456, 5184)
     assert got["mode_name"] == "spot" and got["active"] == [30] and got["n_points"] == 61
+
+
+def test_rescore_old_rows_without_priority(tmp_path):
+    """Rows analyzed before `priority` existed crashed rescore (KeyError); they must re-score, and AF must land."""
+    import json
+    from photosort import config
+    from photosort.db import DB
+    cr2 = tmp_path / "a.cr2"
+    cr2.write_bytes(_tiff(_words([(0, 0, 171, 171), (1174, 0, 171, 171)], mode=9, in_focus=[1], selected=[1])))
+    bad = tmp_path / "b.jpg"
+    bad.write_bytes(b"")
+    db = DB(tmp_path / "db.sqlite")
+    db.add_paths([cr2, bad])
+    # Portrait 3456x5184: point 1 lands around y ~ 1100 near the horizontal middle.
+    near = {"box": [1400, 700, 2100, 3000], "head": [1500, 700, 1950, 1150], "torso": [1400, 1150, 2100, 2000],
+            "sharp_head": 0.1, "sharp_body": 0.1}
+    far = {"box": [100, 2000, 1000, 5000], "head": [300, 2000, 800, 2500], "torso": [100, 2500, 1000, 3500],
+           "sharp_head": 0.2, "sharp_body": 0.2}
+    rows = {r["path"]: r["id"] for r in db.rows("1")}
+    db.set_local(rows[str(cr2)], {"width": 3456, "height": 5184, "people": [far, near], "exif": {}, "local_tier": 0})
+    db.set_local(rows[str(bad)], {"width": 10, "height": 10, "people": [None], "exif": {}, "local_tier": 0})
+    res = local.rescore(db, config.DEFAULTS)
+    assert res["errors"] == 1 and "b.jpg" in res["first_error"]  # the malformed row is reported, not fatal
+    d = json.loads(db.row(rows[str(cr2)])["local_json"])
+    assert d["af"]["active"] == [1] and d["primary_by"] == "af" and d["people"][0]["head"] == near["head"]
+    assert res["af_backfilled"] == 1 and res["primary_changed"] == 1

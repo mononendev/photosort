@@ -127,6 +127,8 @@ def cmd_rescore(args):
     res = rescore(db, cfg)
     print(f"rescored; {res['changed']} images changed tier, EXIF backfilled on {res['exif_backfilled']}, "
           f"AF points read on {res['af_backfilled']}, primary re-picked on {res['primary_changed']}")
+    if res["errors"]:
+        print(f"{res['errors']} rows failed; first: {res['first_error']}")
     _local_summary(db)
 
 

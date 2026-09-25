@@ -11,6 +11,14 @@ import type { Hover } from './FrameOverlay';
 const MAX_ZOOM = 40;
 const FRAME_LONG_EDGE = 1568;   // the cached frame; past this on screen we swap in the full-resolution render
 
+// The stage fills the screen; the toolbar and the hover readout float over it (fixed height), so nothing they show can
+// resize the stage and shift the zoom. Fit-to-screen leaves room for them.
+const INSET_T = 52, INSET_B = 72;
+const fitOf = (w: number, h: number, W: number, H: number) => {
+  const f = Math.max(0.01, Math.min(w / W, (h - INSET_T - INSET_B) / H));
+  return { f, ox: (w - W * f) / 2, oy: INSET_T + (h - INSET_T - INSET_B - H * f) / 2 };
+};
+
 type View = { zoom: number; ox: number; oy: number };   // zoom over fit-to-screen; image top-left in the stage, px
 
 /**
@@ -31,30 +39,30 @@ export default function FrameViewer({ id, name, l, cfg, layers, selected, onSele
   const drag = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
   const dragged = useRef(false);
 
-  const fit = box.w && box.h ? Math.min(box.w / W, box.h / H) : 0;
+  const fit = box.w && box.h ? fitOf(box.w, box.h, W, H).f : 0;
   const reset = useCallback(() => {
     const el = stage.current;
     if (!el) return;
-    const w = el.clientWidth, h = el.clientHeight, f = Math.min(w / W, h / H);
+    const w = el.clientWidth, h = el.clientHeight, { ox, oy } = fitOf(w, h, W, H);
     setBox({ w, h });
-    setView({ zoom: 1, ox: (w - W * f) / 2, oy: (h - H * f) / 2 });
+    setView({ zoom: 1, ox, oy });
   }, [W, H]);
 
   useLayoutEffect(() => {
     reset();
     root.current?.focus();
-    // A resize (window, or the toolbar wrapping) keeps the zoom and the point at the center of the stage.
+    // A window resize keeps the zoom and the point at the center of the stage.
     let last = { w: stage.current?.clientWidth ?? 0, h: stage.current?.clientHeight ?? 0 };
     const ro = new ResizeObserver(() => {
       const el = stage.current;
       if (!el) return;
       const w = el.clientWidth, h = el.clientHeight;
       if (w === last.w && h === last.h) return;
-      const prev = last, f0 = Math.min(prev.w / W, prev.h / H), f1 = Math.min(w / W, h / H);
+      const prev = last, f0 = fitOf(prev.w, prev.h, W, H).f, fresh = fitOf(w, h, W, H), f1 = fresh.f;
       last = { w, h };
       setBox({ w, h });
       setView((v) => {
-        if (v.zoom === 1 || !f0) return { zoom: 1, ox: (w - W * f1) / 2, oy: (h - H * f1) / 2 };
+        if (v.zoom === 1 || !prev.w) return { zoom: 1, ox: fresh.ox, oy: fresh.oy };
         const k = f1 / f0;   // fit changed by k; scale the image about the old center, then move to the new one
         return { zoom: v.zoom, ox: w / 2 - (prev.w / 2 - v.ox) * k, oy: h / 2 - (prev.h / 2 - v.oy) * k };
       });
@@ -67,10 +75,9 @@ export default function FrameViewer({ id, name, l, cfg, layers, selected, onSele
     setView((v) => {
       const el = stage.current;
       if (!el) return v;
-      const f = Math.min(el.clientWidth / W, el.clientHeight / H);
       const zoom = Math.min(MAX_ZOOM, Math.max(1, v.zoom * factor));
       const k = zoom / v.zoom;
-      if (zoom === 1) return { zoom, ox: (el.clientWidth - W * f) / 2, oy: (el.clientHeight - H * f) / 2 };
+      if (zoom === 1) { const { ox, oy } = fitOf(el.clientWidth, el.clientHeight, W, H); return { zoom, ox, oy }; }
       return { zoom, ox: mx - (mx - v.ox) * k, oy: my - (my - v.oy) * k };
     });
   }, [W, H]);
@@ -111,22 +118,8 @@ export default function FrameViewer({ id, name, l, cfg, layers, selected, onSele
   const fullLoaded = loadedFor === id;
 
   return createPortal(
-    <div ref={root} tabIndex={-1} className="fixed inset-0 z-[60] flex flex-col bg-black/95 outline-none">
-      <div className="flex flex-wrap items-center gap-3 px-4 py-2 border-b border-gray-800">
-        <span className="font-mono text-sm text-gray-300 truncate max-w-[40vw]">{name}</span>
-        {bar}
-        <span className="ml-auto flex items-center gap-2 text-xs text-gray-400">
-          <span className="font-mono w-32 text-right whitespace-nowrap" title="screen pixels per original pixel">{fit ? `${Math.round(scale * 100)}% of native` : ''}</span>
-          <span className="text-gray-500 w-28 whitespace-nowrap">{showFull && !fullLoaded ? 'loading full res…' : showFull ? 'full resolution' : ''}</span>
-          <button onClick={() => zoomAt(1 / 1.5, box.w / 2, box.h / 2)} className="px-2 rounded border border-gray-700 hover:border-gray-500">−</button>
-          <button onClick={() => zoomAt(1.5, box.w / 2, box.h / 2)} className="px-2 rounded border border-gray-700 hover:border-gray-500">+</button>
-          <button onClick={() => { const el = stage.current; if (el) { const k = 1 / scale; zoomAt(k, el.clientWidth / 2, el.clientHeight / 2); } }}
-            className="px-2 rounded border border-gray-700 hover:border-gray-500" title="one screen pixel per original pixel">1:1</button>
-          <button onClick={reset} className="px-2 rounded border border-gray-700 hover:border-gray-500">fit</button>
-          <button onClick={onClose} className="px-2 text-lg text-gray-400 hover:text-white">✕</button>
-        </span>
-      </div>
-      <div ref={stage} className="relative flex-1 overflow-hidden select-none cursor-grab active:cursor-grabbing"
+    <div ref={root} tabIndex={-1} className="fixed inset-0 z-[60] bg-black/95 outline-none">
+      <div ref={stage} className="absolute inset-0 overflow-hidden select-none cursor-grab active:cursor-grabbing"
         onDoubleClick={reset}
         onPointerDown={(e) => {
           if (e.button !== 0) return;
@@ -155,8 +148,23 @@ export default function FrameViewer({ id, name, l, cfg, layers, selected, onSele
           </div>
         )}
       </div>
-      <div className="px-4 py-1 border-t border-gray-800 flex items-start gap-4">
-        <div className="flex-1"><HoverBar hover={hover} l={l} /></div>
+      <div className="absolute inset-x-0 top-0 z-10 flex flex-wrap items-center gap-3 px-4 py-2 border-b border-gray-800 bg-black/80 backdrop-blur-sm">
+        <span className="font-mono text-sm text-gray-300 truncate max-w-[40vw]">{name}</span>
+        {bar}
+        <span className="ml-auto flex items-center gap-2 text-xs text-gray-400">
+          <span className="font-mono w-32 text-right whitespace-nowrap" title="screen pixels per original pixel">{fit ? `${Math.round(scale * 100)}% of native` : ''}</span>
+          <span className="text-gray-500 w-28 whitespace-nowrap">{showFull && !fullLoaded ? 'loading full res…' : showFull ? 'full resolution' : ''}</span>
+          <button onClick={() => zoomAt(1 / 1.5, box.w / 2, box.h / 2)} className="px-2 rounded border border-gray-700 hover:border-gray-500">−</button>
+          <button onClick={() => zoomAt(1.5, box.w / 2, box.h / 2)} className="px-2 rounded border border-gray-700 hover:border-gray-500">+</button>
+          <button onClick={() => { const el = stage.current; if (el) { const k = 1 / scale; zoomAt(k, el.clientWidth / 2, el.clientHeight / 2); } }}
+            className="px-2 rounded border border-gray-700 hover:border-gray-500" title="one screen pixel per original pixel">1:1</button>
+          <button onClick={reset} className="px-2 rounded border border-gray-700 hover:border-gray-500">fit</button>
+          <button onClick={onClose} className="px-2 text-lg text-gray-400 hover:text-white">✕</button>
+        </span>
+      </div>
+      <div className="absolute inset-x-0 bottom-0 z-10 flex items-start gap-4 px-4 py-1 border-t border-gray-800 bg-black/80 backdrop-blur-sm overflow-hidden"
+        style={{ height: INSET_B }}>
+        <div className="flex-1 min-w-0"><HoverBar hover={hover} l={l} /></div>
         <div className="text-[11px] text-gray-600 pt-0.5">scroll to zoom · drag to pan · double-click or 0 to fit · Esc to close · ←/→ next image</div>
       </div>
     </div>,

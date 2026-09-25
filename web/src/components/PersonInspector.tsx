@@ -1,10 +1,41 @@
-import type { FocusDebug, FocusView, LocalResult, Person, SpectrumView } from '../api/client';
+import type { FocusDebug, FocusView, LocalResult, MetricTerms, Person, SpectrumView } from '../api/client';
 import Gauge from './Gauge';
 import Tip from './Tip';
 import { fmt } from './CheckTable';
 import { METRIC_TIPS, explainLocal } from '../lib/explain';
 import type { Cfg } from '../lib/explain';
 import { GRADE_COLOR, PERSON_COLORS, gradePerson } from '../lib/pose';
+
+const sci = (v: number | undefined) => (v == null ? '–' : v.toExponential(2));
+
+/** The stored terms behind each ratio, so the arithmetic is visible without reading the original file. */
+function TermsTable({ p, l }: { p: Person; l: LocalResult }) {
+  const eps = l.eps ?? 0.002;
+  const rows: [string, MetricTerms | null | undefined][] = [
+    ['eye band', p.terms?.eye], ['head', p.terms?.head], ['torso', p.terms?.torso], ['body', p.terms?.body], ['background', l.bg_terms],
+  ];
+  if (!p.terms) return null;
+  return (
+    <Tip tip={<>Stored by the local stage. Each sharpness value is var(∇²I) / (var(I) + ε) with ε = {eps}, on the region downscaled to at most 512 px (“at”). The eye FFT ratio is the energy in 0.25–0.75 × Nyquist over the energy from 0.03 up to 0.75.</>}>
+      <table className="font-mono text-[10px] text-gray-400">
+        <thead><tr className="text-gray-500"><td className="pr-2">region</td><td className="pr-2">var(∇²I)</td><td className="pr-2">var(I)</td><td className="pr-2">at</td><td>= value</td></tr></thead>
+        <tbody>
+          {rows.map(([name, t]) => t && (
+            <tr key={name}>
+              <td className="pr-2">{name}</td><td className="pr-2">{sci(t.lap_var)}</td><td className="pr-2">{sci(t.gray_var)}</td>
+              <td className="pr-2">{t.px ? `${t.px[0]}×${t.px[1]}` : t.px_count ? `${(t.px_count / 1000).toFixed(0)}k px` : ''}</td>
+              <td className="text-gray-200">{fmt(t.lap_var / (t.gray_var + eps))}</td>
+            </tr>
+          ))}
+          {p.terms.eye?.band_e != null && p.terms.eye.total_e != null && (
+            <tr><td className="pr-2">eye FFT</td><td className="pr-2">{sci(p.terms.eye.band_e)}</td><td className="pr-2">{sci(p.terms.eye.total_e)}</td><td className="pr-2">band/total</td>
+              <td className="text-gray-200">{fmt(p.terms.eye.band_e / p.terms.eye.total_e)}</td></tr>
+          )}
+        </tbody>
+      </table>
+    </Tip>
+  );
+}
 
 /** Per-person numbers: why they rank where they do, and each metric against its tier thresholds. */
 export function PersonInspector({ l, cfg, selected, onSelect }: { l: LocalResult; cfg: Cfg; selected: number; onSelect: (i: number) => void }) {
@@ -53,6 +84,7 @@ export function PersonInspector({ l, cfg, selected, onSelect }: { l: LocalResult
             grade <b style={{ color: GRADE_COLOR[g.grade ?? 'none'] }}>{g.grade ?? '–'}</b>
             <span className="text-gray-500"> — {g.onEyes ? 'every eye-band metric must clear a tier’s threshold' : 'no eye band, so the head box decides on its own thresholds'}</span>
           </div>
+          <TermsTable p={p} l={l} />
         </div>
         <div className="space-y-2">
           {g.checks.map((c) => (

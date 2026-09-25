@@ -14,7 +14,7 @@ import cv2
 import numpy as np
 
 from . import images as I
-from .local import EYE_MIN_PX, MIN_REGION_PX, hf_ratio
+from .local import EPS, EYE_MIN_PX, MIN_REGION_PX, _fit512, hf_ratio
 
 HEAT_TILES = 96          # tiles along the frame's long edge
 PROFILE_BINS = 60        # radial spectrum bins from 0 to 1.0 x Nyquist
@@ -30,34 +30,25 @@ def _jpg(a: np.ndarray, q: int = 90) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(buf.tobytes()).decode()
 
 
-def _prep(gray: np.ndarray) -> np.ndarray:
-    """The same downscale local.sharpness / hf_ratio apply to regions larger than 512 px."""
-    h, w = gray.shape[:2]
-    if max(h, w) > 512:
-        s = 512 / max(h, w)
-        gray = cv2.resize(gray, (max(1, round(w * s)), max(1, round(h * s))), interpolation=cv2.INTER_AREA)
-    return gray
-
-
 def laplacian_view(gray: np.ndarray, min_px: int) -> Optional[dict]:
     """|Laplacian| of the lightly blurred region, colormapped, plus the two variances the metric divides."""
     if gray is None or min(gray.shape[:2]) < min_px:
         return None
-    g = cv2.GaussianBlur(_prep(gray), (0, 0), 1.0)
+    g = cv2.GaussianBlur(_fit512(gray), (0, 0), 1.0)
     lap = cv2.Laplacian(g, cv2.CV_32F, ksize=3)
     mag = np.abs(lap)
     top = float(np.percentile(mag, 99.5)) or 1e-6
     img = cv2.applyColorMap(np.clip(mag / top * 255, 0, 255).astype(np.uint8), cv2.COLORMAP_INFERNO)
     lap_var, g_var = float(lap.var()), float(g.var())
-    return {"img": _jpg(img), "lap_var": lap_var, "gray_var": g_var, "eps": 2e-3,
-            "value": lap_var / (g_var + 2e-3), "size": [g.shape[1], g.shape[0]]}
+    return {"img": _jpg(img), "lap_var": lap_var, "gray_var": g_var, "eps": EPS,
+            "value": lap_var / (g_var + EPS), "size": [g.shape[1], g.shape[0]]}
 
 
 def spectrum_view(gray: np.ndarray, band=(0.25, 0.75), floor: float = 0.03) -> Optional[dict]:
     """Log power spectrum (DC centered) of the Hann-windowed region and the radial energy profile."""
     if gray is None or min(gray.shape[:2]) < EYE_MIN_PX:
         return None
-    gray = _prep(gray)
+    gray = _fit512(gray)
     h, w = gray.shape[:2]
     win = (gray - gray.mean()) * np.outer(np.hanning(h), np.hanning(w)).astype(np.float32)
     p = np.abs(np.fft.fft2(win)) ** 2
@@ -89,7 +80,7 @@ def heatmap(gray: np.ndarray) -> dict:
     lap = cv2.Laplacian(g, cv2.CV_32F, ksize=3)
     ny, nx = H // t, W // t
     tiles = lambda a: a[: ny * t, : nx * t].reshape(ny, t, nx, t).swapaxes(1, 2).reshape(ny, nx, t * t)
-    v = tiles(lap).var(axis=2) / (tiles(g).var(axis=2) + 2e-3)
+    v = tiles(lap).var(axis=2) / (tiles(g).var(axis=2) + EPS)
     lv = np.log10(v + 1e-6)
     lo, hi = float(np.percentile(lv, 2)), float(np.percentile(lv, 99.5))
     u = np.clip((lv - lo) / (hi - lo + 1e-9), 0, 1)
@@ -116,6 +107,6 @@ def focus_debug(path: Path, local: dict) -> dict:
             region = gray[y0:y1, x0:x1]
             if min(region.shape[:2]) >= MIN_REGION_PX:
                 out["head"] = {"box": p["head"], "img": _jpg(np.asarray(im.crop((x0, y0, x1, y1)).resize(
-                    _prep(region).shape[::-1]))[:, :, ::-1]), "laplacian": laplacian_view(region, MIN_REGION_PX)}
+                    _fit512(region).shape[::-1]))[:, :, ::-1]), "laplacian": laplacian_view(region, MIN_REGION_PX)}
         people.append(out)
     return {"width": W, "height": H, "heatmap": heatmap(gray), "people": people}

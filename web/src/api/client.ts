@@ -55,7 +55,11 @@ export interface Person {
   /** YuNet face: box, 5 landmarks (right eye, left eye, nose, right/left mouth corner), the window it searched */
   face?: { box: number[]; search: number[]; score: number; lm: number[][] } | null;
   priority?: number;
+  /** Each metric's stored terms: value = lap_var / (gray_var + eps); eye FFT ratio = band_e / total_e */
+  terms?: Partial<Record<'head' | 'torso' | 'body' | 'eye', MetricTerms | null>>;
 }
+
+export interface MetricTerms { lap_var: number; gray_var: number; px?: number[]; px_count?: number; band_e?: number; total_e?: number }
 
 export interface FocusView { img: string; lap_var: number; gray_var: number; eps: number; value: number; size: number[] }
 export interface SpectrumView {
@@ -73,6 +77,7 @@ export interface LocalResult {
   bg_sharp: number | null; global_sharp: number | null; primary_head_sharp: number | null; primary_body_sharp: number | null;
   primary_eye_sharp?: number | null; primary_eye_hf?: number | null; primary_eye_src?: string | null;
   crop_box: number[] | null; local_tier: number; local_reason: string; mask_boxes?: number[][];
+  bg_terms?: MetricTerms | null; global_terms?: MetricTerms | null; eps?: number;
   exif?: { camera?: string; lens?: string; f_number?: number; shutter_s?: number; iso?: number; focal_mm?: number; focal_35mm?: number; taken?: string };
   exif_prior?: { dof_risk: string | null; motion_risk: string | null; shake_stops: number | null; pupil_mm?: number | null; summary: string | null };
 }

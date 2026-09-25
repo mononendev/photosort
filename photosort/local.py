@@ -22,6 +22,26 @@ EYE_MIN_PX = 24      # an eye band is small by nature; below this there is nothi
 FACE_WEIGHTS = "face_detection_yunet_2023mar.onnx"
 
 
+EPS = 2e-3   # contrast floor in the Laplacian normalization: keeps flat regions from dividing by ~0
+
+
+def _fit512(gray: np.ndarray) -> np.ndarray:
+    h, w = gray.shape[:2]
+    if max(h, w) > 512:
+        s = 512 / max(h, w)
+        gray = cv2.resize(gray, (max(1, round(w * s)), max(1, round(h * s))), interpolation=cv2.INTER_AREA)
+    return gray
+
+
+def sharpness_parts(gray: np.ndarray, min_px: int = MIN_REGION_PX) -> Optional[dict]:
+    """The terms of the sharpness metric: {"lap_var", "gray_var", "px": [w, h] measured at}, or None."""
+    if gray is None or min(gray.shape[:2]) < min_px:
+        return None
+    g = cv2.GaussianBlur(_fit512(gray), (0, 0), 1.0)
+    lap = cv2.Laplacian(g, cv2.CV_32F, ksize=3)
+    return {"lap_var": float(lap.var()), "gray_var": float(g.var()), "px": [g.shape[1], g.shape[0]]}
+
+
 def sharpness(gray: np.ndarray, min_px: int = MIN_REGION_PX) -> Optional[float]:
     """Contrast-normalized Laplacian variance on a float32 grayscale array in [0,1].
 
@@ -29,15 +49,23 @@ def sharpness(gray: np.ndarray, min_px: int = MIN_REGION_PX) -> Optional[float]:
     metric at high ISO). Normalizing by the region's own variance makes a low-contrast
     but sharp region comparable to a high-contrast one. Higher = sharper.
     """
+    t = sharpness_parts(gray, min_px)
+    return None if t is None else t["lap_var"] / (t["gray_var"] + EPS)
+
+
+def hf_parts(gray: np.ndarray, band=(0.25, 0.75), floor: float = 0.03, min_px: int = EYE_MIN_PX) -> Optional[dict]:
+    """The terms of the FFT ratio: {"band_e", "total_e"} (energy in `band`, energy from `floor` up), or None."""
     if gray is None or min(gray.shape[:2]) < min_px:
         return None
+    gray = _fit512(gray)
     h, w = gray.shape[:2]
-    if max(h, w) > 512:
-        s = 512 / max(h, w)
-        gray = cv2.resize(gray, (max(1, round(w * s)), max(1, round(h * s))), interpolation=cv2.INTER_AREA)
-    g = cv2.GaussianBlur(gray, (0, 0), 1.0)
-    lap = cv2.Laplacian(g, cv2.CV_32F, ksize=3)
-    return float(lap.var() / (g.var() + 2e-3))
+    g = (gray - gray.mean()) * np.outer(np.hanning(h), np.hanning(w)).astype(np.float32)
+    p = np.abs(np.fft.rfft2(g)) ** 2
+    r = np.hypot(np.fft.fftfreq(h)[:, None], np.fft.rfftfreq(w)[None, :]) / 0.5
+    total = float(p[(r >= floor) & (r <= band[1])].sum())
+    if total <= 1e-12:
+        return None
+    return {"band_e": float(p[(r >= band[0]) & (r <= band[1])].sum()), "total_e": total}
 
 
 def hf_ratio(gray: np.ndarray, band=(0.25, 0.75), floor: float = 0.03, min_px: int = EYE_MIN_PX) -> Optional[float]:
@@ -49,20 +77,13 @@ def hf_ratio(gray: np.ndarray, band=(0.25, 0.75), floor: float = 0.03, min_px: i
     spectrum, where high-ISO noise and JPEG ringing live, is left out of both sums. A Hann window keeps
     the region edges from leaking into it.
     """
-    if gray is None or min(gray.shape[:2]) < min_px:
-        return None
-    h, w = gray.shape[:2]
-    if max(h, w) > 512:
-        s = 512 / max(h, w)
-        gray = cv2.resize(gray, (max(1, round(w * s)), max(1, round(h * s))), interpolation=cv2.INTER_AREA)
-        h, w = gray.shape[:2]
-    g = (gray - gray.mean()) * np.outer(np.hanning(h), np.hanning(w)).astype(np.float32)
-    p = np.abs(np.fft.rfft2(g)) ** 2
-    r = np.hypot(np.fft.fftfreq(h)[:, None], np.fft.rfftfreq(w)[None, :]) / 0.5
-    total = p[(r >= floor) & (r <= band[1])].sum()
-    if total <= 1e-12:
-        return None
-    return float(p[(r >= band[0]) & (r <= band[1])].sum() / total)
+    t = hf_parts(gray, band, floor, min_px)
+    return None if t is None else t["band_e"] / t["total_e"]
+
+
+def _sig(t: Optional[dict]) -> Optional[dict]:
+    """Round stored metric terms to 4 significant figures (they span many orders of magnitude)."""
+    return None if t is None else {k: (float(f"{v:.4g}") if isinstance(v, float) else v) for k, v in t.items()}
 
 
 def _clamp_box(b, W, H):
@@ -297,10 +318,13 @@ def _eye_metrics(r: dict, det: dict, scale: float, rgb: np.ndarray, gray: np.nda
         e1, e2, src = (pe[0], pe[1], "pose") if pe else (None, None, None)
     band = eye_band(e1, e2, W, H) if e1 else None
     region = gray[band[1]:band[3], band[0]:band[2]] if band else None
-    lap = sharpness(region, EYE_MIN_PX) if band else None
+    lt = sharpness_parts(region, EYE_MIN_PX) if band else None
+    ht = hf_parts(region) if lt else None
+    lap = lt["lap_var"] / (lt["gray_var"] + EPS) if lt else None
     r.update({"eyes": [[round(e1[0]), round(e1[1])], [round(e2[0]), round(e2[1])]] if lap is not None else None,
               "eye_src": src if lap is not None else None, "eye": band if lap is not None else None,
-              "sharp_eye": lap, "hf_eye": hf_ratio(region) if lap is not None else None})
+              "sharp_eye": lap, "hf_eye": ht["band_e"] / ht["total_e"] if ht else None})
+    r.setdefault("terms", {})["eye"] = _sig({**lt, **(ht or {})}) if lt else None
     # What the face model saw, kept for the UI overlay even when the band ended up unusable.
     r["face"] = None if not found else {
         "box": [round(v) for v in found["box"]], "search": list(found["search"]), "score": round(found["score"], 3),
@@ -326,10 +350,13 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
         center_dist = float(np.hypot(cx - 0.5, cy - 0.5) / 0.7071)
         r.update({
             "area_frac": area_frac, "center": [round(cx, 3), round(cy, 3)], "center_dist": round(center_dist, 3),
-            "sharp_head": sharpness(_region(gray, r["head"])),
-            "sharp_torso": sharpness(_region(gray, r["torso"])),
-            "sharp_body": sharpness(_region(gray, r["box"])),
         })
+        # Keep each metric's terms (Laplacian and gray variance, measured size) next to the ratio itself.
+        r["terms"] = {}
+        for name, key in (("head", "head"), ("torso", "torso"), ("body", "box")):
+            t = sharpness_parts(_region(gray, r[key]))
+            r[f"sharp_{name}"] = t["lap_var"] / (t["gray_var"] + EPS) if t else None
+            r["terms"][name] = _sig(t)
         r["priority"] = round(area_frac * (1 - 0.5 * center_dist) * (0.5 + 0.5 * r["conf"]), 5)
         r["_det"] = d
         people.append(r)
@@ -341,8 +368,11 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
     m_small = cv2.resize(mask.astype(np.uint8), g_small.shape[::-1], interpolation=cv2.INTER_NEAREST).astype(bool)
     gb = cv2.GaussianBlur(g_small, (0, 0), 1.0)
     lap = cv2.Laplacian(gb, cv2.CV_32F, ksize=3)
-    bg_sharp = float(lap[m_small].var() / (gb[m_small].var() + 2e-3)) if m_small.sum() > 5000 else None
-    global_sharp = float(lap.var() / (gb.var() + 2e-3))
+    bg_terms = {"lap_var": float(lap[m_small].var()), "gray_var": float(gb[m_small].var()), "px_count": int(m_small.sum())} \
+        if m_small.sum() > 5000 else None
+    bg_sharp = bg_terms["lap_var"] / (bg_terms["gray_var"] + EPS) if bg_terms else None
+    global_terms = {"lap_var": float(lap.var()), "gray_var": float(gb.var()), "px": [g_small.shape[1], g_small.shape[0]]}
+    global_sharp = global_terms["lap_var"] / (global_terms["gray_var"] + EPS)
 
     people.sort(key=lambda p: -p["priority"])
     # Eye bands for the most prominent people only (a crowd shot can have dozens of tiny faces).
@@ -371,6 +401,7 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
         "people": [{k: (rnd(v) if k.startswith(("sharp", "hf_")) else v) for k, v in p.items()} for p in people[:6]],
         "mask_boxes": [p["box"] for p in people],  # every person, masked out of the background metric
         "bg_sharp": rnd(bg_sharp), "global_sharp": rnd(global_sharp),
+        "bg_terms": _sig(bg_terms), "global_terms": _sig(global_terms), "eps": EPS,
         "primary_head_sharp": rnd(primary["sharp_head"]) if primary else None,
         "primary_body_sharp": rnd(primary["sharp_body"]) if primary else None,
         "primary_eye_sharp": rnd(primary.get("sharp_eye")) if primary else None,

@@ -130,3 +130,13 @@ def test_debugviz_reproduces_stored_metrics():
     assert sv["value"] == local.hf_ratio(g) and abs(sv["band_energy"] / sv["total_energy"] - sv["value"]) < 1e-6
     hm = debugviz.heatmap(rng.random((400, 900)).astype(np.float32))
     assert hm["grid"][0] * hm["tile"] <= 900 and hm["img"].startswith("data:image/png")
+
+
+def test_metric_terms_reproduce_the_ratios():
+    rng = np.random.default_rng(1)
+    g = cv2.GaussianBlur(rng.random((90, 700)).astype(np.float32), (0, 0), 1.2)
+    t, h = local.sharpness_parts(g, local.EYE_MIN_PX), local.hf_parts(g)
+    assert t["px"] == [512, 66]                       # measured after the same 512 px downscale
+    assert t["lap_var"] / (t["gray_var"] + local.EPS) == local.sharpness(g, local.EYE_MIN_PX)
+    assert h["band_e"] / h["total_e"] == local.hf_ratio(g)
+    assert local.sharpness_parts(g[:10], local.EYE_MIN_PX) is None and local.hf_parts(np.full((64, 64), 0.5, np.float32)) is None

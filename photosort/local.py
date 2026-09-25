@@ -341,10 +341,11 @@ def pick_primary(people: list[dict], af: Optional[dict], cfg: dict) -> str:
     acfg = cfg.get("af") or {}
     for p in people:
         p["af_score"] = A.person_score(af, p) if af else None
-    people.sort(key=lambda p: -p["priority"])
+    # Rows analyzed before priority existed don't store it; the sort is stable, so they keep their stored order.
+    people.sort(key=lambda p: -(p.get("priority") or 0))
     if not people or not af or not acfg.get("use", True):
         return "priority"
-    best = max(people, key=lambda p: (p["af_score"] or 0, p["priority"]))
+    best = max(people, key=lambda p: (p["af_score"] or 0, p.get("priority") or 0))
     if (best["af_score"] or 0) < acfg.get("min_score", 0.5):
         return "priority"
     people.remove(best)
@@ -451,41 +452,47 @@ def rescore(db, cfg: dict, backfill_exif: bool = True) -> dict:
     Rows analyzed before the EXIF prior or AF points existed get them read from the file (header only, fast),
     and the primary person is re-picked from the AF points.
     """
-    changed = backfilled = af_new = reordered = 0
+    changed = backfilled = af_new = reordered = errors = 0
+    first_error = None
     for r in db.rows("local_json IS NOT NULL"):
-        d = json.loads(r["local_json"])
-        dirty = False
-        if backfill_exif and "exif" not in d:
-            d["exif"] = X.read(Path(r["path"]))
-            backfilled += 1
-            dirty = True
-        if "exif" in d:
-            d["exif_prior"] = X.prior(d["exif"], cfg.get("exif"))
-        people = d.get("people") or []
-        if backfill_exif and d.get("af") is None and d.get("width"):
-            # Also retries rows whose earlier read came back empty (the first reader missed Canon 0x0026).
-            af, note = A.read_with_note(Path(r["path"]), d["width"], d["height"], (cfg.get("af") or {}).get("y_up", True))
-            if af is not None or note != d.get("af_note") or "af" not in d:
-                d["af"], d["af_note"] = af, note
-                af_new += af is not None
+        try:
+            d = json.loads(r["local_json"])
+            dirty = False
+            if backfill_exif and "exif" not in d:
+                d["exif"] = X.read(Path(r["path"]))
+                backfilled += 1
                 dirty = True
-        old_first, old_by = (people[0].get("box") if people else None), d.get("primary_by")
-        d["primary_by"] = pick_primary(people, d.get("af"), cfg)
-        dirty |= d["primary_by"] != old_by
-        if people and people[0].get("box") != old_first:
-            # Stored people carry their own metrics, so the new primary's numbers are already here; only the
-            # head crop stays the old one until the next local pass.
-            d.update(_primary_fields(people[0]))
-            reordered += 1
-            dirty = True
-        tier, reason = local_tier(people[0] if people else None, people[1:], cfg["focus"], d.get("exif_prior"),
-                                  cfg.get("exif", {}).get("shake_margin", 1.5))
-        if tier != d.get("local_tier") or dirty:
-            if tier != d.get("local_tier"):
-                changed += 1
-            d["local_tier"], d["local_reason"] = tier, reason
-            db.set_local(r["id"], d)
-    return {"changed": changed, "exif_backfilled": backfilled, "af_backfilled": af_new, "primary_changed": reordered}
+            if "exif" in d:
+                d["exif_prior"] = X.prior(d["exif"], cfg.get("exif"))
+            people = d.get("people") or []
+            if backfill_exif and d.get("af") is None and d.get("width"):
+                # Also retries rows whose earlier read came back empty (the first reader missed Canon 0x0026).
+                af, note = A.read_with_note(Path(r["path"]), d["width"], d["height"], (cfg.get("af") or {}).get("y_up", True))
+                if af is not None or note != d.get("af_note") or "af" not in d:
+                    d["af"], d["af_note"] = af, note
+                    af_new += af is not None
+                    dirty = True
+            old_first, old_by = (people[0].get("box") if people else None), d.get("primary_by")
+            d["primary_by"] = pick_primary(people, d.get("af"), cfg)
+            dirty |= d["primary_by"] != old_by
+            if people and people[0].get("box") != old_first:
+                # Stored people carry their own metrics, so the new primary's numbers are already here; only the
+                # head crop stays the old one until the next local pass.
+                d.update(_primary_fields(people[0]))
+                reordered += 1
+                dirty = True
+            tier, reason = local_tier(people[0] if people else None, people[1:], cfg["focus"], d.get("exif_prior"),
+                                      cfg.get("exif", {}).get("shake_margin", 1.5))
+            if tier != d.get("local_tier") or dirty:
+                if tier != d.get("local_tier"):
+                    changed += 1
+                d["local_tier"], d["local_reason"] = tier, reason
+                db.set_local(r["id"], d)
+        except Exception as e:  # one malformed row must not abort the pass
+            errors += 1
+            first_error = first_error or f"{r['path']}: {type(e).__name__}: {e}"
+    return {"changed": changed, "exif_backfilled": backfilled, "af_backfilled": af_new, "primary_changed": reordered,
+            "errors": errors, "first_error": first_error}
 
 
 THUMB_LONG_EDGE = 400

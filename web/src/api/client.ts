@@ -81,6 +81,11 @@ export interface AfInfo {
   active: number[]; active_from: 'in_focus' | 'selected' | null;
 }
 
+export interface RescoreResult {
+  changed: number; exif_backfilled: number; af_backfilled: number; primary_changed: number;
+  errors: number; first_error: string | null;
+}
+
 export interface LocalResult {
   width: number; height: number; orientation: string; n_people: number; people: Person[];
   bg_sharp: number | null; global_sharp: number | null; primary_head_sharp: number | null; primary_body_sharp: number | null;
@@ -252,7 +257,7 @@ export const api = {
   config: () => request<Record<string, unknown>>('/api/config'),
   putConfig: (values: Record<string, unknown>) =>
     request<Record<string, unknown>>('/api/config', { method: 'PUT', body: JSON.stringify({ values }) }),
-  rescore: () => request<{ changed: number }>('/api/rescore', { method: 'POST' }),
+  rescore: () => request<RescoreResult>('/api/rescore', { method: 'POST' }),
   calibration: (n = 48, metric: FocusMetric = 'eye') => request<Calibration>(`/api/calibration${qs({ n, metric })}`),
   truth: () => request<TruthSummary>('/api/truth'),
   truthClear: () => request<{ cleared: number }>('/api/truth', { method: 'DELETE' }),

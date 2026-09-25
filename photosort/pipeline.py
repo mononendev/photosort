@@ -95,18 +95,14 @@ class JobRunner(threading.Thread):
             files = [f for f in files if f.suffix.lower() not in I.RAW_EXT or f.with_suffix("").as_posix() not in stems]
         self.db.add_paths(files)
         from . import sidecar
-        where_new = " OR ".join("path = ? OR path LIKE ?" for _ in paths)
-        p_new = [x for p in paths for x in (str(p), str(p).rstrip("/") + "/%")]
         if paths:
-            sidecar.ingest(self.db, self.db.rows(f"({where_new}) AND lr_json IS NULL", p_new))
+            sidecar.ingest(self.db, self.db.rows_under(paths, "lr_json IS NULL"))
         if self._cancelled(jid):
             return self._finish(jid, "cancelled")
 
         # 2) local stage
-        where_paths = " OR ".join("path = ? OR path LIKE ?" for _ in paths)
-        params = [x for p in paths for x in (str(p), str(p).rstrip("/") + "/%")]
         cond = "local_json IS NULL" if not opts.get("rescan") else "1"
-        rows = self.db.rows(f"({where_paths}) AND ({cond})", params) if paths else []
+        rows = self.db.rows_under(paths, cond) if paths else []
         self.db.update_job(jid, stage="local", total=len(rows), done=0)
         local_err, local_note = 0, "local: nothing new"
         if rows:
@@ -122,12 +118,12 @@ class JobRunner(threading.Thread):
 
         # 3) vlm stage
         if opts.get("vlm", True):
-            self.run_vlm(jid, where_paths, params, opts, local_err, local_note)
+            self.run_vlm(jid, paths, opts, local_err, local_note)
             if self._cancelled(jid):
                 return self._finish(jid, "cancelled")
         self._finish(jid, "done")
 
-    def run_vlm(self, jid: int, where_paths: str, params: list, opts: dict, local_err: int = 0, local_note: str = ""):
+    def run_vlm(self, jid: int, paths: list[Path], opts: dict, local_err: int = 0, local_note: str = ""):
         """Counters switch to the vlm stage only when it has work, so a local-only re-analysis keeps its
         own done/total; errors from both stages add up. The message keeps the local stage's summary."""
         from . import backends
@@ -139,7 +135,7 @@ class JobRunner(threading.Thread):
             return
         model = opts.get("model") or self.cfg.get("model") or backend.default_model
         cond = "local_json IS NOT NULL AND vlm_json IS NULL" + ("" if opts.get("retry_errors") else " AND error IS NULL")
-        rows = self.db.rows(f"({where_paths}) AND {cond}", params)
+        rows = self.db.rows_under(paths, cond) if paths else []
         if opts.get("skip_tier0", False):
             rows = [r for r in rows if json.loads(r["local_json"])["local_tier"] > 0]
         prefix = f"{local_note} · " if local_note else ""

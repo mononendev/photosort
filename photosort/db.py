@@ -93,6 +93,27 @@ class DB:
             q += f" LIMIT {int(limit)} OFFSET {int(offset)}"
         return self.conn.execute(q, params).fetchall()
 
+    def rows_under(self, paths: list[Path], where: str = "1", params=(), chunk: int = 400) -> list[sqlite3.Row]:
+        """Rows whose path is one of `paths` or lies under one of them, AND `where`, ordered by path.
+
+        Files go in chunked IN lists and folders in chunked prefix matches, so a job over thousands of
+        selected files never builds an expression past SQLite's depth limit (1000). A prefix match with
+        substr() rather than LIKE keeps '_' and '%' in folder names literal."""
+        files = [str(p) for p in paths if not p.is_dir()]
+        dirs = [str(p).rstrip("/") + "/" for p in paths if p.is_dir()]
+        seen: dict[int, sqlite3.Row] = {}
+        for i in range(0, len(files), chunk):
+            part = files[i:i + chunk]
+            q = f"path IN ({','.join('?' * len(part))}) AND ({where})"
+            for r in self.rows(q, [*part, *params]):
+                seen[r["id"]] = r
+        for i in range(0, len(dirs), chunk // 4):
+            part = dirs[i:i + chunk // 4]
+            q = "(" + " OR ".join("substr(path, 1, ?) = ?" for _ in part) + f") AND ({where})"
+            for r in self.rows(q, [x for d in part for x in (len(d), d)] + list(params)):
+                seen[r["id"]] = r
+        return sorted(seen.values(), key=lambda r: r["path"])
+
     def row(self, img_id: int) -> Optional[sqlite3.Row]:
         return self.conn.execute("SELECT * FROM images WHERE id=?", (img_id,)).fetchone()
 

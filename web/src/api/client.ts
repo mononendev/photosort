@@ -51,6 +51,8 @@ export interface LocalResult {
   width: number; height: number; orientation: string; n_people: number; people: Person[];
   bg_sharp: number | null; global_sharp: number | null; primary_head_sharp: number | null; primary_body_sharp: number | null;
   crop_box: number[] | null; local_tier: number; local_reason: string;
+  exif?: { camera?: string; lens?: string; f_number?: number; shutter_s?: number; iso?: number; focal_mm?: number; focal_35mm?: number; taken?: string };
+  exif_prior?: { dof_risk: string | null; motion_risk: string | null; shake_stops: number | null; pupil_mm?: number | null; summary: string | null };
 }
 
 export interface VlmResult {

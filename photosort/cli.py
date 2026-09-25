@@ -120,18 +120,10 @@ def cmd_calibrate(args):
 
 def cmd_rescore(args):
     """Re-derive local tiers from stored metrics with the current thresholds (no re-detection)."""
-    from .local import local_tier
+    from .local import rescore
     workdir, cfg, db = _ctx(args)
-    n = 0
-    for r in db.rows("local_json IS NOT NULL"):
-        d = json.loads(r["local_json"])
-        people = d.get("people") or []
-        tier, reason = local_tier(people[0] if people else None, people[1:], cfg["focus"])
-        if tier != d["local_tier"]:
-            n += 1
-        d["local_tier"], d["local_reason"] = tier, reason
-        db.set_local(r["id"], d)
-    print(f"rescored; {n} images changed tier")
+    res = rescore(db, cfg)
+    print(f"rescored; {res['changed']} images changed tier, EXIF backfilled on {res['exif_backfilled']}")
     _local_summary(db)
 
 

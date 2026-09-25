@@ -1,5 +1,6 @@
 """Stage 1: person/pose detection + native-resolution sharpness scoring (no network)."""
 from __future__ import annotations
+import json
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -11,6 +12,7 @@ import numpy as np
 from PIL import Image
 
 from . import images as I
+from . import exif as X
 
 # COCO keypoint indices used by YOLO pose models
 NOSE, LEYE, REYE, LEAR, REAR, LSHO, RSHO, LHIP, RHIP = 0, 1, 2, 3, 4, 5, 6, 11, 12
@@ -135,13 +137,18 @@ def _person_regions(det: dict, scale: float, W: int, H: int) -> dict:
     }
 
 
-def local_tier(primary: Optional[dict], others: list[dict], thr: dict) -> tuple[int, str]:
+def local_tier(primary: Optional[dict], others: list[dict], thr: dict, prior: Optional[dict] = None,
+               shake_margin: float = 1.5) -> tuple[int, str]:
+    """Tier from measured sharpness; the EXIF prior only demotes a *borderline* tier 2 shot at a slow shutter
+    (a clearly sharp head wins, e.g. a well-panned rider)."""
     if primary is None:
         return 0, "no_people"
     s = primary.get("sharp_head") or primary.get("sharp_body")
     if s is None:
         return 0, "subject_too_small"
     if s >= thr["tier2_min"]:
+        if prior and prior.get("motion_risk") == "high" and s < thr["tier2_min"] * shake_margin:
+            return 1, "borderline_sharp_slow_shutter"
         return 2, "primary_head_sharp"
     best_other = max((p.get("sharp_head") or p.get("sharp_body") or 0) for p in others) if others else 0
     if best_other >= thr["tier2_min"]:
@@ -196,7 +203,9 @@ def analyze(path: Path, cfg: dict, detector: Detector) -> LocalResult:
 
     people.sort(key=lambda p: -p["priority"])
     primary = people[0] if people else None
-    tier, reason = local_tier(primary, people[1:], cfg["focus"])
+    exif = X.read(path)
+    prior = X.prior(exif, cfg.get("exif"))
+    tier, reason = local_tier(primary, people[1:], cfg["focus"], prior, cfg.get("exif", {}).get("shake_margin", 1.5))
 
     frame = I.to_jpeg(I.resize_long_edge(im, cfg["frame_long_edge"]), cfg["frame_quality"])
     crop_jpeg, crop_used = None, None
@@ -215,9 +224,34 @@ def analyze(path: Path, cfg: dict, detector: Detector) -> LocalResult:
         "primary_head_sharp": rnd(primary["sharp_head"]) if primary else None,
         "primary_body_sharp": rnd(primary["sharp_body"]) if primary else None,
         "crop_box": crop_used,
+        "exif": exif, "exif_prior": prior,
         "local_tier": tier, "local_reason": reason,
     }
     return LocalResult(data, frame, crop_jpeg)
+
+
+def rescore(db, cfg: dict, backfill_exif: bool = True) -> dict:
+    """Re-derive local tiers from stored metrics with the current thresholds (no re-detection).
+
+    Rows analyzed before the EXIF prior existed get their metadata read from the file (header only, fast).
+    """
+    changed = backfilled = 0
+    for r in db.rows("local_json IS NOT NULL"):
+        d = json.loads(r["local_json"])
+        if backfill_exif and "exif" not in d:
+            d["exif"] = X.read(Path(r["path"]))
+            backfilled += 1
+        if "exif" in d:
+            d["exif_prior"] = X.prior(d["exif"], cfg.get("exif"))
+        people = d.get("people") or []
+        tier, reason = local_tier(people[0] if people else None, people[1:], cfg["focus"], d.get("exif_prior"),
+                                  cfg.get("exif", {}).get("shake_margin", 1.5))
+        if tier != d.get("local_tier") or backfilled:
+            if tier != d.get("local_tier"):
+                changed += 1
+            d["local_tier"], d["local_reason"] = tier, reason
+            db.set_local(r["id"], d)
+    return {"changed": changed, "exif_backfilled": backfilled}
 
 
 THUMB_LONG_EDGE = 400

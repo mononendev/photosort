@@ -80,6 +80,13 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
             ) : (
               <p className="text-sm text-gray-500">{data?.status === 'analyzed' ? 'Not yet tagged by the vision model.' : data?.error ?? 'Not processed.'}</p>
             )}
+            {l?.exif_prior?.summary && (
+              <div className="text-xs text-gray-400">
+                <span className="text-gray-500">camera: </span>{l.exif_prior.summary}
+                {l.exif_prior.motion_risk === 'high' && <span className="ml-1 rounded bg-amber-900/60 px-1 text-amber-200">motion risk</span>}
+                {l.exif_prior.dof_risk === 'high' && <span className="ml-1 rounded bg-sky-900/60 px-1 text-sky-200">shallow DOF</span>}
+              </div>
+            )}
             {data?.local && (
               <div className="text-xs text-gray-500">
                 local: tier {data.local.local_tier} · {data.local.width}×{data.local.height} {data.local.orientation}

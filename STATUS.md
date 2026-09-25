@@ -173,7 +173,17 @@ Observations: focus tiers agree between local and model on 193/200; the 4B model
 are shaky on candid shots (people labelled `no_people`, `crowd_spectators` for a lone walker), so
 treat subject/composition as hints until calibrated; keywords/remarks are usable.
 
+### EXIF prior (2026-09-25)
+- `photosort/exif.py` reads aperture/shutter/ISO/focal/camera/lens via exifread (verified on a 1D X CR2:
+  135mm f/2.2 1/2000 ISO 1250). `prior()` derives dof_risk (entrance pupil >= 40 mm or f <= 2 = high),
+  motion_risk (shake_stops = log2(shutter * focal35): >= +1 stop or >= 1/60 s = high), and a one-line summary
+  that goes into the VLM context and the image detail panel. `local_tier()` demotes borderline tier 2
+  (sharpness < tier2_min * 1.5) to tier 1 when motion_risk is high. `/api/rescore` and `photosort rescore`
+  backfill EXIF on rows analyzed before this existed.
+
 ### Next
+- Pickier static focus (ticket): eye/face-region sharpness instead of the pose head box, a bigger pose
+  model, an FFT high-frequency-ratio metric, and threshold calibration on exported truth.
 - Upload exported known-good XMPs on the Calibrate page and check the agreement matrices.
 - Consider a bigger model for subject labels if the 4B stays shaky (qwen3-vl:8b fits at concurrency 1).
 - Calibrate focus thresholds on real 20 MP frames (defaults are placeholders).

@@ -68,6 +68,8 @@ def context_text(local: dict) -> str:
         return "Detector data unavailable."
     n = local.get("n_people", 0)
     lines = [f"Frame: {local['width']}x{local['height']} {local['orientation']}. People detected: {n}."]
+    if (local.get("exif_prior") or {}).get("summary"):
+        lines.append(f"Camera: {local['exif_prior']['summary']}")
     if n and local.get("people"):
         p = local["people"][0]
         lines.append(

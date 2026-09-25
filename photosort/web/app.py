@@ -312,17 +312,8 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
 
     @app.post("/api/rescore")
     def rescore():
-        from ..local import local_tier
-        n = 0
-        for r in db.rows("local_json IS NOT NULL"):
-            d = json.loads(r["local_json"])
-            people = d.get("people") or []
-            tier, reason = local_tier(people[0] if people else None, people[1:], cfg["focus"])
-            if tier != d["local_tier"]:
-                n += 1
-                d["local_tier"], d["local_reason"] = tier, reason
-                db.set_local(r["id"], d)
-        return {"changed": n}
+        from ..local import rescore as _rescore
+        return _rescore(db, cfg)
 
     @app.get("/api/calibration")
     def calibration(n: int = 48):

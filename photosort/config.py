@@ -51,6 +51,10 @@ DEFAULTS: dict = {
     # Local focus thresholds on the contrast-normalized sharpness of the primary subject.
     # Run `photosort calibrate` to see your set's distribution and adjust.
     "focus": {"tier2_min": 0.030, "tier1_min": 0.010},
+    # Camera-metadata prior: crop_factor converts focal length to 35mm-equivalent when EXIF lacks it;
+    # f-number <= wide_open_f or entrance pupil >= 40mm = "very shallow DOF"; a tier-2 sharpness below tier2_min*shake_margin is
+    # demoted to tier 1 when the shutter was slow enough that motion blur is likely.
+    "exif": {"crop_factor": 1.0, "wide_open_f": 2.0, "action_shutter": 1 / 500, "shake_margin": 1.5},
     # Cloud stage
     "backend": "ollama",         # ollama (local, free) | gemini | anthropic
     "model": None,               # None = backend default

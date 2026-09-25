@@ -13,3 +13,4 @@ dev-data/*.heic
 *.onnx
 photosort_data/
 *.egg-info/
+.claude/

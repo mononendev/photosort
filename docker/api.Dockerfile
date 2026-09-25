@@ -1,6 +1,8 @@
-# API + job worker: FastAPI, YOLO pose (torch, CUDA via the nvidia runtime), sharpness scoring,
-# and the Ollama client. Run with the nvidia runtime class and NVIDIA_VISIBLE_DEVICES=all to share
-# the GPU with Ollama (no nvidia.com/gpu resource request); falls back to CPU otherwise.
+# API + job worker: FastAPI, YOLO pose, sharpness scoring, and the Ollama client.
+# torch is the CPU build on purpose: the CUDA wheels make the image ~5 GB, which evicted pods on
+# k8s-5 (48 GB ephemeral disk) during pulls. YOLO11n-pose on CPU costs ~0.2-0.3 s/image with a few
+# cores, small next to the vision model's ~10 s/image. Switch TORCH_INDEX to the cu124 index to go
+# back to GPU detection if the node gets more disk.
 FROM python:3.11-slim AS base
 ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 \
     YOLO_CONFIG_DIR=/tmp/yolo MPLCONFIGDIR=/tmp/mpl
@@ -11,8 +13,8 @@ RUN groupadd -g 568 photosort && useradd -u 568 -g 568 -M -d /app -s /usr/sbin/n
 WORKDIR /app
 
 FROM base AS deps
-# CUDA 12.4 wheels bundle the CUDA runtime; the driver comes from the host via the nvidia runtime.
-RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
+RUN pip install torch torchvision --index-url ${TORCH_INDEX}
 COPY pyproject.toml ./
 COPY photosort ./photosort
 RUN pip install .

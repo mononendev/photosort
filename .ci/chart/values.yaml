@@ -51,10 +51,11 @@ mononen-library-chart:
               hosts:
                 - photosort.adoah.dev
 
-    # API + job worker. Shares the RTX 4000 cooperatively (runtimeClassName + nodeAffinity,
-    # NO nvidia.com/gpu resource request) exactly like the stasharr transcoder, so it schedules
-    # alongside ollama's hard reservation. YOLO needs ~500 MB of VRAM; falls back to CPU if the
-    # device isn't visible.
+    # API + job worker. Pinned next to Ollama on the GPU node (nodeAffinity) and set up to share the
+    # RTX 4000 cooperatively (runtimeClassName + NVIDIA_VISIBLE_DEVICES, NO nvidia.com/gpu request)
+    # like the stasharr transcoder. The current image ships CPU torch (the CUDA build was ~5 GB and
+    # evicted pods on k8s-5's 47 GB disk), so detection runs on CPU for now; the GPU wiring stays so
+    # switching TORCH_INDEX in docker/api.Dockerfile is the only change needed to use it.
     api:
       enabled: true
       fullnameOverride: photosort-api

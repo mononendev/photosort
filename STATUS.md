@@ -148,7 +148,15 @@ Repo restructured like stasharr: `web/` (React 19 + Vite + Tailwind 4 + TanStack
 - Images pushed as `registry.adoah.dev/projects/photosort-{api,ui}:dev` from the laptop via the
   `homelab-remote-builder` buildx endpoint.
 
+### Deploy notes (2026-09-25)
+- First `helm upgrade --install` done by hand with `:dev` tags; CI takes over on push.
+- The API image is ~4-5 GB (torch cu124 bundles CUDA). k8s-5 has only 48 GB ephemeral storage and hit
+  DiskPressure during the first pull, evicting pods; it cleared after image GC. If it recurs, shrink the
+  image (torch CPU build + CPU YOLO at ~0.3 s/img on 8 cores is the fallback) or add disk to k8s-5.
+- Dockerfile pitfall: ultralytics pulls `opencv-python`, which clashes with `opencv-python-headless`
+  (shared `cv2/`); the image removes both and reinstalls headless.
+
 ### Next
-- First deploy + real-shoot job through the UI; watch `/api/health` for `device: cuda`.
+- First real job through the UI (200 RAW files, Float Life Fest 2024/September/12); watch `/api/health` for `device: cuda`.
 - Calibrate focus thresholds on real 20 MP frames (defaults are placeholders).
 - Push this repo to GitHub so CI takes over builds/deploys (the workflow expects the same secrets as stasharr).

@@ -407,7 +407,7 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
     global_terms = {"lap_var": float(lap.var()), "gray_var": float(gb.var()), "px": [g_small.shape[1], g_small.shape[0]]}
     global_sharp = global_terms["lap_var"] / (global_terms["gray_var"] + EPS)
 
-    af = A.read(path, W, H, (cfg.get("af") or {}).get("y_up", True))
+    af, af_note = A.read_with_note(path, W, H, (cfg.get("af") or {}).get("y_up", True))
     primary_by = pick_primary(people, af, cfg)
     # Eye bands for the most prominent people only (a crowd shot can have dozens of tiny faces).
     rgb = np.asarray(im) if people else None
@@ -437,7 +437,7 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
         "bg_sharp": rnd(bg_sharp), "global_sharp": rnd(global_sharp),
         "bg_terms": _sig(bg_terms), "global_terms": _sig(global_terms), "eps": EPS,
         **_primary_fields(primary),
-        "af": af, "primary_by": primary_by,
+        "af": af, "af_note": af_note, "primary_by": primary_by,
         "crop_box": crop_used,
         "exif": exif, "exif_prior": prior,
         "local_tier": tier, "local_reason": reason,
@@ -462,10 +462,13 @@ def rescore(db, cfg: dict, backfill_exif: bool = True) -> dict:
         if "exif" in d:
             d["exif_prior"] = X.prior(d["exif"], cfg.get("exif"))
         people = d.get("people") or []
-        if backfill_exif and "af" not in d and d.get("width"):
-            d["af"] = A.read(Path(r["path"]), d["width"], d["height"], (cfg.get("af") or {}).get("y_up", True))
-            af_new += 1
-            dirty = True
+        if backfill_exif and d.get("af") is None and d.get("width"):
+            # Also retries rows whose earlier read came back empty (the first reader missed Canon 0x0026).
+            af, note = A.read_with_note(Path(r["path"]), d["width"], d["height"], (cfg.get("af") or {}).get("y_up", True))
+            if af is not None or note != d.get("af_note") or "af" not in d:
+                d["af"], d["af_note"] = af, note
+                af_new += af is not None
+                dirty = True
         old_first, old_by = (people[0].get("box") if people else None), d.get("primary_by")
         d["primary_by"] = pick_primary(people, d.get("af"), cfg)
         dirty |= d["primary_by"] != old_by

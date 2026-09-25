@@ -89,6 +89,8 @@ export interface LocalResult {
   bg_terms?: MetricTerms | null; global_terms?: MetricTerms | null; eps?: number;
   exif?: { camera?: string; lens?: string; f_number?: number; shutter_s?: number; iso?: number; focal_mm?: number; focal_35mm?: number; taken?: string };
   af?: AfInfo | null;
+  /** What the AF read found, e.g. "spot, 1 active" or why there is nothing */
+  af_note?: string | null;
   /** What picked people[0]: the camera's AF points, or prominence (size, centering, confidence) */
   primary_by?: 'af' | 'priority';
   exif_prior?: { dof_risk: string | null; motion_risk: string | null; shake_stops: number | null; pupil_mm?: number | null; summary: string | null };

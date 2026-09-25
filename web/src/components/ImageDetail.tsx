@@ -71,7 +71,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
     <div className="fixed inset-0 z-50 flex" onKeyDown={(e) => { if (e.key === 'Escape') onClose(); if (e.key === 'ArrowRight') onNav?.(1); if (e.key === 'ArrowLeft') onNav?.(-1); }} tabIndex={-1}>
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
       <div className="relative m-auto w-[min(1200px,96vw)] max-h-[94vh] overflow-auto overscroll-contain rounded-xl border border-gray-700 bg-gray-950 shadow-2xl">
-        <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-800 sticky top-0 bg-gray-950/95">
+        <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-800 sticky top-0 z-10 bg-gray-950/95">
           <span className="font-mono text-sm text-gray-300 truncate">{data?.rel ?? id}</span>
           {data && <Tip plain tip={explainFinal(data, cfg)}><TierBadge tier={data.focus_tier} /></Tip>}
           <Tip plain tip={<>Quality score (1–5) and keep/cull verdict: {data?.override?.quality_score != null || data?.override?.keeper != null ? 'your call.' : "the vision model's opinion of the whole photo (exposure, framing, moment), not just focus."}</>}>
@@ -148,6 +148,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
             ) : (
               <p className="text-sm text-gray-500">{data?.status === 'analyzed' ? 'Not yet tagged by the vision model.' : data?.error ?? 'Not processed.'}</p>
             )}
+            {l && !l.af && l.af_note && <div className="text-xs text-gray-600">AF: {l.af_note}</div>}
             {l?.af && (
               <div className="text-xs text-gray-400">
                 <Tip tip="Read from the camera maker notes. The person under the active AF points is who the photographer meant, so they become the primary subject even when someone else is bigger or sharper; the focus tier then says whether focus actually landed on them."><span className="text-gray-500">AF:</span></Tip>{' '}

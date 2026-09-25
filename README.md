@@ -3,6 +3,7 @@
 [![CI/CD](https://github.com/mononendev/photosort/actions/workflows/ci.yml/badge.svg)](https://github.com/mononendev/photosort/actions/workflows/ci.yml)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776ab)
 ![Node 22](https://img.shields.io/badge/node-22-5fa04e)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
 **Cull and tag thousands of event photos without looking at each one.** photosort finds the people in
 every frame, measures whether the eyes of the main subject are actually sharp, and has a vision model
@@ -265,3 +266,9 @@ docs/               CLI, focus scoring, deployment, dev log
 - [docs/FOCUS.md](docs/FOCUS.md): how focus is measured and how to calibrate it
 - [docs/DEPLOY.md](docs/DEPLOY.md): Kubernetes deployment
 - [docs/DEVLOG.md](docs/DEVLOG.md): design decisions, provider research, and measurements as they happened
+
+## License
+
+[GNU AGPL-3.0](LICENSE). If you run a modified version as a network service, you must offer its source to
+its users. The pose model comes from [Ultralytics](https://github.com/ultralytics/ultralytics), which is
+AGPL-3.0 as well.

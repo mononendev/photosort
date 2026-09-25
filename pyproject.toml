@@ -2,6 +2,7 @@
 name = "photosort"
 version = "0.1.0"
 requires-python = ">=3.10"
+license = { text = "AGPL-3.0-only" }
 dependencies = ["pillow", "pillow-heif", "rawpy", "exifread", "opencv-python-headless", "numpy", "ultralytics", "tqdm", "google-genai", "anthropic", "fastapi", "uvicorn[standard]", "python-multipart"]
 
 [project.scripts]

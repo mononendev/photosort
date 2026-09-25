@@ -1,9 +1,0 @@
-pillow
-pillow-heif
-rawpy
-opencv-python-headless
-numpy
-ultralytics
-tqdm
-google-genai
-anthropic

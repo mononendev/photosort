@@ -47,7 +47,11 @@ UI: https://photosort.adoah.dev (internal ingress, LAN/tailscale only). API heal
 
 ## Gotchas
 - The api Deployment has one replica and an RWO data volume; rollouts overlap briefly on the same node.
-  Don't scale it. The job runner re-queues jobs that were running when a pod restarted.
+  Don't scale it. During the overlap the running job stays with the old pod (it holds a heartbeat lease
+  on the job row); on SIGTERM it lets in-flight images finish for up to 20 s and hands the job back, and
+  the new pod resumes it with done/total intact. A pod killed without that gets its job requeued once the
+  lease is 45 s stale; only the images it had in flight are redone. Keep `terminationGracePeriodSeconds`
+  at 30 s or more.
 - If `/api/health` reports `device: cpu`, the GPU isn't visible: check `runtimeClassName: nvidia` rendered
   and that the ollama pod is on the same node (the api pod follows the `nvidia.com/gpu` node label).
 - Exports go to `/data/exports/<name>` on the data volume; copy them out with `kubectl cp` or mount the PVC.

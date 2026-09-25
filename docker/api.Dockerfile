@@ -4,7 +4,7 @@
 # cores, small next to the vision model's ~10 s/image. Switch TORCH_INDEX to the cu124 index to go
 # back to GPU detection if the node gets more disk.
 FROM python:3.11-slim AS base
-ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 \
+ENV PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1 \
     YOLO_CONFIG_DIR=/tmp/yolo MPLCONFIGDIR=/tmp/mpl
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libgomp1 ca-certificates tzdata \
@@ -13,18 +13,23 @@ RUN groupadd -g 568 photosort && useradd -u 568 -g 568 -M -d /app -s /usr/sbin/n
 WORKDIR /app
 
 FROM base AS deps
+# Dependencies come from the lock, before any source is copied, so a code change only re-runs the
+# last two steps. torch/torchvision are pinned from the lock but pulled from TORCH_INDEX; the rest
+# installs --no-deps (the lock is a full closure), which also keeps ultralytics from pulling in the
+# GUI opencv-python next to the headless build (they share cv2/, so having both breaks imports).
 ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
-RUN pip install torch torchvision --index-url ${TORCH_INDEX}
-COPY pyproject.toml ./
-COPY photosort ./photosort
-RUN pip install .
+COPY requirements.lock.txt ./
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install $(grep -E '^(torch|torchvision)==' requirements.lock.txt) --index-url ${TORCH_INDEX} \
+ && grep -vE '^(torch|torchvision|opencv-python)==|^-e ' requirements.lock.txt > /tmp/requirements.txt \
+ && pip install --no-deps -r /tmp/requirements.txt \
+ && python -c "import cv2; print('cv2', cv2.__version__)"
 # Pre-fetch weights as a seed: at runtime config.weights_path() copies them onto the models volume
 # (PHOTOSORT_MODELS) on first use, so the pod needs no egress and later image pulls stay small.
-# ultralytics pulls in opencv-python, which shares the cv2/ directory with the headless build
-# (a partial uninstall breaks both): remove both, then install headless once.
-RUN pip uninstall -y opencv-python opencv-python-headless && pip install opencv-python-headless \
- && python -c "import cv2; print('cv2', cv2.__version__)" \
- && mkdir -p /app/weights && cd /app/weights && python -c "from ultralytics import YOLO; YOLO('yolo11n-pose.pt')" \
+RUN mkdir -p /app/weights && cd /app/weights && python -c "from ultralytics import YOLO; YOLO('yolo11n-pose.pt')"
+COPY pyproject.toml ./
+COPY photosort ./photosort
+RUN pip install --no-cache-dir --no-deps . \
  && python -c "from photosort.config import weights_path; weights_path('face_detection_yunet_2023mar.onnx')" \
  && ls -la /app/weights
 

@@ -15,12 +15,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.lock.txt
       - name: Install
-        # ultralytics pulls the GUI opencv-python (needs libGL); keep only the headless build, as the API image does
+        # The tests stub the YOLO detector, so skip torch/ultralytics: on Linux, PyPI torch drags in
+        # ~3 GB of CUDA wheels. The lock is a full closure, so --no-deps installs exactly what it pins
+        # (and keeps ultralytics from pulling the GUI opencv-python back in).
         run: |
-          pip install -e . pytest
-          pip uninstall -y opencv-python opencv-python-headless
-          pip install opencv-python-headless
+          grep -vE '^(torch|torchvision|ultralytics|ultralytics-thop|nvidia-ml-py|opencv-python)==' requirements.lock.txt > "$RUNNER_TEMP/requirements.test.txt"
+          pip install --no-deps -r "$RUNNER_TEMP/requirements.test.txt"
+          pip install pytest
       - name: Test
         run: pytest -q tests
 
@@ -28,12 +32,14 @@ jobs:
     runs-on: [homelab]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
       - uses: pnpm/action-setup@v4
         with:
           version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
       - name: Install
         working-directory: web
         run: pnpm install --frozen-lockfile
@@ -56,6 +62,7 @@ jobs:
         run: echo "version=${{ github.ref_name }}-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
       - name: Install buildctl
         run: |
+          command -v buildctl && exit 0
           BUILDKIT_VERSION=$(curl -s https://api.github.com/repos/moby/buildkit/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
           curl -fsSL "https://github.com/moby/buildkit/releases/download/${BUILDKIT_VERSION}/buildkit-${BUILDKIT_VERSION}.linux-amd64.tar.gz" \
             | sudo tar -xz -C /usr/local bin/buildctl
@@ -71,6 +78,8 @@ jobs:
             --opt build-arg:VERSION=${{ steps.version.outputs.version }} \
             --opt build-arg:GIT_SHA=${{ github.sha }} \
             --opt build-arg:BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+            --import-cache type=registry,ref=${{ env.REGISTRY }}/projects/photosort-api:buildcache \
+            --export-cache type=registry,ref=${{ env.REGISTRY }}/projects/photosort-api:buildcache,mode=max \
             --output type=image,name=${{ env.REGISTRY }}/projects/photosort-api:${{ steps.version.outputs.version }},push=true
 
   build-ui:
@@ -83,6 +92,7 @@ jobs:
         run: echo "version=${{ github.ref_name }}-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
       - name: Install buildctl
         run: |
+          command -v buildctl && exit 0
           BUILDKIT_VERSION=$(curl -s https://api.github.com/repos/moby/buildkit/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
           curl -fsSL "https://github.com/moby/buildkit/releases/download/${BUILDKIT_VERSION}/buildkit-${BUILDKIT_VERSION}.linux-amd64.tar.gz" \
             | sudo tar -xz -C /usr/local bin/buildctl
@@ -98,6 +108,8 @@ jobs:
             --opt build-arg:VERSION=${{ steps.version.outputs.version }} \
             --opt build-arg:GIT_SHA=${{ github.sha }} \
             --opt build-arg:BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+            --import-cache type=registry,ref=${{ env.REGISTRY }}/projects/photosort-ui:buildcache \
+            --export-cache type=registry,ref=${{ env.REGISTRY }}/projects/photosort-ui:buildcache,mode=max \
             --output type=image,name=${{ env.REGISTRY }}/projects/photosort-ui:${{ steps.version.outputs.version }},push=true
 
   deploy:

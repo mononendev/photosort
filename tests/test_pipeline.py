@@ -16,6 +16,8 @@ def _runner(tmp_path, monkeypatch, vlm_rows_done: bool):
     def fake_local(db_, cfg, cache, ids_paths, device, progress, should_stop, det):
         for i, _ in ids_paths:
             db_.set_local(i, {"local_tier": 2, "people": []})
+            if hasattr(progress, "finish"):
+                progress.finish(i, "boom" if i == ids_paths[-1][0] else None)
             progress.update(1)
         return len(ids_paths), 1  # one error, to check it survives the vlm stage
 
@@ -93,7 +95,7 @@ def test_vlm_items_recorded_with_usage_and_stages(tmp_path, monkeypatch):
     r.run_job(db.job(jid))
     items = db.job_items(jid, stage="vlm")
     assert len(items) == 2 and all(i["error"] is None and i["seconds"] >= 0 for i in items)
-    assert db.job_item_count(jid) == 2 and db.in_flight(jid) == []
+    assert db.job_item_count(jid, "vlm") == 2 and db.in_flight(jid) == []
     stages = json.loads(db.job(jid)["stages_json"])
     assert list(stages) == ["scan", "local", "vlm"]
     assert stages["vlm"]["model"] == "fake" and stages["vlm"]["done"] == 2

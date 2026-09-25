@@ -8,6 +8,8 @@ GIT_SHA    := $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 BUILD_TIME := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 VERSION_ARGS = --build-arg VERSION=$(VERSION) --build-arg GIT_SHA=$(GIT_SHA) --build-arg BUILD_TIME=$(BUILD_TIME)
+# Same registry cache CI reads and writes, so local and CI builds reuse each other's layers
+CACHE_ARGS = --cache-from type=registry,ref=$(1):buildcache --cache-to type=registry,ref=$(1):buildcache,mode=max
 
 .PHONY: dev web test build-api build-ui push deploy
 
@@ -23,11 +25,11 @@ test:
 
 build-api:
 	docker buildx build --builder $(BUILDER) --platform $(PLATFORM) --file docker/api.Dockerfile --target production \
-		$(VERSION_ARGS) --tag $(API_IMAGE):$(VERSION) --tag $(API_IMAGE):latest --push .
+		$(VERSION_ARGS) $(call CACHE_ARGS,$(API_IMAGE)) --tag $(API_IMAGE):$(VERSION) --tag $(API_IMAGE):latest --push .
 
 build-ui:
 	docker buildx build --builder $(BUILDER) --platform $(PLATFORM) --file docker/ui.Dockerfile --target production \
-		$(VERSION_ARGS) --tag $(UI_IMAGE):$(VERSION) --tag $(UI_IMAGE):latest --push .
+		$(VERSION_ARGS) $(call CACHE_ARGS,$(UI_IMAGE)) --tag $(UI_IMAGE):$(VERSION) --tag $(UI_IMAGE):latest --push .
 
 push: build-api build-ui
 

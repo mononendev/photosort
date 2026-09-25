@@ -16,7 +16,11 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install
-        run: pip install -e . pytest
+        # ultralytics pulls the GUI opencv-python (needs libGL); keep only the headless build, as the API image does
+        run: |
+          pip install -e . pytest
+          pip uninstall -y opencv-python opencv-python-headless
+          pip install opencv-python-headless
       - name: Test
         run: pytest -q tests
 

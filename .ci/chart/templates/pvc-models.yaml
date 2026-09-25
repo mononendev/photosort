@@ -1,5 +1,5 @@
-{{- /* Model weights (YOLO pose, torch/ultralytics caches) on Ceph RBD. Kept on uninstall so a
-       redeploy never re-downloads. The library chart has no PVC template, so this lives here. */ -}}
+{{- /* Model weights (YOLO pose, torch/ultralytics caches) and the API's Python deps (docker/pydeps.sh)
+       on Ceph RBD, off k8s-5's small root disk. Kept on uninstall so a redeploy never re-downloads. The library chart has no PVC template, so this lives here. */ -}}
 {{- $lib := index .Values "mononen-library-chart" -}}
 {{- $mv := .Values.modelsVolume -}}
 apiVersion: v1

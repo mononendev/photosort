@@ -196,7 +196,8 @@ Run them together; the UI's nginx proxies `/api` and `/media` to a host named `p
 ```bash
 docker network create photosort
 docker run -d --name photosort-api --network photosort \
-  -v ~/Pictures/event:/photos:ro -v "$PWD/photosort_data:/data" \
+  -v ~/Pictures/event:/photos:ro -v "$PWD/photosort_data:/data" -v photosort-pydeps:/pydeps \
+  -e PHOTOSORT_PYDEPS=/pydeps \
   -e OLLAMA_HOST=http://host.docker.internal:11434 photosort-api
 docker run -d --name photosort-ui --network photosort -p 8080:80 photosort-ui
 ```
@@ -204,8 +205,12 @@ docker run -d --name photosort-ui --network photosort -p 8080:80 photosort-ui
 The UI is then at http://localhost:8080. The API runs as uid 568, so on Linux `photosort_data/` must be
 writable by it (`sudo chown 568:568 photosort_data`).
 
-The API image uses CPU PyTorch on purpose: the CUDA wheels push it to ~5 GB, and detection is a small cost
-next to the vision model. Model weights are baked in, so the only network access it needs is to Ollama.
+The API image ships Python, the app and its model weights, but not its dependencies: on first start (and
+whenever `requirements.lock.txt` changes) its entrypoint, [`docker/pydeps.sh`](docker/pydeps.sh), installs
+the lock into a venv under `$PHOTOSORT_PYDEPS`. Mount a volume there, as above, so this happens once
+(~1 minute and ~1.4 GB) rather than on every new container. That keeps the image at ~230 MB and keeps
+PyTorch off the node's root disk in the cluster. PyTorch is the CPU build: detection is a small cost
+next to the vision model.
 `make push` builds both images for `linux/amd64` on a remote buildx builder and pushes them.
 
 ## Deploy

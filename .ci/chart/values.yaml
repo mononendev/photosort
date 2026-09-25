@@ -1,8 +1,9 @@
-# Chart-managed volume for model weights (see templates/pvc-models.yaml).
+# Chart-managed volume for model weights and the API's Python deps (see templates/pvc-models.yaml).
+# Deps are ~1.4 GB per lock (CPU torch), up to 3 kept, plus the pip wheel cache (~0.4 GB).
 modelsVolume:
   name: photosort-models
   storageClass: csi-rbd-sc
-  size: 10Gi
+  size: 20Gi
 
 mononen-library-chart:
   global:
@@ -59,9 +60,12 @@ mononen-library-chart:
 
     # API + job worker. Pinned next to Ollama on the GPU node (nodeAffinity) and set up to share the
     # RTX 4000 cooperatively (runtimeClassName + NVIDIA_VISIBLE_DEVICES, NO nvidia.com/gpu request)
-    # like the stasharr transcoder. The current image ships CPU torch (the CUDA build was ~5 GB and
-    # evicted pods on k8s-5's 47 GB disk), so detection runs on CPU for now; the GPU wiring stays so
-    # switching TORCH_INDEX in docker/api.Dockerfile is the only change needed to use it.
+    # like the stasharr transcoder. Detection runs on CPU torch for now; the GPU wiring stays so
+    # switching TORCH_INDEX in docker/api.Dockerfile (and growing modelsVolume) is all it takes.
+    # k8s-5's root disk is only 48 GB, so nothing big lives in the image or in ephemeral storage:
+    # torch and the other deps install onto the models volume (PHOTOSORT_PYDEPS, docker/pydeps.sh)
+    # the first time a pod starts with a new requirements.lock.txt; that start takes a few minutes
+    # and needs egress to PyPI and download.pytorch.org.
     api:
       enabled: true
       fullnameOverride: photosort-api
@@ -108,6 +112,9 @@ mononen-library-chart:
               value: "/models/.yolo"
             - name: TORCH_HOME
               value: "/models/torch"
+            # Python deps (torch, ultralytics, ...): one venv per lock hash, plus the pip cache.
+            - name: PHOTOSORT_PYDEPS
+              value: "/models/pydeps"
             - name: NVIDIA_VISIBLE_DEVICES
               value: "all"
             - name: NVIDIA_DRIVER_CAPABILITIES

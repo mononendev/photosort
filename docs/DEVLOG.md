@@ -223,3 +223,19 @@ treat subject/composition as hints until calibrated; keywords/remarks are usable
 - UNVERIFIED on a real CR2: layout decoded from ExifTool's documented format with synthetic tests only. The y sign
   (`af.y_up`, default true = Cartesian) is the likeliest thing to be wrong: if AF boxes appear mirrored top/bottom,
   set `af.y_up: false`.
+
+### DiskPressure again: Python deps off the image, onto the models PVC (2026-09-25)
+- k8s-5 evicted the master-31 rollout (`available: 2.2Gi`, threshold 2.5Gi). The photosort pod itself uses ~1 MB
+  of ephemeral storage; the node's root disk (48 GB, shared by kubelet and containerd) sits at ~42 GB, right at the
+  image-GC threshold, with ollama (3.7 GB) and immich-ml cuda (2.75 GB) images on it too.
+- Culprit on our side: torch + the whole lock were one `pip install` layer (456 MB gz, ~2 GB unpacked). Any lock
+  edit (master-31 added three small packages) rebuilt it with a new digest, so every such deploy pulled and unpacked
+  ~2 GB next to the still-running old image. There were 10 API rollouts that day.
+- Now the image is Python + app + weights (~230 MB unpacked; `libgl1`/`libglib2.0-0` dropped too, headless cv2
+  doesn't need them). `docker/pydeps.sh` is the entrypoint: it hashes lock + torch index + python + itself, and if
+  `$PHOTOSORT_PYDEPS/<hash>` (on the models PVC, now 20Gi) is missing, builds a venv there with the pip cache on
+  the PVC as well, then execs. Warm start ~1 s; lock change ~30 s with 0 downloads locally (all wheels cached);
+  cold ~1 min. Keeps the 3 most recently used envs. The Docker build runs the same script in a throwaway stage, so a
+  lock that doesn't install or import fails CI rather than the rollout.
+- Needs pod egress to PyPI + download.pytorch.org on lock changes (production has no NetworkPolicies).
+- Because deps no longer touch node disk, the cu124 torch build is now only a question of PVC size (~5 GB/env).

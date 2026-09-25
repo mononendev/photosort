@@ -1,5 +1,5 @@
-"""The API image installs requirements.lock.txt with --no-deps, so a dependency missing from the lock is missing
-from the image (python-multipart was, and the API crash-looped on startup)."""
+"""The API container installs requirements.lock.txt with --no-deps (docker/pydeps.sh), so a dependency missing from
+the lock is missing at runtime (python-multipart was, and the API crash-looped on startup)."""
 import ast
 import re
 from pathlib import Path

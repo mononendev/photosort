@@ -1,11 +1,12 @@
 # Keep the build context small: the images only COPY pyproject.toml, requirements.lock.txt,
-# photosort/, web/ and docker/nginx.conf.
+# photosort/, web/, docker/nginx.conf and docker/pydeps.sh.
 *
 !pyproject.toml
 !requirements.lock.txt
 !photosort/
 !web/
 !docker/nginx.conf
+!docker/pydeps.sh
 **/__pycache__
 **/*.pyc
 web/node_modules

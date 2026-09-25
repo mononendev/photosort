@@ -19,8 +19,9 @@ DEFAULTS: dict = {
     # Run `photosort calibrate` to see your set's distribution and adjust.
     "focus": {"tier2_min": 0.030, "tier1_min": 0.010},
     # Cloud stage
-    "backend": "gemini",
+    "backend": "ollama",         # ollama (local, free) | gemini | anthropic
     "model": None,               # None = backend default
+    "vlm_concurrency": 1,
     "batch_size": 1000,          # requests per batch job (Anthropic backend clamps to its 256 MB limit)
     "gemini_thinking_level": "LOW",
     "anthropic_effort": "low",

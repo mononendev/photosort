@@ -54,9 +54,9 @@ class ExportIn(BaseModel):
 def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -> FastAPI:
     workdir.mkdir(parents=True, exist_ok=True)
     cfg = config.load(workdir)
-    cfg.setdefault("backend", "ollama")
-    if os.environ.get("OLLAMA_HOST"):
+    if os.environ.get("OLLAMA_HOST"):        # deployment wiring wins over a stale config.json
         cfg["base_url"] = os.environ["OLLAMA_HOST"]
+        cfg["backend"] = "ollama"
     db = DB(workdir / "photosort.db")
     runner = JobRunner(db, cfg, workdir, photos_root, device)
     cache = workdir / "cache"

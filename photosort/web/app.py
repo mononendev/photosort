@@ -244,6 +244,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             where.append("(path LIKE ? OR vlm_json LIKE ?)"); params += [f"%{q}%", f"%{q}%"]
         order = {"path": "path", "newest": "id DESC", "score": "json_extract(vlm_json,'$.quality_score') DESC, path",
                  "sharpness": "json_extract(local_json,'$.primary_head_sharp') DESC",
+                 "eye_sharpness": "json_extract(local_json,'$.primary_eye_sharp') DESC",
                  "lr": "json_extract(lr_json,'$.rating') DESC, path"}.get(sort, "path")
         w = " AND ".join(where)
         total = db.count(w, params)
@@ -316,20 +317,24 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         return _rescore(db, cfg)
 
     @app.get("/api/calibration")
-    def calibration(n: int = 48):
+    def calibration(n: int = 48, metric: str = "eye"):
         import numpy as np
+        if metric not in truth.METRICS:
+            raise HTTPException(400, f"metric must be one of {sorted(truth.METRICS)}")
+        key = truth.METRICS[metric][0][2:]
         vals = []
         for r in db.rows("local_json IS NOT NULL"):
             d = json.loads(r["local_json"])
-            if d.get("primary_head_sharp") is not None:
-                vals.append((d["primary_head_sharp"], r["id"], d["local_tier"]))
+            if d.get(key) is not None:
+                vals.append((d[key], r["id"], d["local_tier"]))
+        base = {"metric": metric, "thresholds": cfg["focus"], "keys": truth.METRICS[metric][1:]}
         if not vals:
-            return {"percentiles": {}, "samples": []}
+            return {**base, "percentiles": {}, "samples": []}
         vals.sort()
         arr = np.array([v[0] for v in vals])
         idx = np.linspace(0, len(vals) - 1, min(n, len(vals))).astype(int)
-        return {"count": len(vals), "percentiles": {f"p{q}": round(float(np.percentile(arr, q)), 4) for q in (5, 10, 25, 50, 75, 90, 95)},
-                "thresholds": cfg["focus"], "samples": [{"id": vals[i][1], "sharp": vals[i][0], "tier": vals[i][2]} for i in idx]}
+        return {**base, "count": len(vals), "percentiles": {f"p{q}": round(float(np.percentile(arr, q)), 4) for q in (5, 10, 25, 50, 75, 90, 95)},
+                "samples": [{"id": vals[i][1], "sharp": vals[i][0], "tier": vals[i][2]} for i in idx]}
 
     # ---- ground truth -----------------------------------------------------------------
     def truth_summary():
@@ -345,11 +350,16 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         def acc(m):
             tot = sum(r["n"] for r in m); ok = sum(r["n"] for r in m if r["truth"] == r["pred"])
             return round(ok / tot, 3) if tot else None
-        pairs = [(r[0], int(r[1])) for r in c.execute(
-            "SELECT json_extract(local_json,'$.primary_head_sharp'), json_extract(truth_json,'$.focus_tier') FROM images "
-            "WHERE json_extract(truth_json,'$.focus_tier') IS NOT NULL AND json_extract(local_json,'$.primary_head_sharp') IS NOT NULL")]
+        suggested = {}
+        for m, (path, k2, k1) in truth.METRICS.items():
+            pairs = [(r[0], int(r[1])) for r in c.execute(
+                f"SELECT json_extract(local_json,'{path}'), json_extract(truth_json,'$.focus_tier') FROM images "
+                f"WHERE json_extract(truth_json,'$.focus_tier') IS NOT NULL AND json_extract(local_json,'{path}') IS NOT NULL")]
+            sug = truth.suggest_thresholds(pairs)
+            if sug:
+                suggested[m] = {"n": len(pairs), **{(k2 if k == "tier2_min" else k1): v for k, v in sug.items()}}
         return {"images_with_truth": n, "with_tier": with_tier, "local": {"matrix": local_m, "accuracy": acc(local_m)},
-                "vlm": {"matrix": vlm_m, "accuracy": acc(vlm_m)}, "suggested": truth.suggest_thresholds(pairs),
+                "vlm": {"matrix": vlm_m, "accuracy": acc(vlm_m)}, "suggested": suggested,
                 "mapping": cfg.get("truth")}
 
     @app.get("/api/truth")

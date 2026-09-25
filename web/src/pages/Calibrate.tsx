@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, cropUrl } from '../api/client';
-import type { TruthMatrixRow, TruthSummary } from '../api/client';
+import { api, cropUrl, FOCUS_METRIC_LABEL } from '../api/client';
+import type { FocusMetric, TruthMatrixRow, TruthSummary } from '../api/client';
 
 function Matrix({ rows, title, accuracy }: { rows: TruthMatrixRow[]; title: string; accuracy: number | null }) {
   const cell = (t: number, p: number) => rows.find((r) => r.truth === t && r.pred === p)?.n ?? '';
@@ -19,7 +19,7 @@ function Matrix({ rows, title, accuracy }: { rows: TruthMatrixRow[]; title: stri
   );
 }
 
-function GroundTruth({ onApply }: { onApply: (t1?: number, t2?: number) => void }) {
+function GroundTruth({ onApply, applying }: { onApply: (values: Record<string, number>) => void; applying: boolean }) {
   const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ['truth'], queryFn: api.truth });
   const [dir, setDir] = useState('');
@@ -56,12 +56,18 @@ function GroundTruth({ onApply }: { onApply: (t1?: number, t2?: number) => void 
             <Matrix rows={s.local.matrix} title="local sharpness tier" accuracy={s.local.accuracy} />
             <Matrix rows={s.vlm.matrix} title="vision model tier" accuracy={s.vlm.accuracy} />
           </div>
-          {(s.suggested.tier1_min || s.suggested.tier2_min) && (
-            <div className="text-sm flex flex-wrap items-center gap-3">
-              <span className="text-gray-400">Suggested thresholds from your verdicts:</span>
-              {s.suggested.tier1_min && <span>tier 1 ≥ <b>{s.suggested.tier1_min.value}</b> <span className="text-gray-500">(balanced acc. {Math.round(s.suggested.tier1_min.balanced_accuracy * 100)}%)</span></span>}
-              {s.suggested.tier2_min && <span>tier 2 ≥ <b>{s.suggested.tier2_min.value}</b> <span className="text-gray-500">({Math.round(s.suggested.tier2_min.balanced_accuracy * 100)}%)</span></span>}
-              <button onClick={() => onApply(s.suggested.tier1_min?.value, s.suggested.tier2_min?.value)} className="px-3 py-1 rounded bg-gray-800 hover:bg-gray-700">use these</button>
+          {Object.keys(s.suggested).length > 0 && (
+            <div className="text-sm space-y-1">
+              <div className="text-gray-400">Suggested thresholds from your verdicts (each picked for balanced accuracy on its own; with eyes found, a shot must clear both eye-band metrics):</div>
+              {(Object.entries(s.suggested) as [FocusMetric, NonNullable<TruthSummary['suggested'][FocusMetric]>][]).map(([m, sug]) => (
+                <div key={m} className="flex flex-wrap gap-3 pl-2">
+                  <span className="w-64 text-gray-300">{FOCUS_METRIC_LABEL[m]} <span className="text-gray-500">(n={sug.n})</span></span>
+                  {Object.entries(sug).filter(([k]) => k !== 'n').map(([k, v]) => typeof v === 'object' && (
+                    <span key={k} className="font-mono text-xs">{k} ≥ <b>{v.value}</b> <span className="text-gray-500">({Math.round(v.balanced_accuracy * 100)}%)</span></span>
+                  ))}
+                </div>
+              ))}
+              <button disabled={applying} onClick={() => onApply(Object.fromEntries(Object.values(s.suggested).flatMap((sug) => Object.entries(sug ?? {}).flatMap(([k, v]) => (typeof v === 'object' && v ? [[k, v.value]] : []))))) } className="px-3 py-1 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-40">use all + re-score</button>
             </div>
           )}
         </div>
@@ -72,34 +78,39 @@ function GroundTruth({ onApply }: { onApply: (t1?: number, t2?: number) => void 
 
 export default function Calibrate() {
   const qc = useQueryClient();
-  const { data } = useQuery({ queryKey: ['calibration'], queryFn: () => api.calibration(48) });
-  // Inputs show the server thresholds until edited (null = not edited yet).
-  const [e1, setE1] = useState<string | null>(null);
-  const [e2, setE2] = useState<string | null>(null);
-  const t1 = e1 ?? String(data?.thresholds?.tier1_min ?? '');
-  const t2 = e2 ?? String(data?.thresholds?.tier2_min ?? '');
-  const setT1 = setE1;
-  const setT2 = setE2;
+  const [metric, setMetric] = useState<FocusMetric>('eye');
+  const { data } = useQuery({ queryKey: ['calibration', metric], queryFn: () => api.calibration(48, metric) });
+  // Inputs show the server thresholds until edited (keyed by config name; missing = not edited yet).
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [k2, k1] = data?.keys ?? ['', ''];
+  const shown = (k: string) => edits[k] ?? String(data?.thresholds?.[k] ?? '');
   const save = useMutation({
-    mutationFn: async () => { await api.putConfig({ focus: { tier1_min: Number(t1), tier2_min: Number(t2) } }); return api.rescore(); },
-    onSuccess: () => { qc.invalidateQueries(); },
+    mutationFn: async (values: Record<string, number>) => { await api.putConfig({ focus: values }); return api.rescore(); },
+    onSuccess: () => { setEdits({}); qc.invalidateQueries(); },
   });
   const sel = 'bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm w-28';
   return (
     <div className="space-y-4">
       <h1 className="text-lg font-semibold">Calibrate</h1>
-      <GroundTruth onApply={(a, b) => { if (a !== undefined) setE1(String(a)); if (b !== undefined) setE2(String(b)); }} />
+      <GroundTruth onApply={(values) => save.mutate(values)} applying={save.isPending} />
       <h2 className="font-semibold">Local focus thresholds</h2>
-      <p className="text-sm text-gray-400 max-w-3xl">Head crops below are ordered from softest to sharpest by the local sharpness metric (contrast-normalized Laplacian variance on the original pixels). Find where "soft" becomes "usable" and "usable" becomes "crisp", enter those two numbers, and re-score. This only affects the <em>local</em> tier; the vision model makes its own call and disagreements land in review.</p>
-      {data?.percentiles && (
-        <div className="text-xs text-gray-400 font-mono">{data.count} images · {Object.entries(data.percentiles).map(([k, v]) => `${k}=${v}`).join('  ')}</div>
-      )}
-      <div className="flex items-center gap-3 text-sm">
-        <span className="text-gray-500">tier 1 ≥</span><input value={t1} onChange={(e) => setT1(e.target.value)} className={sel} />
-        <span className="text-gray-500">tier 2 ≥</span><input value={t2} onChange={(e) => setT2(e.target.value)} className={sel} />
-        <button onClick={() => save.mutate()} disabled={save.isPending} className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40">save + re-score</button>
-        {save.data && <span className="text-gray-400">{save.data.changed} images changed tier</span>}
+      <p className="text-sm text-gray-400 max-w-3xl">Focus is judged on a band across both eyes when they can be located (face landmarks, else the pose model's eye keypoints). There the eye band must clear two thresholds: the contrast-normalized Laplacian and the FFT detail ratio, which drops faster for slight softness. When no eyes are found (helmet, visor, turned away), the head-box Laplacian is used. Crops below are the primary subject ordered softest to sharpest by the chosen metric. Find where "soft" becomes "usable" and "usable" becomes "crisp", enter those two numbers, and re-score. This only affects the <em>local</em> tier. Metrics added after an image was analyzed need a fresh local pass on it.</p>
+      <div className="flex gap-1 text-sm">
+        {(Object.keys(FOCUS_METRIC_LABEL) as FocusMetric[]).map((m) => (
+          <button key={m} onClick={() => setMetric(m)} className={`px-3 py-1 rounded ${m === metric ? 'bg-gray-700 text-white' : 'bg-gray-900 text-gray-400 hover:text-white'}`}>{FOCUS_METRIC_LABEL[m]}</button>
+        ))}
       </div>
+      {data?.percentiles && (
+        <div className="text-xs text-gray-400 font-mono">{data.count ?? 0} images · {Object.entries(data.percentiles).map(([k, v]) => `${k}=${v}`).join('  ')}</div>
+      )}
+      {k1 && (
+        <div className="flex items-center gap-3 text-sm">
+          <span className="text-gray-500">tier 1 ≥</span><input value={shown(k1)} onChange={(e) => setEdits({ ...edits, [k1]: e.target.value })} className={sel} />
+          <span className="text-gray-500">tier 2 ≥</span><input value={shown(k2)} onChange={(e) => setEdits({ ...edits, [k2]: e.target.value })} className={sel} />
+          <button onClick={() => save.mutate({ [k1]: Number(shown(k1)), [k2]: Number(shown(k2)) })} disabled={save.isPending} className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40">save + re-score</button>
+          {save.data && <span className="text-gray-400">{save.data.changed} images changed tier</span>}
+        </div>
+      )}
       <div className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(150px,1fr))]">
         {data?.samples.map((s) => (
           <div key={s.id} className="rounded-lg overflow-hidden border border-gray-800 bg-gray-900">

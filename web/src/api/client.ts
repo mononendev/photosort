@@ -32,11 +32,14 @@ export interface ImageSummary {
 }
 
 export interface TruthMatrixRow { truth: number; pred: number; n: number }
+/** head = head-box Laplacian (fallback), eye = eye-band Laplacian, hf = eye-band FFT ratio */
+export type FocusMetric = 'head' | 'eye' | 'hf';
+export const FOCUS_METRIC_LABEL: Record<FocusMetric, string> = { eye: 'eye band · Laplacian', hf: 'eye band · FFT detail ratio', head: 'head box · Laplacian (no eyes found)' };
 export interface TruthSummary {
   images_with_truth: number; with_tier: number;
   local: { matrix: TruthMatrixRow[]; accuracy: number | null };
   vlm: { matrix: TruthMatrixRow[]; accuracy: number | null };
-  suggested: { tier2_min?: { value: number; balanced_accuracy: number }; tier1_min?: { value: number; balanced_accuracy: number } };
+  suggested: Partial<Record<FocusMetric, { n: number } & Partial<Record<string, { value: number; balanced_accuracy: number }>>>>;
   mapping: { label_tiers: Record<string, number>; rating_tiers: Record<string, number | null> } | null;
 }
 export interface TruthImportResult { verdicts: number; matched: number; unmatched: number; summary: TruthSummary }
@@ -45,11 +48,14 @@ export interface Person {
   box: number[]; head: number[]; head_src: string; torso: number[]; upper: number[]; conf: number;
   area_frac: number; center: number[]; center_dist: number;
   sharp_head: number | null; sharp_torso: number | null; sharp_body: number | null;
+  eyes?: number[][] | null; eye_src?: 'face' | 'pose' | null; eye?: number[] | null;
+  sharp_eye?: number | null; hf_eye?: number | null;
 }
 
 export interface LocalResult {
   width: number; height: number; orientation: string; n_people: number; people: Person[];
   bg_sharp: number | null; global_sharp: number | null; primary_head_sharp: number | null; primary_body_sharp: number | null;
+  primary_eye_sharp?: number | null; primary_eye_hf?: number | null; primary_eye_src?: string | null;
   crop_box: number[] | null; local_tier: number; local_reason: string;
   exif?: { camera?: string; lens?: string; f_number?: number; shutter_s?: number; iso?: number; focal_mm?: number; focal_35mm?: number; taken?: string };
   exif_prior?: { dof_risk: string | null; motion_risk: string | null; shake_stops: number | null; pupil_mm?: number | null; summary: string | null };
@@ -99,7 +105,8 @@ export interface Health {
 }
 
 export interface Calibration {
-  count?: number; percentiles: Record<string, number>; thresholds?: { tier1_min: number; tier2_min: number };
+  metric: FocusMetric; keys: [string, string];  // [tier2 key, tier1 key] in config.focus
+  count?: number; percentiles: Record<string, number>; thresholds?: Record<string, number | boolean>;
   samples: { id: number; sharp: number; tier: number }[];
 }
 
@@ -167,7 +174,7 @@ export const api = {
   putConfig: (values: Record<string, unknown>) =>
     request<Record<string, unknown>>('/api/config', { method: 'PUT', body: JSON.stringify({ values }) }),
   rescore: () => request<{ changed: number }>('/api/rescore', { method: 'POST' }),
-  calibration: (n = 48) => request<Calibration>(`/api/calibration${qs({ n })}`),
+  calibration: (n = 48, metric: FocusMetric = 'eye') => request<Calibration>(`/api/calibration${qs({ n, metric })}`),
   truth: () => request<TruthSummary>('/api/truth'),
   truthClear: () => request<{ cleared: number }>('/api/truth', { method: 'DELETE' }),
   truthImport: (dir: string, folder = '') =>

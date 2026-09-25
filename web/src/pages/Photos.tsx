@@ -76,7 +76,7 @@ export default function Photos() {
         </select>
         <input value={filters.q ?? ''} onChange={(e) => set('q', e.target.value)} placeholder="search keywords / name" className={`${sel} w-56`} />
         <select value={filters.sort} onChange={(e) => set('sort', e.target.value)} className={sel}>
-          <option value="path">by path</option><option value="newest">newest</option><option value="score">by score</option><option value="sharpness">by sharpness</option><option value="lr">by your LR rating</option>
+          <option value="path">by path</option><option value="newest">newest</option><option value="score">by score</option><option value="eye_sharpness">by eye sharpness</option><option value="sharpness">by head sharpness</option><option value="lr">by your LR rating</option>
         </select>
         <span className="ml-auto text-xs text-gray-500">{isFetching ? 'loading…' : `${total} photos`}</span>
       </div>

@@ -78,6 +78,12 @@ def context_text(local: dict) -> str:
         lines.append(
             f"Sharpness (higher = sharper): head {p['sharp_head']}, torso {p['sharp_torso']}, body {p['sharp_body']}, "
             f"background {local.get('bg_sharp')}, whole frame {local.get('global_sharp')}.")
+        if p.get("sharp_eye") is not None:
+            lines.append(
+                f"Eye band (both eyes, located by {'face landmarks' if p.get('eye_src') == 'face' else 'pose keypoints'}): "
+                f"sharpness {p['sharp_eye']}, fine-detail energy ratio {p.get('hf_eye')}. This is what decides focus.")
+        else:
+            lines.append("Eyes not located (helmet, visor, turned away, or too small); judge the head.")
         if n > 1:
             others = ", ".join(str(q.get("sharp_head") or q.get("sharp_body")) for q in local["people"][1:4])
             lines.append(f"Other people head sharpness: {others}.")

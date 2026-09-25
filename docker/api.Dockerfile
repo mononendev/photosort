@@ -24,7 +24,9 @@ RUN pip install .
 # (a partial uninstall breaks both): remove both, then install headless once.
 RUN pip uninstall -y opencv-python opencv-python-headless && pip install opencv-python-headless \
  && python -c "import cv2; print('cv2', cv2.__version__)" \
- && mkdir -p /app/weights && cd /app/weights && python -c "from ultralytics import YOLO; YOLO('yolo11n-pose.pt')" && ls -la /app/weights
+ && mkdir -p /app/weights && cd /app/weights && python -c "from ultralytics import YOLO; YOLO('yolo11n-pose.pt')" \
+ && python -c "from photosort.config import weights_path; weights_path('face_detection_yunet_2023mar.onnx')" \
+ && ls -la /app/weights
 
 FROM deps AS production
 ARG VERSION=dev

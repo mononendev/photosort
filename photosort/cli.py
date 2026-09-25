@@ -71,23 +71,25 @@ def _local_summary(db):
 def cmd_calibrate(args):
     """Print the sharpness distribution and build a contact sheet of head crops sorted by sharpness."""
     from PIL import Image, ImageDraw
+    from .truth import METRICS
     workdir, cfg, db = _ctx(args)
+    path, k2, k1 = METRICS[args.metric]
     rows = db.rows("local_json IS NOT NULL")
     vals = []
     for r in rows:
         d = json.loads(r["local_json"])
-        if d["primary_head_sharp"] is not None:
-            vals.append((d["primary_head_sharp"], r["id"], r["path"], d))
+        if d.get(path[2:]) is not None:
+            vals.append((d[path[2:]], r["id"], r["path"], d))
     if not vals:
         print("no local results yet")
         return
     vals.sort()
     import numpy as np
     arr = np.array([v[0] for v in vals])
-    print(f"{len(vals)} images with a primary subject. Head sharpness percentiles:")
+    print(f"{len(vals)} images with a primary-subject {args.metric} value. Percentiles:")
     for q in (5, 10, 25, 50, 75, 90, 95):
         print(f"  p{q:<3d} {np.percentile(arr, q):.4f}")
-    print(f"current thresholds: tier2 >= {cfg['focus']['tier2_min']}, tier1 >= {cfg['focus']['tier1_min']}")
+    print(f"current thresholds: {k2} = {cfg['focus'][k2]}, {k1} = {cfg['focus'][k1]}")
     # contact sheet: N tiles evenly spaced across the sorted range
     n = min(args.tiles, len(vals))
     idx = np.linspace(0, len(vals) - 1, n).astype(int)
@@ -115,7 +117,7 @@ def cmd_calibrate(args):
     sheet.save(out, quality=85)
     print(f"contact sheet (sharpness ascending, left-to-right, top-to-bottom): {out}")
     print("Pick the sharpness values where 'soft' becomes 'acceptable' and 'acceptable' becomes 'crisp',")
-    print(f"then set focus.tier1_min / focus.tier2_min in {workdir/'config.json'} and re-run `local --rescore`.")
+    print(f"then set focus.{k1} / focus.{k2} in {workdir/'config.json'} and run `photosort rescore`.")
 
 
 def cmd_rescore(args):
@@ -336,7 +338,10 @@ def main(argv=None):
     p.add_argument("--limit", type=int); p.add_argument("--retry-errors", action="store_true"); p.set_defaults(fn=cmd_local)
 
     p = sub.add_parser("calibrate", help="show sharpness distribution + contact sheet to pick focus thresholds")
-    p.add_argument("--tiles", type=int, default=64); p.set_defaults(fn=cmd_calibrate)
+    p.add_argument("--tiles", type=int, default=64)
+    p.add_argument("--metric", choices=["eye", "hf", "head"], default="eye",
+                   help="eye = eye-band Laplacian, hf = eye-band FFT ratio, head = head-box Laplacian (no-eyes fallback)")
+    p.set_defaults(fn=cmd_calibrate)
     p = sub.add_parser("rescore", help="re-derive local tiers with current thresholds"); p.set_defaults(fn=cmd_rescore)
 
     p = sub.add_parser("estimate", help="cost table for pending images across models"); p.set_defaults(fn=cmd_estimate)

@@ -26,3 +26,9 @@ def test_suggest_thresholds_separates_classes():
     assert 0.03 <= s["tier2_min"]["value"] <= 0.06 and s["tier2_min"]["balanced_accuracy"] >= 0.95
     assert 0.01 <= s["tier1_min"]["value"] <= 0.025
     assert truth.suggest_thresholds([(0.1, 2)] * 5) == {}
+
+
+def test_metrics_map_to_config_keys():
+    from photosort.config import DEFAULTS
+    for path, k2, k1 in truth.METRICS.values():
+        assert path.startswith("$.primary_") and k2 in DEFAULTS["focus"] and k1 in DEFAULTS["focus"]

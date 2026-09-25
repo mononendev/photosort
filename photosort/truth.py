@@ -111,8 +111,16 @@ def apply(db, verdicts: dict[str, dict], cfg: dict, folder: Optional[str] = None
     return {"verdicts": len(verdicts), "matched": matched, "unmatched": len(set(verdicts) - seen)}
 
 
+# Which stored per-image value each threshold pair calibrates: metric -> (local_json path, tier2 key, tier1 key)
+METRICS = {
+    "head": ("$.primary_head_sharp", "tier2_min", "tier1_min"),
+    "eye": ("$.primary_eye_sharp", "eye_tier2_min", "eye_tier1_min"),
+    "hf": ("$.primary_eye_hf", "hf_tier2_min", "hf_tier1_min"),
+}
+
+
 def suggest_thresholds(pairs: list[tuple[float, int]]) -> dict:
-    """pairs of (head_sharpness, truth_tier). Grid-search thresholds maximizing balanced accuracy for
+    """pairs of (metric value, truth_tier). Grid-search thresholds maximizing balanced accuracy for
     tier2-vs-rest and tier0-vs-rest. Returns {} when there isn't enough of each class."""
     import numpy as np
     if len(pairs) < 10:

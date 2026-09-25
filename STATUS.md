@@ -181,9 +181,28 @@ treat subject/composition as hints until calibrated; keywords/remarks are usable
   (sharpness < tier2_min * 1.5) to tier 1 when motion_risk is high. `/api/rescore` and `photosort rescore`
   backfill EXIF on rows analyzed before this existed.
 
+### Eye-band focus (2026-09-25, irh-cse2)
+- `local.FaceLandmarks` runs OpenCV YuNet (`face_detection_yunet_2023mar.onnx`, 230 KB, no new pip deps,
+  fetched by `config.weights_path` from opencv_zoo and seeded in the image) on a native-res window 3x the
+  pose head box. The eye band is both eyes plus 0.5 IOD sideways and 0.4 IOD up/down. Pose eye keypoints
+  (conf >= 0.5) are the fallback, and the head box is used when neither is found. Top `eye_max_people` (4)
+  people only.
+- New per-person metrics `sharp_eye` (same Laplacian) and `hf_eye` (`local.hf_ratio`: Hann-windowed FFT,
+  energy in 0.25-0.75 Nyquist / energy in 0.03-0.75). On natural patches with a sigma=0.8 blur, hf keeps 0.43-0.49
+  of its value vs 0.60-0.64 for the Laplacian. At very high noise (sigma 0.05) it flattens, which is why the
+  tier needs both.
+- Tier rule: eyes found -> `eye_tier*_min` AND `hf_tier*_min`, else head `tier*_min`. Config switches:
+  `focus.use_eyes`, `focus.use_hf`. Eye/hf thresholds (0.06/0.02, 0.03/0.01) are PLACEHOLDERS: the dev-data
+  JPEGs are 4.6x upscaled, so nothing in them is sharp at native res and they can't set real values.
+- Calibrate page: metric tabs (eye / hf / head) for the contact sheet and thresholds, and truth suggestions
+  for all three with "use all + re-score". CLI: `photosort calibrate --metric eye|hf|head`.
+- Existing rows need a fresh local pass to get eye metrics (rescore only re-tiers stored numbers).
+
 ### Next
-- Pickier static focus (ticket): eye/face-region sharpness instead of the pose head box, a bigger pose
-  model, an FFT high-frequency-ratio metric, and threshold calibration on exported truth.
+- Re-run the local stage on the 200-shot set, upload exported XMPs, apply suggested eye/hf thresholds
+  (bias tier2 upward if still lenient). Placeholders until then.
+- Detector A/B (yolo11s/m-pose vs n) for primary-subject recall; MUSIQ/CLIP-IQA as a third opinion if
+  eye band + FFT still disagree with truth.
 - Upload exported known-good XMPs on the Calibrate page and check the agreement matrices.
 - Consider a bigger model for subject labels if the 4B stays shaky (qwen3-vl:8b fits at concurrency 1).
 - Calibrate focus thresholds on real 20 MP frames (defaults are placeholders).

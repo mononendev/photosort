@@ -10,3 +10,4 @@ web/dist/
 .ci/chart/Chart.lock
 dev-data/*.heic
 .tickets/
+*.onnx

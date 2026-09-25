@@ -55,6 +55,9 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
                   <div>Native-resolution crop of the primary subject's head and upper body (what the model judges focus from).</div>
                   {p && (
                     <div className="font-mono text-gray-300">
+                      {p.sharp_eye != null
+                        ? <div>eyes {p.sharp_eye} · fft {p.hf_eye ?? '–'} <span className="text-gray-500">(via {p.eye_src === 'face' ? 'face landmarks' : 'pose keypoints'})</span></div>
+                        : <div className="text-gray-500">eyes not located</div>}
                       head {p.sharp_head ?? '–'} · torso {p.sharp_torso ?? '–'} · body {p.sharp_body ?? '–'} · bg {l?.bg_sharp ?? '–'}
                       <div className="text-gray-500">head via {p.head_src} · {l?.n_people} people · local tier {l?.local_tier} ({l?.local_reason})</div>
                     </div>

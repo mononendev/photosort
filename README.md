@@ -18,8 +18,12 @@ docs/           STATUS.md is at the repo root; docs/CLI.md covers the command-li
 ## How it works
 
 1. **Local stage** (free): YOLO11n-pose finds people and head keypoints; sharpness (contrast-normalized
-   Laplacian variance on the original pixels) is scored for head / torso / body / background. Produces a
-   local focus tier (0 nobody, 1 partial, 2 sharp), a 1568 px frame, a native-res head crop and a thumbnail.
+   Laplacian variance on the original pixels) is scored for head / torso / body / background. Inside the
+   head box, OpenCV's YuNet face detector locates the eyes (pose eye keypoints as a fallback), and a band
+   across both eyes is scored with the Laplacian and an FFT upper-mid-frequency energy ratio, which falls
+   faster for slight defocus. With eyes found, both must clear their thresholds; without eyes (helmet,
+   visor, turned away), the head box decides. Produces a local focus tier (0 nobody, 1 partial, 2 sharp),
+   a 1568 px frame, a native-res head crop and a thumbnail.
    Camera EXIF (aperture, shutter, focal length, ISO) is read as a static prior: entrance pupil >= 40 mm or
    f-number <= 2 flags "very shallow depth of field", a shutter slower than the 1/focal rule flags motion-blur
    risk. A slow-shutter shot with only *borderline* head sharpness is demoted to tier 1; the prior is also

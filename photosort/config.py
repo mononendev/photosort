@@ -5,6 +5,11 @@ import shutil
 from pathlib import Path
 
 SEED_WEIGHTS_DIR = Path("/app/weights")   # where the docker image keeps its pre-fetched copy
+# Weights that ultralytics can't fetch by name.
+WEIGHT_URLS = {
+    "face_detection_yunet_2023mar.onnx":
+        "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+}
 
 
 def models_dir() -> Path:
@@ -28,6 +33,12 @@ def weights_path(name: str) -> Path:
     if seed.exists():
         shutil.copy2(seed, target)
         return target
+    if p.name in WEIGHT_URLS:
+        import urllib.request
+        tmp = target.with_suffix(target.suffix + ".part")
+        urllib.request.urlretrieve(WEIGHT_URLS[p.name], tmp)
+        tmp.replace(target)
+        return target
     try:
         from ultralytics.utils.downloads import attempt_download_asset
         attempt_download_asset(str(target))
@@ -48,9 +59,17 @@ DEFAULTS: dict = {
     "detect_model": "yolo11n-pose.pt",
     "min_person_frac": 0.0015,   # ignore boxes smaller than this fraction of the frame
     "workers": 4,
-    # Local focus thresholds on the contrast-normalized sharpness of the primary subject.
-    # Run `photosort calibrate` to see your set's distribution and adjust.
-    "focus": {"tier2_min": 0.030, "tier1_min": 0.010},
+    "face_model": "face_detection_yunet_2023mar.onnx",   # OpenCV YuNet: locates the eyes inside the head box
+    "face_conf": 0.6,
+    "eye_max_people": 4,         # eye bands for the N most prominent people
+    # Local focus thresholds. When the eyes are found (face landmarks, else confident pose keypoints), the
+    # eye band must clear both eye_* (contrast-normalized Laplacian) and hf_* (FFT upper-mid band energy
+    # ratio); otherwise the head box Laplacian is judged against tier*_min. The eye/hf values are
+    # placeholders: upload exported verdicts on the Calibrate page (or run `photosort calibrate`) to set them.
+    "focus": {"tier2_min": 0.030, "tier1_min": 0.010,
+              "eye_tier2_min": 0.060, "eye_tier1_min": 0.020,
+              "hf_tier2_min": 0.030, "hf_tier1_min": 0.010,
+              "use_eyes": True, "use_hf": True},
     # Camera-metadata prior: crop_factor converts focal length to 35mm-equivalent when EXIF lacks it;
     # f-number <= wide_open_f or entrance pupil >= 40mm = "very shallow DOF"; a tier-2 sharpness below tier2_min*shake_margin is
     # demoted to tier 1 when the shutter was slow enough that motion blur is likely.

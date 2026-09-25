@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, cropUrl } from '../api/client';
 import { TierBadge, Stars, LrBadge } from './TierBadge';
@@ -34,6 +34,13 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
   const [note, setNote] = useState('');
   const [layers, setLayers] = useState<Set<Layer>>(() => new Set(stored<Layer[]>('detail.layers', DEFAULT_LAYERS)));
   const [full, setFull] = useState(false);
+  useEffect(() => {  // the gallery behind must not scroll while this is open (wheel over the backdrop, or past the end)
+    const html = document.documentElement;
+    const prev = { overflow: html.style.overflow, gutter: html.style.scrollbarGutter };
+    html.style.scrollbarGutter = 'stable';   // keep the scrollbar's space so the gallery doesn't shift sideways
+    html.style.overflow = 'hidden';
+    return () => { html.style.overflow = prev.overflow; html.style.scrollbarGutter = prev.gutter; };
+  }, []);
   const closeFull = useCallback(() => setFull(false), []);
   const [showMath, setShowMath] = useState<boolean>(() => stored('detail.math', false));
   const [sel, setSel] = useState({ id, person: 0 });   // the inspected person resets when navigating to another image
@@ -63,7 +70,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
   return (
     <div className="fixed inset-0 z-50 flex" onKeyDown={(e) => { if (e.key === 'Escape') onClose(); if (e.key === 'ArrowRight') onNav?.(1); if (e.key === 'ArrowLeft') onNav?.(-1); }} tabIndex={-1}>
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
-      <div className="relative m-auto w-[min(1200px,96vw)] max-h-[94vh] overflow-auto rounded-xl border border-gray-700 bg-gray-950 shadow-2xl">
+      <div className="relative m-auto w-[min(1200px,96vw)] max-h-[94vh] overflow-auto overscroll-contain rounded-xl border border-gray-700 bg-gray-950 shadow-2xl">
         <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-800 sticky top-0 bg-gray-950/95">
           <span className="font-mono text-sm text-gray-300 truncate">{data?.rel ?? id}</span>
           {data && <Tip plain tip={explainFinal(data, cfg)}><TierBadge tier={data.focus_tier} /></Tip>}

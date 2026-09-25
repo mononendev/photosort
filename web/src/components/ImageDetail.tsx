@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, cropUrl } from '../api/client';
 import { TierBadge, Stars, LrBadge } from './TierBadge';
 import Tip from './Tip';
 import FrameOverlay from './FrameOverlay';
+import FrameViewer from './FrameViewer';
+import LayerBar from './LayerBar';
 import { FocusMath, PersonInspector } from './PersonInspector';
-import { DEFAULT_LAYERS, LAYERS } from '../lib/pose';
+import { DEFAULT_LAYERS } from '../lib/pose';
 import type { Layer } from '../lib/pose';
 import { METRIC_TIPS, TIER_MEANING, explainDisagree, explainFinal, explainLocal, explainPrior } from '../lib/explain';
 
@@ -31,6 +33,8 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
   const { data: cfg } = useQuery({ queryKey: ['config'], queryFn: api.config, staleTime: 30_000 });
   const [note, setNote] = useState('');
   const [layers, setLayers] = useState<Set<Layer>>(() => new Set(stored<Layer[]>('detail.layers', DEFAULT_LAYERS)));
+  const [full, setFull] = useState(false);
+  const closeFull = useCallback(() => setFull(false), []);
   const [showMath, setShowMath] = useState<boolean>(() => stored('detail.math', false));
   const [sel, setSel] = useState({ id, person: 0 });   // the inspected person resets when navigating to another image
   const person = sel.id === id ? sel.person : 0;
@@ -55,6 +59,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
   const l = data?.local;
   const p = l?.people?.[0];
   const heat = dbg.data?.heatmap;
+  const layerBar = <LayerBar layers={layers} toggle={toggle} heat={heat} heatLoading={dbg.isFetching} />;
   return (
     <div className="fixed inset-0 z-50 flex" onKeyDown={(e) => { if (e.key === 'Escape') onClose(); if (e.key === 'ArrowRight') onNav?.(1); if (e.key === 'ArrowLeft') onNav?.(-1); }} tabIndex={-1}>
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
@@ -85,22 +90,9 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
         </div>
         <div className="grid md:grid-cols-[1fr_380px] gap-4 p-4">
           <div className="space-y-3">
-            {l && (
-              <div className="flex flex-wrap items-center gap-1 text-xs">
-                {LAYERS.map((ly) => (
-                  <Tip key={ly.key} plain tip={ly.tip}>
-                    <button onClick={() => toggle(ly.key)} className={`px-2 py-0.5 rounded border ${layers.has(ly.key) ? 'border-blue-500 bg-blue-900/40 text-gray-100' : 'border-gray-700 text-gray-500 hover:border-gray-500'}`}>{ly.label}</button>
-                  </Tip>
-                ))}
-                {layers.has('heatmap') && (dbg.isFetching ? <span className="text-gray-500 ml-1">computing…</span> : heat && (
-                  <span className="ml-2 inline-flex items-center gap-1 text-[10px] text-gray-500">
-                    soft <span className="inline-block h-2 w-20 rounded" style={{ background: 'linear-gradient(90deg,#30123b,#4686fb,#1ae4b6,#a2fc3c,#faba39,#e4460a,#7a0403)' }} /> sharp
-                    <span className="font-mono">(log₁₀ {heat.log_range[0]}…{heat.log_range[1]}, {heat.tile}px tiles)</span>
-                  </span>
-                ))}
-              </div>
-            )}
-            <FrameOverlay id={id} l={l} cfg={cfg} layers={layers} selected={person} onSelect={setPerson} heat={heat} />
+            {l && layerBar}
+            <FrameOverlay id={id} l={l} cfg={cfg} layers={layers} selected={person} onSelect={setPerson} heat={heat} onOpen={() => setFull(true)} />
+            {full && l && <FrameViewer id={id} name={data?.rel ?? String(id)} l={l} cfg={cfg} layers={layers} selected={person} onSelect={setPerson} heat={heat} bar={layerBar} onClose={closeFull} onNav={onNav} />}
             {data?.has_crop && (
               <div className="flex gap-3 items-start">
                 <img src={cropUrl(id)} alt="head crop" className="w-64 rounded-lg bg-gray-900" />

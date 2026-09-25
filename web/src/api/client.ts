@@ -215,6 +215,8 @@ export const api = {
 export const thumbUrl = (id: number) => `/media/thumb/${id}`;
 export const frameUrl = (id: number) => `/media/frame/${id}`;
 export const cropUrl = (id: number) => `/media/crop/${id}`;
+/** The original at native resolution (rendered on first request, then cached). */
+export const fullUrl = (id: number) => `/media/full/${id}`;
 
 export const TIER_LABEL: Record<number, string> = { 0: 'nobody in focus', 1: 'partly in focus', 2: 'sharp' };
 export const TIER_CLASS: Record<number, string> = {

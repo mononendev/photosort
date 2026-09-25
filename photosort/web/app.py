@@ -295,6 +295,20 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
     def crop(img_id: int):
         return media(img_id, "_crop")
 
+    @app.get("/media/full/{img_id}")
+    def full(img_id: int):
+        """The original at native resolution for the zoomable viewer; rendered once, then served from the cache."""
+        p = cache / f"{img_id}_full.jpg"
+        if not p.exists():
+            r = db.row(img_id)
+            if not r or not Path(r["path"]).exists():
+                raise HTTPException(404)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            tmp = p.with_suffix(f".{os.getpid()}.{time.monotonic_ns()}.tmp")
+            tmp.write_bytes(I.to_jpeg(I.load_rgb(Path(r["path"])), 92))
+            tmp.replace(p)
+        return media(img_id, "_full")
+
     debug_cache: dict = {}   # (id, local_json hash) -> focus_debug result; a few recent images only
 
     @app.get("/api/images/{img_id}/focus-debug")

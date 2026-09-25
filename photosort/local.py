@@ -448,6 +448,7 @@ def write_cache(cache_dir: Path, img_id: int, res: "LocalResult"):
         cp.write_bytes(res.crop_jpeg)
     elif cp.exists():
         cp.unlink()
+    (cache_dir / f"{img_id}_full.jpg").unlink(missing_ok=True)  # the viewer re-renders it from the file on demand
     import io
     thumb = I.resize_long_edge(Image.open(io.BytesIO(res.frame_jpeg)), THUMB_LONG_EDGE)
     (cache_dir / f"{img_id}_thumb.jpg").write_bytes(I.to_jpeg(thumb, 80))

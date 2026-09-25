@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import { frameUrl } from '../api/client';
 import type { FocusDebug, LocalResult, Person } from '../api/client';
@@ -7,20 +7,23 @@ import type { Cfg } from '../lib/explain';
 import { FACE_LM, GRADE_COLOR, KP_MIN_CONF, KP_NAMES, PERSON_COLORS, SKELETON, boxH, boxW, gradePerson } from '../lib/pose';
 import type { Layer } from '../lib/pose';
 
-type Hover = { title: string; body: ReactNode } | null;
+export type Hover = { title: string; body: ReactNode } | null;
+
+type OverlayProps = {
+  l: LocalResult; cfg: Cfg; layers: Set<Layer>; selected: number; onSelect: (i: number) => void;
+  heat?: FocusDebug['heatmap']; setHover: (h: Hover) => void;
+  /** Labels, dots and hit areas shrink by this so they stay the same size on screen when zoomed. */
+  zoom?: number;
+};
 
 /**
- * The frame with everything the local stage found drawn on top, in the original's pixel coordinates
- * (the cached frame is a downscale with the same aspect ratio, so one viewBox fits both).
+ * Everything the local stage found, as an SVG in the original's pixel coordinates (any downscale of the frame
+ * with the same aspect ratio fits the one viewBox). Fills its positioned parent.
  */
-export default function FrameOverlay({ id, l, cfg, layers, selected, onSelect, heat }: {
-  id: number; l: LocalResult | null | undefined; cfg: Cfg; layers: Set<Layer>; selected: number;
-  onSelect: (i: number) => void; heat?: FocusDebug['heatmap'];
-}) {
-  const [hover, setHover] = useState<Hover>(null);
-  if (!l) return <img src={frameUrl(id)} alt="" className="w-full rounded-lg bg-gray-900 object-contain max-h-[60vh]" />;
+export function OverlaySvg({ l, cfg, layers, selected, onSelect, heat, setHover, zoom = 1 }: OverlayProps) {
   const W = l.width, H = l.height;
-  const u = Math.max(W, H) / 1000;           // one "unit" ≈ 0.1% of the long edge
+  const hatch = `hatch${useId().replace(/[^a-zA-Z0-9]/g, '')}`;   // unique per SVG: inline and fullscreen coexist
+  const u = Math.max(W, H) / 1000 / zoom;    // one "unit" ≈ 0.1% of the long edge at zoom 1
   const fs = 16 * u;
   const on = (k: Layer) => layers.has(k);
   const hv = (title: string, body: ReactNode) => ({ onMouseEnter: () => setHover({ title, body }), onMouseLeave: () => setHover(null) });
@@ -47,7 +50,7 @@ export default function FrameOverlay({ id, l, cfg, layers, selected, onSelect, h
       <g key={i} opacity={selected >= 0 && !sel ? 0.55 : 1}>
         {on('people') && (
           <rect x={bx0} y={by0} width={bx1 - bx0} height={by1 - by0} stroke={c} {...stroke(primary ? 2.5 : 1.5)}
-            strokeDasharray={primary ? undefined : '6 4'} className="cursor-pointer" onClick={() => onSelect(i)}
+            strokeDasharray={primary ? undefined : '6 4'} className="cursor-pointer" onClick={(e) => { e.stopPropagation(); onSelect(i); }}
             {...hv(`Person #${i + 1}${primary ? ' · primary subject' : ''}`, <>
               detection conf {fmt(p.conf)} · {(p.area_frac * 100).toFixed(1)}% of frame · center distance {fmt(p.center_dist)}<br />
               priority {p.priority != null ? fmt(p.priority) : '–'} = area × (1 − ½·center dist) × (½ + ½·conf)<br />
@@ -98,39 +101,59 @@ export default function FrameOverlay({ id, l, cfg, layers, selected, onSelect, h
   };
 
   return (
-    <div>
-      <div className="relative mx-auto rounded-lg overflow-hidden bg-gray-900" style={{ aspectRatio: `${W} / ${H}`, width: `min(100%, calc(60vh * ${W / H}))` }}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 w-full h-full" onMouseLeave={() => setHover(null)}>
+      <defs>
+        <pattern id={hatch} width={12 * u} height={12 * u} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect width={12 * u} height={12 * u} fill="rgba(0,0,0,.35)" />
+          <line x1={0} y1={0} x2={0} y2={12 * u} stroke="rgba(255,255,255,.25)" strokeWidth={3 * u} />
+        </pattern>
+      </defs>
+      {on('heatmap') && heat && (
+        <image href={heat.img} x={0} y={0} width={heat.cover[0]} height={heat.cover[1]} preserveAspectRatio="none" style={{ imageRendering: 'pixelated' }} opacity={0.8} pointerEvents="none" />
+      )}
+      {on('mask') && (l.mask_boxes ?? people.map((p) => p.box)).map((b, j) => (
+        <rect key={j} x={b[0]} y={b[1]} width={boxW(b)} height={boxH(b)} fill={`url(#${hatch})`} pointerEvents="none" />
+      ))}
+      {on('crop') && l.crop_box && <>
+        <rect x={l.crop_box[0]} y={l.crop_box[1]} width={boxW(l.crop_box)} height={boxH(l.crop_box)} stroke="#fff" {...stroke(1.5)} strokeDasharray="10 6" pointerEvents="none" />
+        {label(l.crop_box[0], l.crop_box[3] + fs * 1.4, 'model crop', '#fff')}
+      </>}
+      {on('people') && extra.map((b, j) => (
+        <rect key={`x${j}`} x={b[0]} y={b[1]} width={boxW(b)} height={boxH(b)} stroke="#6b7280" {...stroke(1)} strokeDasharray="2 4"
+          {...hv('Person (not ranked in the top 6)', <>Found and masked out of the background, but not stored with metrics.</>)} />
+      ))}
+      {people.map((p, i) => personLayer(p, i)).reverse() /* primary drawn last, on top */}
+    </svg>
+  );
+}
+
+export function HoverBar({ hover, l }: { hover: Hover; l: LocalResult }) {
+  const people = l.people ?? [];
+  return (
+    <div className="min-h-[2.5rem] text-xs">
+      {hover
+        ? <><div className="text-gray-200">{hover.title}</div><div className="text-gray-400">{hover.body}</div></>
+        : <div className="text-gray-600">Hover a box or dot to see what the model found there; click a person to inspect their numbers.
+          {people.length > 0 && !people[0].kp && ' Pose keypoints and face landmarks weren’t stored for this image yet: re-run the local stage (rescan) to see them.'}</div>}
+    </div>
+  );
+}
+
+/** The frame with the overlay, sized to the detail view. Clicking the photo (not a person) opens the viewer. */
+export default function FrameOverlay({ id, l, onOpen, ...rest }: Omit<OverlayProps, 'setHover' | 'l' | 'zoom'> & {
+  id: number; l: LocalResult | null | undefined; onOpen: () => void;
+}) {
+  const [hover, setHover] = useState<Hover>(null);
+  if (!l) return <img src={frameUrl(id)} alt="" onClick={onOpen} className="w-full rounded-lg bg-gray-900 object-contain max-h-[60vh] cursor-zoom-in" />;
+  return (
+    <div className="space-y-1">
+      <div onClick={onOpen} className="group relative mx-auto rounded-lg overflow-hidden bg-gray-900 cursor-zoom-in"
+        style={{ aspectRatio: `${l.width} / ${l.height}`, width: `min(100%, calc(60vh * ${l.width / l.height}))` }}>
         <img src={frameUrl(id)} alt="" className="absolute inset-0 w-full h-full" />
-        <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 w-full h-full">
-          <defs>
-            <pattern id="hatch" width={12 * u} height={12 * u} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-              <rect width={12 * u} height={12 * u} fill="rgba(0,0,0,.35)" />
-              <line x1={0} y1={0} x2={0} y2={12 * u} stroke="rgba(255,255,255,.25)" strokeWidth={3 * u} />
-            </pattern>
-          </defs>
-          {on('heatmap') && heat && (
-            <image href={heat.img} x={0} y={0} width={heat.cover[0]} height={heat.cover[1]} preserveAspectRatio="none" style={{ imageRendering: 'pixelated' }} opacity={0.8} pointerEvents="none" />
-          )}
-          {on('mask') && (l.mask_boxes ?? people.map((p) => p.box)).map((b, j) => (
-            <rect key={j} x={b[0]} y={b[1]} width={boxW(b)} height={boxH(b)} fill="url(#hatch)" pointerEvents="none" />
-          ))}
-          {on('crop') && l.crop_box && <>
-            <rect x={l.crop_box[0]} y={l.crop_box[1]} width={boxW(l.crop_box)} height={boxH(l.crop_box)} stroke="#fff" {...stroke(1.5)} strokeDasharray="10 6" pointerEvents="none" />
-            {label(l.crop_box[0], l.crop_box[3] + fs * 1.4, 'model crop', '#fff')}
-          </>}
-          {on('people') && extra.map((b, j) => (
-            <rect key={`x${j}`} x={b[0]} y={b[1]} width={boxW(b)} height={boxH(b)} stroke="#6b7280" {...stroke(1)} strokeDasharray="2 4"
-              {...hv('Person (not ranked in the top 6)', <>Found and masked out of the background, but not stored with metrics.</>)} />
-          ))}
-          {people.map((p, i) => personLayer(p, i)).reverse() /* primary drawn last, on top */}
-        </svg>
+        <OverlaySvg l={l} setHover={setHover} {...rest} />
+        <span className="absolute right-2 top-2 rounded bg-black/60 px-1.5 text-xs text-gray-300 opacity-0 group-hover:opacity-100 pointer-events-none">⛶ click to enlarge</span>
       </div>
-      <div className="min-h-[2.5rem] mt-1 text-xs">
-        {hover
-          ? <><div className="text-gray-200">{hover.title}</div><div className="text-gray-400">{hover.body}</div></>
-          : <div className="text-gray-600">Hover a box or dot to see what the model found there; click a person to inspect their numbers.
-            {people.length > 0 && !people[0].kp && ' Pose keypoints and face landmarks weren’t stored for this image yet: re-run the local stage (rescan) to see them.'}</div>}
-      </div>
+      <HoverBar hover={hover} l={l} />
     </div>
   );
 }

@@ -2,11 +2,12 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import JobRow from '../components/JobRow';
+import Tip from '../components/Tip';
 
-function Tile({ label, value, to, sub }: { label: string; value: number | string; to?: string; sub?: string }) {
+function Tile({ label, value, to, sub, tip }: { label: string; value: number | string; to?: string; sub?: string; tip?: string }) {
   const body = (
     <div className="rounded-lg border border-gray-800 bg-gray-900 p-4 hover:border-gray-700">
-      <div className="text-xs uppercase tracking-wide text-gray-500">{label}</div>
+      <div className="text-xs uppercase tracking-wide text-gray-500">{tip ? <Tip tip={tip}>{label}</Tip> : label}</div>
       <div className="text-2xl font-semibold mt-1 tabular-nums">{value}</div>
       {sub && <div className="text-xs text-gray-500 mt-1">{sub}</div>}
     </div>
@@ -23,13 +24,13 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-        <Tile label="Tracked" value={stats?.tracked ?? '–'} to="/photos" />
-        <Tile label="Analyzed" value={stats?.analyzed ?? '–'} to="/photos?status=analyzed" sub="local focus scoring" />
-        <Tile label="Tagged" value={stats?.tagged ?? '–'} to="/photos?status=tagged" sub="vision model" />
-        <Tile label="Sharp" value={t?.tier2 ?? '–'} to="/photos?tier=2" />
+        <Tile label="Tracked" value={stats?.tracked ?? '–'} to="/photos" tip="Images registered by any job. Folders you haven't processed aren't counted." />
+        <Tile label="Analyzed" value={stats?.analyzed ?? '–'} to="/photos?status=analyzed" sub="local focus scoring" tip="Images with local results: people found, eye bands and sharpness measured, and a local tier." />
+        <Tile label="Tagged" value={stats?.tagged ?? '–'} to="/photos?status=tagged" sub="vision model" tip="Images the vision model has tagged (its tier, subject, keywords, remarks, score)." />
+        <Tile label="Sharp" value={t?.tier2 ?? '–'} to="/photos?tier=2" tip="Shown tier 2: your call, else the configured focus source (the model by default)." />
         <Tile label="Partial" value={t?.tier1 ?? '–'} to="/photos?tier=1" />
         <Tile label="Nobody in focus" value={t?.tier0 ?? '–'} to="/photos?tier=0" />
-        <Tile label="Needs review" value={stats?.review ?? '–'} to="/photos?review=1" sub="local ≠ model" />
+        <Tile label="Needs review" value={stats?.review ?? '–'} to="/photos?review=1" sub="local ≠ model" tip="The local sharpness tier and the vision model's tier differ. Either the thresholds need calibrating or the model is being generous." />
       </div>
 
       <section>

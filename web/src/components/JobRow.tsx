@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type { Job, JobOptions } from '../api/client';
 import Progress from './Progress';
+import Tip from './Tip';
 
 const STATE_CLASS: Record<string, string> = {
   queued: 'text-gray-400', running: 'text-blue-300', cancelling: 'text-amber-300',
@@ -36,19 +37,23 @@ export default function JobRow({ job, compact }: { job: Job; compact?: boolean }
         <span className="text-gray-300 truncate flex-1" title={job.paths.join('\n')}>
           {job.paths.map((p) => p.split('/').slice(-2).join('/')).join(', ')}
         </span>
-        <span className="text-gray-400 tabular-nums">{job.done}/{job.total}</span>
-        {job.errors > 0 && <span className="text-red-400">{job.errors} err</span>}
+        <Tip tip={<>Progress of the current stage ({job.stage === 'done' ? 'the last stage that had work' : job.stage}). The local stage counts images analyzed; the vlm stage counts images sent to the vision model. The note below keeps the local stage's summary.</>} className="text-gray-400 tabular-nums">{job.done}/{job.total}</Tip>
+        {job.errors > 0 && <Tip tip="Images that failed in the local or vision stage, both added up. Filter Photos by status = error for the messages; resume retries them." className="text-red-400">{job.errors} err</Tip>}
         {live && job.rate ? <span className="text-gray-500">{job.rate}/s · eta {fmtEta(job.eta_s)}</span> : null}
         {(job.state === 'queued' || job.state === 'running') && (
           <button onClick={() => cancel.mutate()} className="text-xs text-gray-400 hover:text-red-300">cancel</button>
         )}
         {finished && incomplete && (
-          <button onClick={() => rerun.mutate({ rescan: false })} disabled={rerun.isPending} title="New job, same paths and options: finish what's left and retry errors"
-            className="text-xs px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-40">resume</button>
+          <Tip plain tip="Queue a new job with the same paths and options. It only processes images this job didn't finish and retries errors; finished images are left alone.">
+            <button onClick={() => rerun.mutate({ rescan: false })} disabled={rerun.isPending}
+              className="text-xs px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-40">resume</button>
+          </Tip>
         )}
         {finished && (
-          <button onClick={() => rerun.mutate({ rescan: true })} disabled={rerun.isPending} title="New job, same paths and options, re-analyzing every image locally (vision-model results are kept)"
-            className="text-xs px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-40">re-run</button>
+          <Tip plain tip="Queue a new job with the same paths and options, re-analyzing every image locally: new detections, eye bands, metrics and tiers with the current thresholds. Existing vision-model tags are kept; only untagged images go to the model.">
+            <button onClick={() => rerun.mutate({ rescan: true })} disabled={rerun.isPending}
+              className="text-xs px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-40">re-run</button>
+          </Tip>
         )}
         {rerun.isSuccess && <span className="text-xs text-emerald-300">queued #{rerun.data.id}</span>}
         {rerun.isError && <span className="text-xs text-red-400">{(rerun.error as Error).message}</span>}

@@ -3,12 +3,19 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, cropUrl, FOCUS_METRIC_LABEL } from '../api/client';
 import type { FocusMetric, TruthMatrixRow, TruthSummary } from '../api/client';
+import Tip from '../components/Tip';
 
-function Matrix({ rows, title, accuracy }: { rows: TruthMatrixRow[]; title: string; accuracy: number | null }) {
+const METRIC_TAB_TIP: Record<FocusMetric, string> = {
+  eye: 'Laplacian on the band across both eyes. Decides the tier (together with the FFT ratio) whenever the eyes were located.',
+  hf: 'FFT upper-mid frequency share on the eye band. More sensitive to slight softness; it must also clear its threshold for eye-band photos.',
+  head: 'Laplacian on the head box. Used only when no eyes were located (helmet, visor, turned away). Photos with eyes still list a head value, but it does not affect their tier.',
+};
+
+function Matrix({ rows, title, accuracy, tip }: { rows: TruthMatrixRow[]; title: string; accuracy: number | null; tip: string }) {
   const cell = (t: number, p: number) => rows.find((r) => r.truth === t && r.pred === p)?.n ?? '';
   return (
     <div className="rounded-lg border border-gray-800 bg-gray-900 p-3">
-      <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">{title} {accuracy !== null && <span className="text-gray-300 normal-case">· agreement {Math.round(accuracy * 100)}%</span>}</div>
+      <div className="text-xs uppercase tracking-wide text-gray-500 mb-1"><Tip tip={tip}>{title}</Tip> {accuracy !== null && <Tip tip="Share of photos with a truth tier where this source picked exactly the same tier (the diagonal). Rows are your tier, columns the prediction: above the diagonal is too generous, below is too strict." className="text-gray-300 normal-case">· agreement {Math.round(accuracy * 100)}%</Tip>}</div>
       <table className="text-xs">
         <thead><tr><th className="text-gray-600 font-normal pr-2 text-left">truth ↓ / predicted →</th>{[0, 1, 2].map((p) => <th key={p} className="px-3 text-gray-400">{p}</th>)}</tr></thead>
         <tbody>{[0, 1, 2].map((t) => (
@@ -53,17 +60,17 @@ function GroundTruth({ onApply, applying }: { onApply: (values: Record<string, n
         <div className="space-y-3">
           <div className="text-sm text-gray-300">{s.images_with_truth} images have verdicts, {s.with_tier} with a focus tier. <Link to="/photos?truth_mismatch=1" className="text-blue-400 hover:underline">show mismatches →</Link></div>
           <div className="grid md:grid-cols-2 gap-3">
-            <Matrix rows={s.local.matrix} title="local sharpness tier" accuracy={s.local.accuracy} />
-            <Matrix rows={s.vlm.matrix} title="vision model tier" accuracy={s.vlm.accuracy} />
+            <Matrix rows={s.local.matrix} title="local sharpness tier" accuracy={s.local.accuracy} tip="Your tier vs the local tier from the current thresholds. This is the one the thresholds below change; re-score and it updates." />
+            <Matrix rows={s.vlm.matrix} title="vision model tier" accuracy={s.vlm.accuracy} tip="Your tier vs the vision model's tier. Thresholds don't affect it; it only changes when the model re-tags." />
           </div>
           {Object.keys(s.suggested).length > 0 && (
             <div className="text-sm space-y-1">
               <div className="text-gray-400">Suggested thresholds from your verdicts (each picked for balanced accuracy on its own; with eyes found, a shot must clear both eye-band metrics):</div>
               {(Object.entries(s.suggested) as [FocusMetric, NonNullable<TruthSummary['suggested'][FocusMetric]>][]).map(([m, sug]) => (
                 <div key={m} className="flex flex-wrap gap-3 pl-2">
-                  <span className="w-64 text-gray-300">{FOCUS_METRIC_LABEL[m]} <span className="text-gray-500">(n={sug.n})</span></span>
+                  <span className="w-64 text-gray-300"><Tip tip={METRIC_TAB_TIP[m]}>{FOCUS_METRIC_LABEL[m]}</Tip> <Tip tip="Photos that have both this metric and a truth tier. Under about 30, treat the suggestion as rough." className="text-gray-500">(n={sug.n})</Tip></span>
                   {Object.entries(sug).filter(([k]) => k !== 'n').map(([k, v]) => typeof v === 'object' && (
-                    <span key={k} className="font-mono text-xs">{k} ≥ <b>{v.value}</b> <span className="text-gray-500">({Math.round(v.balanced_accuracy * 100)}%)</span></span>
+                    <Tip key={k} plain tip={<>The cut on this metric that best separates your {k.includes('tier2') ? 'tier-2 photos from the rest' : 'tier-1-or-better photos from tier 0'}. Balanced accuracy is the average of the hit rate on each side, so a lopsided set can't inflate it. To be pickier than your own labels, round tier 2 up.</>}><span className="font-mono text-xs cursor-help">{k} ≥ <b>{v.value}</b> <span className="text-gray-500">({Math.round(v.balanced_accuracy * 100)}% balanced acc.)</span></span></Tip>
                   ))}
                 </div>
               ))}
@@ -97,11 +104,11 @@ export default function Calibrate() {
       <p className="text-sm text-gray-400 max-w-3xl">Focus is judged on a band across both eyes when they can be located (face landmarks, else the pose model's eye keypoints). There the eye band must clear two thresholds: the contrast-normalized Laplacian and the FFT detail ratio, which drops faster for slight softness. When no eyes are found (helmet, visor, turned away), the head-box Laplacian is used. Crops below are the primary subject ordered softest to sharpest by the chosen metric. Find where "soft" becomes "usable" and "usable" becomes "crisp", enter those two numbers, and re-score. This only affects the <em>local</em> tier. Metrics added after an image was analyzed need a fresh local pass on it.</p>
       <div className="flex gap-1 text-sm">
         {(Object.keys(FOCUS_METRIC_LABEL) as FocusMetric[]).map((m) => (
-          <button key={m} onClick={() => setMetric(m)} className={`px-3 py-1 rounded ${m === metric ? 'bg-gray-700 text-white' : 'bg-gray-900 text-gray-400 hover:text-white'}`}>{FOCUS_METRIC_LABEL[m]}</button>
+          <Tip key={m} plain tip={METRIC_TAB_TIP[m]}><button onClick={() => setMetric(m)} className={`px-3 py-1 rounded ${m === metric ? 'bg-gray-700 text-white' : 'bg-gray-900 text-gray-400 hover:text-white'}`}>{FOCUS_METRIC_LABEL[m]}</button></Tip>
         ))}
       </div>
       {data?.percentiles && (
-        <div className="text-xs text-gray-400 font-mono">{data.count ?? 0} images · {Object.entries(data.percentiles).map(([k, v]) => `${k}=${v}`).join('  ')}</div>
+        <Tip tip="Distribution of this metric over the primary subject of every analyzed photo. p50 is the median, and p90 means 90% of photos score at or below it. If the current tier-2 cut sits below p25, most photos pass it and the tier isn't picky." className="text-xs text-gray-400 font-mono">{data.count ?? 0} images · {Object.entries(data.percentiles).map(([k, v]) => `${k}=${v}`).join('  ')}</Tip>
       )}
       {k1 && (
         <div className="flex items-center gap-3 text-sm">

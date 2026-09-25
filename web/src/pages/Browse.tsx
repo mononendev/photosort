@@ -7,6 +7,7 @@ import type { TreeDir } from '../api/client';
 import useStore from '../hooks/useStore';
 import { StatusDot, TierBadge, Stars } from '../components/TierBadge';
 import Progress from '../components/Progress';
+import Tip from '../components/Tip';
 
 type ToggleFn = (e: MouseEvent) => void;
 
@@ -30,7 +31,7 @@ function DirRow({ d, checked, onToggle }: { d: TreeDir; checked: boolean; onTogg
         {d.tracked > 0 ? (
           <>
             <Progress done={done} total={d.tracked} className="flex-1" />
-            <span className="text-xs text-gray-400 tabular-nums w-24 text-right">{done}/{d.tracked} · {pct}%</span>
+            <Tip tip="Tagged by the vision model / tracked (registered by a job) across this folder and its subfolders. Images never included in a job aren't tracked yet." className="text-xs text-gray-400 tabular-nums w-24 text-right">{done}/{d.tracked} · {pct}%</Tip>
           </>
         ) : (
           <span className="text-xs text-gray-600">not processed</span>
@@ -139,9 +140,9 @@ export default function Browse() {
           <span className="font-semibold">{selected.length}</span> selected
           {selected.length > 0 && <button onClick={clear} className="ml-2 text-xs text-gray-400 hover:text-gray-200">clear</button>}
         </span>
-        <label className="text-sm flex items-center gap-1"><input type="checkbox" checked={defaults.vlm} onChange={(e) => setDefaults({ vlm: e.target.checked })} className="accent-blue-500" /> run vision model</label>
-        <label className="text-sm flex items-center gap-1"><input type="checkbox" checked={defaults.skip_tier0} onChange={(e) => setDefaults({ skip_tier0: e.target.checked })} className="accent-blue-500" /> skip nobody-in-focus</label>
-        <label className="text-sm flex items-center gap-1"><input type="checkbox" checked={defaults.rescan} onChange={(e) => setDefaults({ rescan: e.target.checked })} className="accent-blue-500" /> re-analyze already done</label>
+        <label className="text-sm flex items-center gap-1"><input type="checkbox" checked={defaults.vlm} onChange={(e) => setDefaults({ vlm: e.target.checked })} className="accent-blue-500" /> <Tip tip="After local focus scoring, send each image (frame + native-res head crop + the local numbers) to the vision model for its tier, subject, keywords and remarks. Off = local scoring only, much faster.">run vision model</Tip></label>
+        <label className="text-sm flex items-center gap-1"><input type="checkbox" checked={defaults.skip_tier0} onChange={(e) => setDefaults({ skip_tier0: e.target.checked })} className="accent-blue-500" /> <Tip tip="Don't spend vision-model time on images the local stage put in tier 0 (no people, or nobody sharp). Saves time, but the model can't rescue a local false negative.">skip nobody-in-focus</Tip></label>
+        <label className="text-sm flex items-center gap-1"><input type="checkbox" checked={defaults.rescan} onChange={(e) => setDefaults({ rescan: e.target.checked })} className="accent-blue-500" /> <Tip tip="Redo local scoring on images that already have it, for example after a metric change. Vision-model tags are kept either way. Threshold changes alone don't need this; Calibrate's re-score is instant.">re-analyze already done</Tip></label>
         <button
           disabled={selected.length === 0 || start.isPending}
           onClick={() => start.mutate(selected)}

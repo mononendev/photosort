@@ -43,6 +43,8 @@ CI builds `registry.adoah.dev/projects/photosort-{api,ui}` and runs `helm upgrad
 .ci/chart -n production` on the default branch, like stasharr. Manually: `make push VERSION=x && make deploy VERSION=x`.
 Cluster prerequisites (in the homelab repo): `photos-ro-claim` (read-only CephFS `/photos`),
 `photosort-data-claim` (RBD, state + cache + exports), and the `ollama` HelmRelease with `qwen3-vl:4b-instruct`.
+The chart itself owns `photosort-models` (RBD, `helm.sh/resource-policy: keep`): YOLO weights and the
+torch/ultralytics caches live there (`PHOTOSORT_MODELS=/models`), seeded from the image on first start.
 The API pod shares the GPU cooperatively (nvidia runtime class + `NVIDIA_VISIBLE_DEVICES=all`, no GPU
 resource request) exactly like the stasharr transcoder.
 

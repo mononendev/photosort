@@ -1,6 +1,39 @@
 from __future__ import annotations
 import json
+import os
+import shutil
 from pathlib import Path
+
+SEED_WEIGHTS_DIR = Path("/app/weights")   # where the docker image keeps its pre-fetched copy
+
+
+def models_dir() -> Path:
+    d = Path(os.environ.get("PHOTOSORT_MODELS", "")) if os.environ.get("PHOTOSORT_MODELS") else Path.cwd()
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def weights_path(name: str) -> Path:
+    """Resolve a weights file inside the models dir, seeding it from the image copy or a download.
+
+    Order: already on the models volume -> copy from the image's /app/weights -> ultralytics download
+    (needs egress). Returns the path to hand to YOLO()."""
+    p = Path(name)
+    if p.is_absolute():
+        return p
+    target = models_dir() / p.name
+    if target.exists():
+        return target
+    seed = SEED_WEIGHTS_DIR / p.name
+    if seed.exists():
+        shutil.copy2(seed, target)
+        return target
+    try:
+        from ultralytics.utils.downloads import attempt_download_asset
+        attempt_download_asset(str(target))
+    except Exception:
+        pass  # YOLO() will raise a clear error if the file is still missing
+    return target
 
 DEFAULTS: dict = {
     # What gets sent to the cloud model

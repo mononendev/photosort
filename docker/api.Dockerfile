@@ -18,7 +18,8 @@ RUN pip install torch torchvision --index-url ${TORCH_INDEX}
 COPY pyproject.toml ./
 COPY photosort ./photosort
 RUN pip install .
-# Pre-fetch weights so the pod needs no egress at runtime.
+# Pre-fetch weights as a seed: at runtime config.weights_path() copies them onto the models volume
+# (PHOTOSORT_MODELS) on first use, so the pod needs no egress and later image pulls stay small.
 # ultralytics pulls in opencv-python, which shares the cv2/ directory with the headless build
 # (a partial uninstall breaks both): remove both, then install headless once.
 RUN pip uninstall -y opencv-python opencv-python-headless && pip install opencv-python-headless \
@@ -30,10 +31,10 @@ ARG VERSION=dev
 ARG GIT_SHA=unknown
 ARG BUILD_TIME=
 ENV PHOTOSORT_VERSION=${VERSION} PHOTOSORT_GIT_SHA=${GIT_SHA} PHOTOSORT_BUILD_TIME=${BUILD_TIME} \
-    PHOTOSORT_WORKDIR=/data PHOTOSORT_PHOTOS=/photos PORT=8080 \
+    PHOTOSORT_WORKDIR=/data PHOTOSORT_PHOTOS=/photos PHOTOSORT_MODELS=/app/weights PORT=8080 \
     NVIDIA_VISIBLE_DEVICES=all NVIDIA_DRIVER_CAPABILITIES=compute,utility
 RUN chown -R 568:568 /app
 USER 568:568
-WORKDIR /app/weights
+WORKDIR /app
 EXPOSE 8080
 CMD ["python", "-m", "photosort", "web"]

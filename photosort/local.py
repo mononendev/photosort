@@ -60,9 +60,10 @@ class Detector:
     def _load(self):
         from ultralytics import YOLO
         import torch
+        from .config import weights_path
         if self.device is None:
             self.device = "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu")
-        self._model = YOLO(self.weights)
+        self._model = YOLO(str(weights_path(self.weights)))
 
     def __call__(self, im: Image.Image) -> list[dict]:
         with self._lock:

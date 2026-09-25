@@ -10,6 +10,9 @@ resources (volumes, Ollama).
 - `cluster/apps/production/ollama/helm-release.yaml`: chart ≥ 1.83.0, `ollama.models.pull:
   [qwen3-vl:4b-instruct]`, `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_FLASH_ATTENTION=1`, `OLLAMA_KV_CACHE_TYPE=q8_0`.
 
+- The chart creates `photosort-models` (RBD, kept on uninstall) and mounts it at `/models`; weights are
+  copied there from the image on first start, so later images can drop the pre-fetch.
+
 ## App
 ```bash
 make push VERSION=$(git describe --tags --always)   # buildx via the homelab remote builder → Harbor

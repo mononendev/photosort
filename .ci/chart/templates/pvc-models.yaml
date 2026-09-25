@@ -1,0 +1,21 @@
+{{- /* Model weights (YOLO pose, torch/ultralytics caches) on Ceph RBD. Kept on uninstall so a
+       redeploy never re-downloads. The library chart has no PVC template, so this lives here. */ -}}
+{{- $lib := index .Values "mononen-library-chart" -}}
+{{- $mv := .Values.modelsVolume -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $mv.name }}
+  namespace: {{ $lib.global.namespace }}
+  labels:
+    app.kubernetes.io/name: photosort
+    app.kubernetes.io/component: models
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ $mv.storageClass }}
+  resources:
+    requests:
+      storage: {{ $mv.size }}

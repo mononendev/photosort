@@ -103,6 +103,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
     def health():
         dev = runner._detector.device if runner._detector else None
         return {"ok": True, "version": __version__, "photos_root": str(photos_root), "workdir": str(workdir),
+                "models_dir": str(config.models_dir()),
                 "device": dev, "backend": cfg.get("backend"), "ollama": cfg.get("base_url"), "current_job": runner.current}
 
     @app.get("/api/stats")

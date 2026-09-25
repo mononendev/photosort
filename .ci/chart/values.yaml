@@ -1,3 +1,9 @@
+# Chart-managed volume for model weights (see templates/pvc-models.yaml).
+modelsVolume:
+  name: photosort-models
+  storageClass: csi-rbd-sc
+  size: 10Gi
+
 mononen-library-chart:
   global:
     namespace: production
@@ -95,6 +101,13 @@ mononen-library-chart:
               value: "/photos"
             - name: OLLAMA_HOST
               value: "http://ollama.production.svc.cluster.local:11434"
+            # Weights + torch/ultralytics caches live on the models volume; the image only seeds it.
+            - name: PHOTOSORT_MODELS
+              value: "/models"
+            - name: YOLO_CONFIG_DIR
+              value: "/models/.yolo"
+            - name: TORCH_HOME
+              value: "/models/torch"
             - name: NVIDIA_VISIBLE_DEVICES
               value: "all"
             - name: NVIDIA_DRIVER_CAPABILITIES
@@ -120,6 +133,8 @@ mononen-library-chart:
             # State, frame/crop/thumb cache (~0.5 MB per image) and exports.
             - name: data
               mountPath: /data
+            - name: models
+              mountPath: /models
       volumes:
         - name: photos
           persistentVolumeClaim:
@@ -128,6 +143,9 @@ mononen-library-chart:
         - name: data
           persistentVolumeClaim:
             claimName: photosort-data-claim
+        - name: models
+          persistentVolumeClaim:
+            claimName: photosort-models
       service:
         port: 8080
         targetPort: 8080

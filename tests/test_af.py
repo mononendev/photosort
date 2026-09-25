@@ -72,3 +72,47 @@ def test_read_missing_is_none(tmp_path):
     p = tmp_path / "x.jpg"
     Image.new("RGB", (32, 32)).save(p)
     assert af.read(p, 32, 32) is None
+
+
+def _tiff(words, orientation=8):
+    """Minimal little-endian TIFF: IFD0 (Orientation, ExifIFD) -> Exif IFD (MakerNote) -> maker note IFD (0x0026)."""
+    import struct
+    b = bytearray(b"II*\x00" + struct.pack("<I", 8))
+    ifd0, exif, mn, arr = 8, 8 + 2 + 24 + 4, 8 + 2 + 24 + 4 + 2 + 12 + 4, 8 + 2 + 24 + 4 + 2 + 12 + 4 + 2 + 12 + 4
+    b += struct.pack("<H", 2) + struct.pack("<HHIHH", 0x0112, 3, 1, orientation, 0) + struct.pack("<HHII", 0x8769, 4, 1, exif) + b"\0" * 4
+    b += struct.pack("<H", 1) + struct.pack("<HHII", 0x927C, 7, 0, mn) + b"\0" * 4
+    b += struct.pack("<H", 1) + struct.pack("<HHII", 0x0026, 3, len(words), arr) + b"\0" * 4
+    assert len(b) == arr
+    return bytes(b + struct.pack(f"<{len(words)}H", *words))
+
+
+def test_read_tiff_maker_note(tmp_path):
+    p = tmp_path / "x.cr2"
+    p.write_bytes(_tiff(_words([(0, 0, 171, 171), (1174, 0, 171, 171)], mode=9, in_focus=[1], selected=[1])))
+    got, note = af.read_with_note(p, 3456, 5184)
+    assert got["mode_name"] == "spot" and got["active"] == [1] and note == "spot, 1 active"
+    # Orientation 8 (upright = sensor rotated 90 CCW): sensor-right lands in the upper half of the portrait frame.
+    b = got["points"][0]["box"]
+    assert (b[1] + b[3]) / 2 < 5184 / 2 - 1000 and abs((b[0] + b[2]) / 2 - 3456 / 2) < 2
+
+
+def test_manual_focus_has_no_active_points():
+    raw = af.parse_afinfo2(_words([(0, 0, 100, 100), (500, 0, 100, 100)], mode=0, selected=[0, 1]))
+    out = af.to_frame(raw, 5184, 3456)
+    assert out["active"] == [] and out["points"] == [] and out["mode_name"] == "manual focus"
+
+
+def test_primary_point_padding_ignored():
+    # 1D X: the word after the bitmasks is 0 padding, not "point 0"
+    raw = af.parse_afinfo2(_words([(0, 0, 100, 100), (500, 0, 100, 100)], in_focus=[1], selected=[1], primary=0))
+    assert raw["primary_point"] is None
+
+
+def test_real_1dx_cr2_if_present():
+    import pytest
+    from pathlib import Path
+    p = Path(__file__).parent.parent / "dev-data" / "cr2" / "IMG_1010.CR2"
+    if not p.exists():
+        pytest.skip("local CR2 sample not present (dev-data/cr2 is gitignored)")
+    got = af.read(p, 3456, 5184)
+    assert got["mode_name"] == "spot" and got["active"] == [30] and got["n_points"] == 61

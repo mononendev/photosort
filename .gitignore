@@ -14,3 +14,4 @@ dev-data/*.heic
 photosort_data/
 *.egg-info/
 .claude/
+dev-data/cr2/

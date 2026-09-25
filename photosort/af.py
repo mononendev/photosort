@@ -17,12 +17,13 @@ Point centers are relative to the image center in AFImageWidth/Height units, x t
 y upward (Cartesian). They are in sensor orientation, so they are rotated by the EXIF
 orientation to match the upright frame the rest of the pipeline sees.
 
-exifread parses the Canon maker note but doesn't name these tags; they come through as
-"MakerNote Tag 0x0026". Files exifread can't read (CR3) fall back to exiftool when installed.
+The maker note is read by walking the TIFF IFDs directly (exifread drops 0x0026). Files that aren't
+TIFF-based (CR3) fall back to exiftool when installed.
 """
 from __future__ import annotations
 import json
 import shutil
+import struct
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -68,6 +69,8 @@ def parse_afinfo2(words: list[int]) -> Optional[dict]:
     selected = _bits(w[o:o + nw], n) if len(w) >= o + nw else [False] * n
     o += nw
     primary = w[o] if len(w) > o and 0 <= w[o] < n else None
+    if primary is not None and not (in_focus[primary] or selected[primary]):
+        primary = None  # the 1D X has padding here, not a point index
     valid = w[3] if 0 < w[3] <= n else n
     pts = []
     for i in range(valid):
@@ -103,34 +106,77 @@ def to_frame(raw: dict, W: int, H: int, orientation: int = 1, y_up: bool = True)
         b = _orient((cx - hw, cy - hh, cx + hw, cy + hh), sw, sh, orientation)
         pts.append({"i": p["i"], "box": [round(v) for v in b], "in_focus": p["in_focus"], "selected": p["selected"]})
     mode = raw["mode"]
-    active = [p for p in pts if p["in_focus"]] or [p for p in pts if p["selected"]]
+    if mode == 0:  # manual focus: the body flags every point as selected, which says nothing about intent
+        active = []
+    else:
+        active = [p for p in pts if p["in_focus"]] or [p for p in pts if p["selected"]]
     return {
         "source": raw.get("source", "canon"),
         "mode": mode, "mode_name": AREA_MODES.get(mode, f"mode {mode}"), "user_placed": mode in USER_PLACED,
         "n_points": len(pts), "primary_point": raw.get("primary_point"),
         # Only the points worth drawing: every one on a 61-point body is noise on the overlay.
-        "points": [p for p in pts if p["in_focus"] or p["selected"]],
+        "points": [p for p in pts if p["in_focus"] or p["selected"]] if mode != 0 else [],
         "active": [p["i"] for p in active],
         "active_from": "in_focus" if any(p["in_focus"] for p in pts) else ("selected" if active else None),
     }
 
 
-def _read_exifread(path: Path) -> tuple[Optional[list[int]], int]:
-    try:
-        import exifread
-        with open(path, "rb") as f:
-            tags = exifread.process_file(f, details=True, extract_thumbnail=False)
-    except Exception:
+def _read_tiff(path: Path) -> tuple[Optional[list[int]], int]:
+    """AFInfo2/AFInfo3 words and the orientation, walked straight out of a TIFF-based file (CR2, JPEG APP1).
+
+    exifread parses the Canon maker note but drops tag 0x0026 (seen on a 1D X CR2), so this reads the IFDs
+    itself: IFD0 -> Exif IFD (0x8769) -> MakerNote (0x927C), whose offsets are relative to the TIFF header.
+    """
+    with open(path, "rb") as f:
+        return _walk(f)
+
+
+def _walk(f) -> tuple[Optional[list[int]], int]:
+    def read(off, n):  # seek per field: only a few KB of a 25 MB raw are touched, which matters on a network mount
+        f.seek(off)
+        return f.read(n)
+
+    base = 0
+    head = read(0, 65536)
+    if head[:2] == b"\xff\xd8":  # JPEG: TIFF header follows "Exif\0\0" in APP1
+        i = head.find(b"Exif\x00\x00")
+        if i < 0:
+            return None, 1
+        base = i + 6
+    bo = head[base:base + 2]
+    if bo not in (b"II", b"MM"):
         return None, 1
-    ori = tags.get("Image Orientation")
-    try:
-        orientation = int(ori.values[0]) if ori is not None else 1
-    except (AttributeError, IndexError, TypeError, ValueError):
-        orientation = 1
-    for tag in ("MakerNote Tag 0x0026", "MakerNote Tag 0x003C"):
-        t = tags.get(tag)
-        if t is not None and getattr(t, "values", None):
-            return list(t.values), orientation
+    e = "<" if bo == b"II" else ">"
+
+    def u16(o): return struct.unpack(e + "H", read(base + o, 2))[0]
+    def u32(o): return struct.unpack(e + "I", read(base + o, 4))[0]
+
+    def entries(off):
+        n = u16(off)
+        raw = read(base + off + 2, 12 * n)
+        out = {}
+        for i in range(n):
+            tag, typ, count = struct.unpack_from(e + "HHI", raw, 12 * i)
+            out[tag] = (typ, count, off + 10 + 12 * i)
+        return out
+
+    ifd0 = entries(u32(4))
+    orientation = 1
+    if 0x0112 in ifd0:
+        orientation = u16(ifd0[0x0112][2])
+    if 0x8769 not in ifd0:
+        return None, orientation
+    exif = entries(u32(ifd0[0x8769][2]))
+    if 0x927C not in exif:
+        return None, orientation
+    mn = entries(u32(exif[0x927C][2]))
+    for tag in (0x0026, 0x003C):
+        if tag in mn:
+            typ, count, voff = mn[tag]
+            if typ not in (3, 8) or not count:
+                continue
+            off = u32(voff) if count * 2 > 4 else voff
+            return list(struct.unpack(e + f"{count}H", read(base + off, 2 * count))), orientation
     return None, orientation
 
 
@@ -169,20 +215,27 @@ def _read_exiftool(path: Path) -> tuple[Optional[dict], int]:
             "source": "exiftool"}, orientation
 
 
-def read(path: Path, W: int, H: int, y_up: bool = True) -> Optional[dict]:
-    """AF points on the upright W x H frame, or None when the file doesn't carry them. Never raises."""
+def read_with_note(path: Path, W: int, H: int, y_up: bool = True) -> tuple[Optional[dict], str]:
+    """AF points on the upright W x H frame (or None) and a short note saying what was found. Never raises."""
     try:
-        words, orientation = _read_exifread(path)
+        words, orientation = _read_tiff(path)
         raw = parse_afinfo2(words) if words else None
         if raw:
             raw["source"] = "canon_afinfo2"
+        elif words:
+            return None, f"AF info present but not decodable ({len(words)} words)"
         else:
             raw, orientation = _read_exiftool(path)
         if not raw or not raw["points"]:
-            return None
-        return to_frame(raw, W, H, orientation, y_up)
-    except Exception:
-        return None
+            return None, "no AF info in file" if shutil.which("exiftool") else "no Canon AF info (exiftool not installed)"
+        af = to_frame(raw, W, H, orientation, y_up)
+        return af, f"{af['mode_name']}, {len(af['active'])} active"
+    except Exception as e:
+        return None, f"AF read failed: {type(e).__name__}: {e}"
+
+
+def read(path: Path, W: int, H: int, y_up: bool = True) -> Optional[dict]:
+    return read_with_note(path, W, H, y_up)[0]
 
 
 def _overlap(a, b) -> float:

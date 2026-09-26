@@ -62,6 +62,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
     runner = JobRunner(db, cfg, workdir, photos_root, device)
     cache = workdir / "cache"
     app = FastAPI(title="photosort", version=__version__)
+    app.state.db, app.state.runner = db, runner
 
     @app.on_event("startup")
     def _start():

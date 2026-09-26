@@ -19,7 +19,7 @@ _SUBJECT = re.compile(r"<dc:subject>(.*?)</dc:subject>", re.S)
 _LI = re.compile(r"<rdf:li[^>]*>(.*?)</rdf:li>", re.S)
 _FOCUS_KW = re.compile(r"^(?:focus|tier)[:_ -]?([012])$", re.I)
 DEFAULT_TRUTH_CFG = {
-    "label_tiers": {"Green": 2, "Yellow": 1, "Red": 0},
+    "label_tiers": {"Blue": 2, "Green": 2, "Yellow": 1, "Red": 0},
     "rating_tiers": {"5": 2, "4": 2, "3": 1, "2": 1, "1": 0, "0": None},
 }
 

@@ -8,6 +8,10 @@ from pathlib import Path
 from xml.sax.saxutils import escape
 
 TIER_NAMES = {0: "focus_0_none", 1: "focus_1_partial", 2: "focus_2_sharp"}
+# Your cull rating from the UI: 0-2 are the focus tiers, 3 is a banger (sharp and a favorite). Exported as the
+# matching Lightroom color label.
+BANGER = 3
+RATING_LABELS = {0: "Red", 1: "Yellow", 2: "Green", 3: "Blue"}
 
 
 def final_record(row, source: str) -> dict:
@@ -42,6 +46,9 @@ def final_record(row, source: str) -> dict:
         "quality_score": ov.get("quality_score", (vlm or {}).get("quality_score")),
         "keeper": ov.get("keeper", (vlm or {}).get("keeper")),
         "note": ov.get("note"),
+        "rating": ov.get("rating"),
+        "banger": ov.get("rating") == BANGER,
+        "reviewed": bool(ov.get("reviewed")),
         "overridden": bool(ov),
         "local": {k: local.get(k) for k in ("n_people", "primary_head_sharp", "primary_body_sharp", "bg_sharp", "local_reason")} if local else None,
         "error": row["error"],
@@ -79,6 +86,9 @@ def build_tree(records: list[dict], out: Path, mode: str) -> dict:
         if r["review"]:
             place(src, out / "review" / f"local{r['focus_tier_local']}_vlm{r['focus_tier_vlm']}" / src.name, "symlink" if mode == "move" else mode)
             counts["review"] = counts.get("review", 0) + 1
+        if r.get("banger"):
+            place(src, out / "bangers" / src.name, "symlink" if mode == "move" else mode)
+            counts["bangers"] = counts.get("bangers", 0) + 1
     return counts
 
 
@@ -88,7 +98,7 @@ def export(records: list[dict], out: Path):
         for r in records:
             f.write(json.dumps(r) + "\n")
     cols = ["path", "focus_tier", "focus_tier_local", "focus_tier_vlm", "review", "subject", "composition", "placement",
-            "action", "people_count", "quality_score", "keeper", "keywords", "adjectives", "description", "focus_notes",
+            "action", "people_count", "rating", "reviewed", "quality_score", "keeper", "keywords", "adjectives", "description", "focus_notes",
             "quality_remarks", "error"]
     with (out / "results.csv").open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
@@ -110,6 +120,7 @@ XMP_TMPL = """<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
     xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/"
     xmlns:photosort="http://photosort.local/ns/1.0/"
     {rating}
+    {label}
     {attrs}>
    <dc:subject><rdf:Bag>
 {subjects}
@@ -136,17 +147,22 @@ def xmp_for(r: dict) -> str:
     if r["review"]:
         tags.append("photosort-review")
         hier.append("PhotoSort|Review")
+    if r.get("banger"):
+        tags.append("photosort-banger")
+        hier.append("PhotoSort|Banger")
     li = lambda xs: "\n".join(f"    <rdf:li>{escape(str(x))}</rdf:li>" for x in xs)
     instr = " ".join(x for x in (r["focus_notes"], r["quality_remarks"]) if x)
     attrs = {
         "photosort:FocusTier": tier, "photosort:FocusTierLocal": r["focus_tier_local"], "photosort:FocusTierVLM": r["focus_tier_vlm"],
         "photosort:QualityScore": r.get("quality_score"),
+        "photosort:Rating": r.get("rating"),
         "photosort:Keeper": None if r.get("keeper") is None else str(r["keeper"]).lower(),
         "photoshop:Instructions": instr or None,
     }
     attr_s = "\n    ".join(f'{k}="{escape(str(v), {chr(34): "&quot;"})}"' for k, v in attrs.items() if v is not None)
     return XMP_TMPL.format(
         rating=f'xmp:Rating="{r["quality_score"]}"' if r.get("quality_score") else "",
+        label=f'xmp:Label="{RATING_LABELS[r["rating"]]}"' if r.get("rating") in RATING_LABELS else "",
         attrs=attr_s, subjects=li(kws + tags), hier=li(hier),
         description=escape(r["description"] or ""))
 

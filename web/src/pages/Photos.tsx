@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { api, thumbUrl } from '../api/client';
 import type { ImageFilters } from '../api/client';
-import { TierBadge, Stars, StatusDot, LrBadge } from '../components/TierBadge';
+import { TierBadge, Stars, StatusDot, LrBadge, RatingBadge } from '../components/TierBadge';
 import ImageDetail from '../components/ImageDetail';
 import Tip from '../components/Tip';
 
@@ -23,6 +23,8 @@ export default function Photos() {
     lr_rating: sp.get('lr_rating') ? Number(sp.get('lr_rating')) : undefined,
     truth_tier: sp.get('truth_tier') ? Number(sp.get('truth_tier')) : undefined,
     truth_mismatch: sp.get('truth_mismatch') ? true : undefined,
+    reviewed: sp.get('reviewed') ? sp.get('reviewed') === 'true' : undefined,
+    rating: sp.get('rating') ? Number(sp.get('rating')) : undefined,
     q: sp.get('q') ?? undefined,
     sort: sp.get('sort') ?? 'path',
     offset: Number(sp.get('offset') ?? 0),
@@ -34,10 +36,11 @@ export default function Photos() {
   const open = openState === undefined ? (sp.get('open') ? Number(sp.get('open')) : null) : openState;
   const setOpen = (v: number | null) => setOpenState(v);
 
-  const set = (k: string, v: string | undefined) => {
+  const set = (k: string, v: string | undefined) => setMany({ [k]: v });
+  const setMany = (kv: Record<string, string | undefined>) => {
     const n = new URLSearchParams(sp);
-    if (v === undefined || v === '') n.delete(k); else n.set(k, v);
-    if (k !== 'offset') n.delete('offset');
+    for (const [k, v] of Object.entries(kv)) if (v === undefined || v === '') n.delete(k); else n.set(k, v);
+    if (!('offset' in kv)) n.delete('offset');
     n.delete('open');
     setOpenState(undefined);
     setSp(n);
@@ -53,7 +56,7 @@ export default function Photos() {
   const offset = filters.offset ?? 0;
   const sel = 'bg-gray-900 border border-gray-700 rounded px-2 py-1.5 sm:py-1 text-sm';
   const [showFilters, setShowFilters] = useState(false);
-  const nActive = ['folder', 'tier', 'keeper', 'subject', 'status', 'review', 'truth_mismatch', 'lr_rating', 'recursive'].filter((k) => sp.get(k)).length;
+  const nActive = ['folder', 'tier', 'keeper', 'subject', 'status', 'review', 'truth_mismatch', 'lr_rating', 'recursive', 'reviewed', 'rating'].filter((k) => sp.get(k)).length;
 
   return (
     <div className="space-y-4">
@@ -73,6 +76,10 @@ export default function Photos() {
         <select value={filters.keeper === undefined ? '' : String(filters.keeper)} onChange={(e) => set('keeper', e.target.value)} className={`${sel} w-full sm:w-auto`}>
           <option value="">keeper?</option><option value="true">keepers</option><option value="false">culls</option>
         </select>
+        <Tip plain tip="Photos you have or haven't rated yet (q/w/e/r in the photo view), or just your bangers. Pick “not reviewed yet” to cull: rating a photo steps to the next one."><select value={filters.rating === 3 ? 'banger' : filters.reviewed === undefined ? '' : String(filters.reviewed)}
+          onChange={(e) => setMany(e.target.value === 'banger' ? { rating: '3', reviewed: undefined } : { rating: undefined, reviewed: e.target.value })} className={`${sel} w-full sm:w-auto`}>
+          <option value="">reviewed?</option><option value="false">not reviewed yet</option><option value="true">reviewed</option><option value="banger">★ bangers</option>
+        </select></Tip>
         <select value={filters.subject ?? ''} onChange={(e) => set('subject', e.target.value)} className={`${sel} w-full sm:w-auto`}>
           <option value="">any subject</option>{SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
@@ -101,7 +108,9 @@ export default function Photos() {
                 <Tip plain tip={<>Focus tier shown: {it.overridden ? 'your call if you set focus, otherwise ' : ''}the configured source. Local {it.focus_tier_local ?? '–'}, model {it.focus_tier_vlm ?? '–'}. Open the photo for the reasoning.</>}><TierBadge tier={it.focus_tier} small /></Tip>
                 {it.truth_tier !== null && it.truth_tier !== undefined && <Tip plain tip={<>Your ground truth: tier {it.truth_tier}. {it.truth_tier === it.focus_tier ? 'Matches the shown tier.' : `Differs from the shown tier (${it.focus_tier ?? '–'}).`}</>}><span className={`rounded px-1 text-[10px] ${it.truth_tier === it.focus_tier ? 'bg-emerald-900/80 text-emerald-200' : 'bg-red-900/80 text-red-200'}`}>T{it.truth_tier}</span></Tip>}
                 {it.review && <Tip plain tip={<>Local sharpness says tier {it.focus_tier_local}, the vision model says tier {it.focus_tier_vlm}. Open it to see why each decided that, then set your call.</>}><span className="rounded bg-amber-900/80 text-amber-200 px-1 text-[10px]">review</span></Tip>}
-                {it.overridden && <Tip plain tip="You set a focus tier, score, keep/cull or note on this photo. Your values beat the automatic ones."><span className="rounded bg-purple-900/80 text-purple-200 px-1 text-[10px]">edited</span></Tip>}
+                {it.reviewed
+                  ? <RatingBadge rating={it.rating} />
+                  : it.overridden && <Tip plain tip="You set a score, keep/cull or note on this photo. Your values beat the automatic ones."><span className="rounded bg-purple-900/80 text-purple-200 px-1 text-[10px]">edited</span></Tip>}
               </div>
               {it.keeper === false && <div className="absolute inset-0 bg-black/40" />}
             </div>

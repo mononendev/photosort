@@ -55,7 +55,11 @@ flowchart LR
    1568 px frame and a native-resolution head crop for the vision model.
 2. **Vision model.** Gets the frame, the crop, the measured sharpness, and an EXIF summary, and returns
    structured JSON. The default is `qwen3-vl:4b-instruct` on Ollama, which fits an 8 GB card.
-3. **Review and export.** Browse results, override anything, then export.
+3. **Review and export.** Browse results, override anything, then export. To cull, open a photo and rate it
+   with `q` `w` `e` `r` (or the bar at the bottom on a phone): 0, 1 and 2 are the focus tiers, and the fourth
+   (blue ★) marks a banger. Rating marks the photo reviewed and steps to the next one. Re-running jobs never
+   changes a rating. Exports carry it as the Lightroom color label (red, yellow, green, blue), and bangers get
+   their own `bangers/` folder in the tree.
 
 The focus scoring, including how the thresholds work and why there are two metrics, is written up in
 [docs/FOCUS.md](docs/FOCUS.md).

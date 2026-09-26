@@ -21,6 +21,8 @@ export interface ImageSummary {
   quality_score?: number | null;
   keeper?: boolean | null;
   overridden?: boolean;
+  rating?: number | null;      // your cull: 0-2 focus tier, 3 banger (see RATINGS)
+  reviewed?: boolean;
   people_count?: number | null;
   description?: string | null;
   error?: string | null;
@@ -107,7 +109,7 @@ export interface VlmResult {
   quality_remarks: string; quality_score: number; keeper: boolean;
 }
 
-export interface Override { focus_tier?: number; quality_score?: number; keeper?: boolean; note?: string }
+export interface Override { rating?: number; focus_tier?: number; quality_score?: number; keeper?: boolean; note?: string; reviewed?: boolean }
 
 export interface ImageDetail extends ImageSummary {
   local: LocalResult | null;
@@ -193,6 +195,7 @@ export interface ImagesPage { total: number; offset: number; items: ImageSummary
 export interface ImageFilters {
   folder?: string; recursive?: boolean; tier?: number; keeper?: boolean; subject?: string; status?: string;
   review?: boolean; lr_rating?: number; lr_label?: string; truth_tier?: number; truth_mismatch?: boolean;
+  rating?: number; reviewed?: boolean;
   q?: string; sort?: string; offset?: number; limit?: number;
 }
 
@@ -286,3 +289,11 @@ export const TIER_CLASS: Record<number, string> = {
   1: 'bg-amber-900/70 text-amber-200 border-amber-700',
   2: 'bg-emerald-900/70 text-emerald-200 border-emerald-700',
 };
+
+/** Your cull ratings, in key order (q w e r). 0-2 are the focus tiers; 3 is a banger. Exported as these LR color labels. */
+export const RATINGS = [
+  { value: 0, key: 'q', short: '0', label: 'nobody in focus', color: 'Red', cls: 'bg-red-900/70 text-red-200 border-red-700', solid: 'bg-red-600 border-red-400' },
+  { value: 1, key: 'w', short: '1', label: 'partly in focus', color: 'Yellow', cls: 'bg-amber-900/70 text-amber-200 border-amber-700', solid: 'bg-amber-500 border-amber-300 text-gray-950' },
+  { value: 2, key: 'e', short: '2', label: 'sharp', color: 'Green', cls: 'bg-emerald-900/70 text-emerald-200 border-emerald-700', solid: 'bg-emerald-600 border-emerald-400' },
+  { value: 3, key: 'r', short: '★', label: 'banger', color: 'Blue', cls: 'bg-blue-900/70 text-blue-200 border-blue-600', solid: 'bg-blue-600 border-blue-400' },
+] as const;

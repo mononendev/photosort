@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, cropUrl } from '../api/client';
-import { TierBadge, Stars, LrBadge } from './TierBadge';
+import { api, cropUrl, RATINGS } from '../api/client';
+import { TierBadge, Stars, LrBadge, RatingBadge } from './TierBadge';
 import Tip from './Tip';
 import FrameOverlay from './FrameOverlay';
 import FrameViewer from './FrameViewer';
@@ -54,14 +54,31 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
   });
   const needDebug = (layers.has('heatmap') || showMath) && !!data?.local;
   const dbg = useQuery({ queryKey: ['focus-debug', id], queryFn: () => api.focusDebug(id), enabled: needDebug, staleTime: 5 * 60_000, retry: false });
-  const ov = useMutation({
-    mutationFn: (o: Parameters<typeof api.override>[1]) => api.override(id, o),
-    onSuccess: () => {
+  // The id travels with the mutation: rating advances to the next photo before the save lands.
+  const ovm = useMutation({
+    mutationFn: ({ id, o }: { id: number; o: Parameters<typeof api.override>[1] }) => api.override(id, o),
+    onSuccess: (_d, { id }) => {
       qc.invalidateQueries({ queryKey: ['image', id] });
       qc.invalidateQueries({ queryKey: ['images'] });
       qc.invalidateQueries({ queryKey: ['tree'] });
     },
   });
+  const save = ovm.mutate;   // stable across renders
+  const ov = { mutate: (o: Parameters<typeof api.override>[1]) => save({ id, o }) };
+  // Culling: q/w/e/r (or the bottom bar on a phone) rate the photo, mark it reviewed, and move on to the next one.
+  const rate = useCallback((r: number) => { save({ id, o: { rating: r } }); onNav?.(1); }, [save, id, onNav]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || t?.closest('input, textarea, select, [contenteditable]')) return;
+      const r = RATINGS.find((x) => x.key === e.key.toLowerCase());
+      if (!r) return;
+      e.preventDefault();
+      rate(r.value);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [rate]);
   const v = data?.vlm;
   const l = data?.local;
   const p = l?.people?.[0];
@@ -90,6 +107,8 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
           <span className="font-mono text-sm text-gray-300 truncate min-w-0 flex-1 sm:flex-none">{data?.rel ?? id}</span>
           <span className="order-last basis-full sm:basis-auto sm:order-none flex flex-wrap items-center gap-x-3 gap-y-1">
           {data && <Tip plain tip={explainFinal(data, cfg)}><TierBadge tier={data.focus_tier} /></Tip>}
+          {data?.reviewed && <Tip plain tip="You rated this photo (q/w/e/r). Re-running jobs never changes it; only another rating or reset does."><span className="inline-flex items-center gap-1 text-xs text-gray-300"><RatingBadge rating={data.rating} /> reviewed</span></Tip>}
+          {ovm.isError && <span className="text-xs text-red-400">couldn't save: {String(ovm.error?.message ?? ovm.error)}</span>}
           <Tip plain tip={<>Quality score (1–5) and keep/cull verdict: {data?.override?.quality_score != null || data?.override?.keeper != null ? 'your call.' : "the vision model's opinion of the whole photo (exposure, framing, moment), not just focus."}</>}>
             <span className="inline-flex items-center gap-2">
               <Stars n={data?.quality_score} />
@@ -191,9 +210,12 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
             <div className="rounded-lg border border-gray-800 p-3 space-y-2">
               <div className="text-xs uppercase tracking-wide text-gray-500"><Tip tip="Your overrides. They beat the local and model results in the grid, the filters, and every export (tree, CSV, XMP). Reset clears them. They aren't used as calibration truth; import your exported ratings for that.">Your call</Tip></div>
               <div className="flex flex-wrap gap-1 text-xs items-center">
-                <span className="text-gray-500 w-14">focus</span>
-                {[0, 1, 2].map((t) => (
-                  <button key={t} onClick={() => ov.mutate({ focus_tier: t })} className={`px-3 py-2 sm:px-2 sm:py-1 rounded border transition active:scale-95 ${data?.focus_tier === t ? 'border-blue-500 bg-blue-900/40' : 'border-gray-700 hover:border-gray-500'}`}>{t}</button>
+                <span className="text-gray-500 w-14"><Tip tip="Your cull: 0–2 set the focus tier, ★ marks a banger (sharp, and one of the best). Keys q w e r. Rating marks the photo reviewed and moves to the next one.">rating</Tip></span>
+                {RATINGS.map((r) => (
+                  <button key={r.value} onClick={() => rate(r.value)} title={`${r.label} (${r.key})`}
+                    className={`px-3 py-2 sm:px-2 sm:py-1 rounded border transition active:scale-95 ${data?.rating === r.value ? r.cls : 'border-gray-700 hover:border-gray-500'}`}>
+                    {r.short} <kbd className="hidden sm:inline text-[10px] text-gray-500">{r.key}</kbd>
+                  </button>
                 ))}
               </div>
               <div className="flex flex-wrap gap-1 text-xs items-center">
@@ -214,6 +236,14 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
               </div>
             </div>
           </div>
+        </div>
+        <div className="sm:hidden sticky bottom-0 z-10 grid grid-cols-4 gap-2 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] border-t border-gray-800 bg-gray-950/95 backdrop-blur">
+          {RATINGS.map((r) => (
+            <button key={r.value} onClick={() => rate(r.value)} aria-label={`Rate ${r.label}`}
+              className={`h-12 rounded-lg border text-lg font-semibold transition active:scale-95 ${data?.rating === r.value ? `${r.solid} ring-2 ring-white/70` : r.cls}`}>
+              {r.short}
+            </button>
+          ))}
         </div>
       </div>
     </div>

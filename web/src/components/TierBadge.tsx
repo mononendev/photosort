@@ -1,4 +1,4 @@
-import { TIER_CLASS, TIER_LABEL } from '../api/client';
+import { RATINGS, TIER_CLASS, TIER_LABEL } from '../api/client';
 
 export function TierBadge({ tier, small }: { tier: number | null | undefined; small?: boolean }) {
   if (tier === null || tier === undefined) {
@@ -9,6 +9,13 @@ export function TierBadge({ tier, small }: { tier: number | null | undefined; sm
       {small ? `F${tier}` : `focus ${tier}: ${TIER_LABEL[tier]}`}
     </span>
   );
+}
+
+/** Your cull rating (0-2 focus, ★ banger), only once you've reviewed the photo. */
+export function RatingBadge({ rating }: { rating: number | null | undefined }) {
+  const r = rating == null ? undefined : RATINGS[rating];
+  if (!r) return null;
+  return <span className={`rounded border px-1 text-[10px] ${r.cls}`} title={`your call: ${r.label}`}>{r.short}</span>;
 }
 
 export function Stars({ n }: { n: number | null | undefined }) {

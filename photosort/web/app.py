@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .. import __version__, config, images as I, schema, sort as sorter, truth
 from ..db import DB
@@ -26,7 +26,8 @@ class JobIn(BaseModel):
 
 
 class OverrideIn(BaseModel):
-    focus_tier: Optional[int] = None
+    rating: Optional[int] = Field(None, ge=0, le=3)   # your cull: 0-2 focus tier, 3 banger; marks the photo reviewed
+    focus_tier: Optional[int] = Field(None, ge=0, le=2)
     quality_score: Optional[int] = None
     keeper: Optional[bool] = None
     note: Optional[str] = None
@@ -97,6 +98,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             "focus_tier": rec["focus_tier"], "focus_tier_local": rec["focus_tier_local"], "focus_tier_vlm": rec["focus_tier_vlm"],
             "review": rec["review"], "subject": rec["subject"], "composition": rec["composition"],
             "quality_score": rec["quality_score"], "keeper": rec["keeper"], "overridden": rec["overridden"],
+            "rating": rec["rating"], "reviewed": rec["reviewed"],
             "people_count": rec["people_count"], "description": rec["description"], "error": row["error"],
             "lr_rating": lr.get("rating"), "lr_label": lr.get("label"),
             "truth_tier": tr.get("focus_tier"), "truth_rating": tr.get("rating"), "truth_label": tr.get("label"),
@@ -288,6 +290,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
                     subject: Optional[str] = None, status: Optional[str] = None, review: Optional[bool] = None,
                     lr_rating: Optional[int] = None, lr_label: Optional[str] = None,
                     truth_tier: Optional[int] = None, truth_mismatch: Optional[bool] = None,
+                    rating: Optional[int] = None, reviewed: Optional[bool] = None,
                     q: Optional[str] = None, sort: str = "path", offset: int = 0, limit: int = Query(60, le=500)):
         where, params = ["1"], []
         if folder:
@@ -322,6 +325,10 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         if truth_mismatch:
             where.append("json_extract(truth_json,'$.focus_tier') IS NOT NULL AND local_json IS NOT NULL AND "
                          "json_extract(truth_json,'$.focus_tier') != COALESCE(json_extract(override_json,'$.focus_tier'), json_extract(vlm_json,'$.focus_tier'), json_extract(local_json,'$.local_tier'))")
+        if rating is not None:
+            where.append("json_extract(override_json,'$.rating') = ?"); params.append(rating)
+        if reviewed is not None:
+            where.append("COALESCE(json_extract(override_json,'$.reviewed'), 0) = ?"); params.append(int(reviewed))
         if q:
             where.append("(path LIKE ? OR vlm_json LIKE ?)"); params += [f"%{q}%", f"%{q}%"]
         order = {"path": "path", "newest": "id DESC", "score": "json_extract(vlm_json,'$.quality_score') DESC, path",
@@ -401,6 +408,12 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         else:
             for k, v in o.model_dump(exclude={"clear"}, exclude_none=True).items():
                 cur[k] = v
+            # A rating or a focus tier is your verdict on the photo: the two stay in step, and the photo counts as
+            # reviewed. Only another rating or a reset changes it; jobs and rescans never write override_json.
+            if o.rating is not None or o.focus_tier is not None:
+                cur["rating"] = o.rating if o.rating is not None else o.focus_tier
+                cur["focus_tier"] = min(cur["rating"], 2)
+                cur["reviewed"], cur["reviewed_at"] = True, time.time()
         db.set_override(img_id, cur or None)
         return get_image(img_id)
 

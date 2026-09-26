@@ -91,7 +91,7 @@ DEFAULTS: dict = {
     "ollama_frame_long_edge": 1024,
     "ollama_schema_max_lengths": True,   # hard string caps in the grammar (safer, slower decode); False = rely on sampling  # the local model gets a smaller frame; the crop carries fine focus
     # Ground truth (calibration): how your exported verdicts map to focus tiers when no explicit tier is given
-    "truth": {"label_tiers": {"Green": 2, "Yellow": 1, "Red": 0},
+    "truth": {"label_tiers": {"Blue": 2, "Green": 2, "Yellow": 1, "Red": 0},
               "rating_tiers": {"5": 2, "4": 2, "3": 1, "2": 1, "1": 0, "0": None}},
     # Sorting
     "focus_source": "vlm",       # vlm | local | strict (strict = min of both)

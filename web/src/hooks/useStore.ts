@@ -8,7 +8,7 @@ interface AppState {
   toggleSelected: (p: string) => void;
   setSelected: (ps: string[]) => void;
   clearSelected: () => void;
-  jobDefaults: { vlm: boolean; skip_tier0: boolean; rescan: boolean };
+  jobDefaults: { vlm: boolean; skip_tier0: boolean; rescan: boolean; revlm?: boolean };
   setJobDefaults: (d: Partial<AppState['jobDefaults']>) => void;
   layers: Layer[];                         // overlay layers shown in the photo view
   toggleLayer: (k: Layer) => void;
@@ -23,7 +23,7 @@ const useStore = create<AppState>()(
       toggleSelected: (p) => set((s) => ({ selected: s.selected.includes(p) ? s.selected.filter((x) => x !== p) : [...s.selected, p] })),
       setSelected: (ps) => set({ selected: ps }),
       clearSelected: () => set({ selected: [] }),
-      jobDefaults: { vlm: true, skip_tier0: false, rescan: false },
+      jobDefaults: { vlm: true, skip_tier0: false, rescan: false, revlm: false },
       setJobDefaults: (d) => set((s) => ({ jobDefaults: { ...s.jobDefaults, ...d } })),
       layers: DEFAULT_LAYERS,
       toggleLayer: (k) => set((s) => ({ layers: s.layers.includes(k) ? s.layers.filter((x) => x !== k) : [...s.layers, k] })),

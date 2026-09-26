@@ -227,7 +227,8 @@ class JobRunner(threading.Thread):
             return
         model = opts.get("model") or self.cfg.get("model") or backend.default_model
         conc = int(opts.get("concurrency") or self.cfg.get("vlm_concurrency", 1))
-        cond = "local_json IS NOT NULL AND vlm_json IS NULL" + ("" if opts.get("retry_errors") else " AND error IS NULL")
+        cond = ("local_json IS NOT NULL" + ("" if opts.get("revlm") else " AND vlm_json IS NULL")
+                + ("" if opts.get("retry_errors") else " AND error IS NULL"))
         prior, errors = self.db.job_finished_images(jid, "vlm")
         rows = [r for r in self.db.rows_under(paths, cond) if r["id"] not in prior] if paths else []
         if opts.get("skip_tier0", False):

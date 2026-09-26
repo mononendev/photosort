@@ -54,6 +54,17 @@ def test_rerun_with_nothing_for_vlm_keeps_local_counts(tmp_path, monkeypatch):
     assert "local 2/2" in j["message"] and "nothing new" in j["message"]
 
 
+def test_revlm_retags_already_tagged_images(tmp_path, monkeypatch):
+    db, r, photos = _runner(tmp_path, monkeypatch, vlm_rows_done=True)
+    for row in db.rows("1"):
+        (tmp_path / "cache" / f"{row['id']}.jpg").write_bytes(b"x")
+    jid = db.add_job([str(photos)], {"vlm": True, "revlm": True})
+    r.run_job(db.job(jid))
+    j = db.job(jid)
+    assert (j["state"], j["done"], j["total"]) == ("done", 2, 2)
+    assert "nothing new to tag" not in j["message"]
+
+
 def test_vlm_stage_takes_over_counters_and_adds_errors(tmp_path, monkeypatch):
     db, r, photos = _runner(tmp_path, monkeypatch, vlm_rows_done=False)
     jid = db.add_job([str(photos)], {"vlm": True})

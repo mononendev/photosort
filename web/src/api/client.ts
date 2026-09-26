@@ -172,7 +172,7 @@ export interface VlmRequest {
   request: Record<string, unknown> | null; build_error: string | null;
 }
 export interface JobOptions {
-  vlm?: boolean; skip_tier0?: boolean; rescan?: boolean; retry_errors?: boolean; concurrency?: number; model?: string | null;
+  vlm?: boolean; skip_tier0?: boolean; rescan?: boolean; revlm?: boolean; retry_errors?: boolean; concurrency?: number; model?: string | null;
 }
 
 export interface Stats {

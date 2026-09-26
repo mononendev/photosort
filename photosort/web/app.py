@@ -19,7 +19,8 @@ class JobIn(BaseModel):
     paths: list[str]
     vlm: bool = True
     skip_tier0: bool = False
-    rescan: bool = False
+    rescan: bool = False          # redo the local stage on images that already have it
+    revlm: bool = False           # re-tag images that already have vision-model tags
     retry_errors: bool = False
     concurrency: int = 1
     model: Optional[str] = None

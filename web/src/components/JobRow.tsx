@@ -40,12 +40,12 @@ export default function JobRow({ job, compact }: { job: Job; compact?: boolean }
         )}
         {finished && incomplete && (
           <Tip plain tip="Queue a new job with the same paths and options. It only processes images this job didn't finish and retries errors; finished images are left alone.">
-            <button onClick={() => rerun.mutate({ rescan: false })} disabled={rerun.isPending}
+            <button onClick={() => rerun.mutate({ rescan: false, revlm: false })} disabled={rerun.isPending}
               className="text-xs px-2.5 py-1 sm:px-2 sm:py-0.5 rounded bg-gray-800 hover:bg-gray-700 active:bg-gray-600 disabled:opacity-40">resume</button>
           </Tip>
         )}
         {finished && (
-          <Tip plain tip="Queue a new job with the same paths and options, re-analyzing every image locally: new detections, eye bands, metrics and tiers with the current thresholds. Existing vision-model tags are kept; only untagged images go to the model.">
+          <Tip plain tip="Queue a new job with the same paths and options, re-analyzing every image locally: new detections, eye bands, metrics and tiers with the current thresholds. Existing vision-model tags are kept (only untagged images go to the model) unless the job also re-tagged.">
             <button onClick={() => rerun.mutate({ rescan: true })} disabled={rerun.isPending}
               className="text-xs px-2.5 py-1 sm:px-2 sm:py-0.5 rounded bg-gray-800 hover:bg-gray-700 active:bg-gray-600 disabled:opacity-40">re-run</button>
           </Tip>
@@ -57,7 +57,7 @@ export default function JobRow({ job, compact }: { job: Job; compact?: boolean }
       {!compact && (
         <div className="mt-1 text-xs text-gray-500">
           {job.options.vlm === false ? 'local only' : 'local + vision model'}
-          {job.options.skip_tier0 ? ' · skip tier 0' : ''}{job.options.rescan ? ' · re-analyze' : ''}
+          {job.options.skip_tier0 ? ' · skip tier 0' : ''}{job.options.rescan ? ' · re-analyze' : ''}{job.options.revlm && job.options.vlm !== false ? ' · re-tag' : ''}
           {job.message ? ` · ${job.message}` : ''}
         </div>
       )}

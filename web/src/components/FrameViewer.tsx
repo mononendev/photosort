@@ -3,8 +3,8 @@ import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { frameUrl, fullUrl } from '../api/client';
 import type { FocusDebug, LocalResult } from '../api/client';
-import type { Cfg } from '../lib/explain';
-import type { Layer } from '../lib/pose';
+import type { Grade, Layer } from '../lib/pose';
+import useHotkeys from '../hooks/useHotkeys';
 import { HoverBar, OverlaySvg } from './FrameOverlay';
 import type { Hover } from './FrameOverlay';
 
@@ -26,8 +26,8 @@ type View = { zoom: number; ox: number; oy: number };   // zoom over fit-to-scre
  * + / − zoom around the center. Escape closes the viewer only; arrow keys still step through images.
  * On touch screens: pinch zooms around the fingers, one finger pans, double-tap zooms in (or back to fit).
  */
-export default function FrameViewer({ id, name, l, cfg, layers, selected, onSelect, heat, bar, onClose, onNav }: {
-  id: number; name: string; l: LocalResult; cfg: Cfg; layers: Set<Layer>; selected: number; onSelect: (i: number) => void;
+export default function FrameViewer({ id, name, l, grades, layers, selected, onSelect, heat, bar, onClose, onNav }: {
+  id: number; name: string; l: LocalResult; grades: Grade[]; layers: Set<Layer>; selected: number; onSelect: (i: number) => void;
   heat?: FocusDebug['heatmap']; bar: ReactNode; onClose: () => void; onNav?: (dir: 1 | -1) => void;
 }) {
   const W = l.width, H = l.height;
@@ -91,21 +91,12 @@ export default function FrameViewer({ id, name, l, cfg, layers, selected, onSele
     });
   }, [W, H]);
 
-  useEffect(() => {  // on window, capture phase: works wherever focus is, and the detail view never sees these keys
-    const onKey = (e: KeyboardEvent) => {
-      const el = stage.current;
-      const cx = (el?.clientWidth ?? 0) / 2, cy = (el?.clientHeight ?? 0) / 2;
-      const act: Record<string, () => void> = {
-        Escape: onClose, '0': reset, '+': () => zoomAt(1.5, cx, cy), '=': () => zoomAt(1.5, cx, cy), '-': () => zoomAt(1 / 1.5, cx, cy),
-        ArrowRight: () => onNav?.(1), ArrowLeft: () => onNav?.(-1),
-      };
-      if (!act[e.key] || (e.target as HTMLElement)?.tagName === 'INPUT') return;
-      e.preventDefault(); e.stopPropagation();
-      act[e.key]();
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [onClose, onNav, reset, zoomAt]);
+  // Capture phase: these win over the detail view's own Escape and arrows underneath.
+  const zoomCenter = (k: number) => zoomAt(k, (stage.current?.clientWidth ?? 0) / 2, (stage.current?.clientHeight ?? 0) / 2);
+  useHotkeys({
+    Escape: onClose, '0': reset, '+': () => zoomCenter(1.5), '=': () => zoomCenter(1.5), '-': () => zoomCenter(1 / 1.5),
+    ArrowRight: () => onNav?.(1), ArrowLeft: () => onNav?.(-1),
+  }, { capture: true });
 
   useEffect(() => {  // wheel must be non-passive to stop the page scrolling
     const el = stage.current;
@@ -189,7 +180,7 @@ export default function FrameViewer({ id, name, l, cfg, layers, selected, onSele
             <img src={frameUrl(id)} alt="" draggable={false} className="absolute inset-0 w-full h-full" />
             {showFull && <img src={fullUrl(id)} alt="" draggable={false} onLoad={() => setLoadedFor(id)}
               className={`absolute inset-0 w-full h-full ${fullLoaded ? '' : 'opacity-0'}`} style={{ imageRendering: scale > 2 ? 'pixelated' : 'auto' }} />}
-            <OverlaySvg l={l} cfg={cfg} layers={layers} selected={selected} heat={heat} setHover={setHover}
+            <OverlaySvg l={l} grades={grades} layers={layers} selected={selected} heat={heat} setHover={setHover}
               zoom={0.4 + 0.6 * view.zoom} onSelect={selectUnlessDragged} />
           </div>
         )}

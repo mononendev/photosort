@@ -1,10 +1,14 @@
+import { memo } from 'react';
+import type { ReactNode } from 'react';
 import type { FocusDebug, FocusView, LocalResult, MetricTerms, Person, SpectrumView } from '../api/client';
 import Gauge from './Gauge';
 import Tip from './Tip';
 import { fmt } from '../lib/format';
-import { METRIC_TIPS, explainLocal, focusThr } from '../lib/explain';
+import { TIER_COLOR } from '../api/client';
+import { METRIC_TIPS, focusThr } from '../lib/explain';
 import type { Cfg } from '../lib/explain';
-import { GRADE_COLOR, PERSON_COLORS, gradePerson } from '../lib/pose';
+import { PERSON_COLORS } from '../lib/pose';
+import type { Grade } from '../lib/pose';
 
 const sci = (v: number | undefined) => (v == null ? '–' : v.toExponential(2));
 
@@ -38,12 +42,14 @@ function TermsTable({ p, l }: { p: Person; l: LocalResult }) {
 }
 
 /** Per-person numbers: why they rank where they do, and each metric against its tier thresholds. */
-export function PersonInspector({ l, cfg, selected, onSelect }: { l: LocalResult; cfg: Cfg; selected: number; onSelect: (i: number) => void }) {
+export const PersonInspector = memo(function PersonInspector({ l, cfg, grades, localTip, selected, onSelect }: {
+  l: LocalResult; cfg: Cfg; grades: Grade[]; localTip: ReactNode; selected: number; onSelect: (i: number) => void;
+}) {
   const people = l.people ?? [];
   if (!people.length) return <div className="text-xs text-gray-500">No people found, so there is nothing to grade: local tier {l.local_tier} ({l.local_reason}).</div>;
   const i = Math.min(Math.max(selected, 0), people.length - 1);
   const p = people[i];
-  const g = gradePerson(p, cfg);
+  const g = grades[i];
   const others = [
     { label: 'head', value: p.sharp_head }, { label: 'torso', value: p.sharp_torso },
     { label: 'body', value: p.sharp_body }, { label: 'bg', value: l.bg_sharp },
@@ -53,12 +59,12 @@ export function PersonInspector({ l, cfg, selected, onSelect }: { l: LocalResult
     <div className="rounded-lg border border-gray-800 p-3 space-y-3">
       <div className="flex flex-wrap items-center gap-1 text-xs">
         <span className="uppercase tracking-wide text-gray-500 mr-1">people</span>
-        {people.map((q, j) => {
-          const gj = gradePerson(q, cfg).grade;
+        {people.map((_, j) => {
+          const gj = grades[j].grade;
           return (
             <button key={j} onClick={() => onSelect(j)} className={`px-2 py-0.5 rounded border ${j === i ? 'border-gray-400 bg-gray-800' : 'border-gray-700 hover:border-gray-500'}`}>
               <span style={{ color: PERSON_COLORS[j % PERSON_COLORS.length] }}>#{j + 1}</span>
-              <span className="ml-1" style={{ color: GRADE_COLOR[gj ?? 'none'] }}>{gj ?? '–'}</span>
+              <span className="ml-1" style={{ color: TIER_COLOR[gj ?? 'none'] }}>{gj ?? '–'}</span>
             </button>
           );
         })}
@@ -81,7 +87,7 @@ export function PersonInspector({ l, cfg, selected, onSelect }: { l: LocalResult
             head box via {p.head_src} · eyes via {p.eye_src ?? 'nothing (not located)'}{p.face ? ` · face score ${fmt(p.face.score)}` : ''}
           </div>
           <div className="text-xs">
-            grade <b style={{ color: GRADE_COLOR[g.grade ?? 'none'] }}>{g.grade ?? '–'}</b>
+            grade <b style={{ color: TIER_COLOR[g.grade ?? 'none'] }}>{g.grade ?? '–'}</b>
             <span className="text-gray-500"> — {g.onEyes ? 'every eye-band metric must clear a tier’s threshold' : 'no eye band, so the head box decides on its own thresholds'}</span>
           </div>
           <TermsTable p={p} l={l} />
@@ -96,10 +102,10 @@ export function PersonInspector({ l, cfg, selected, onSelect }: { l: LocalResult
             tip={<>Head against torso, whole body and background on the same log axis. Torso or background well right of the head suggests focus landed behind or below the face.</>} />
         </div>
       </div>
-      {i === 0 && <div className="text-xs text-gray-300 border-t border-gray-800 pt-2">{explainLocal(l, cfg)}</div>}
+      {i === 0 && <div className="text-xs text-gray-300 border-t border-gray-800 pt-2">{localTip}</div>}
     </div>
   );
-}
+});
 
 const px = (s: number[]) => `${s[0]}×${s[1]}`;
 

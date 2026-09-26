@@ -3,14 +3,14 @@ import type { ReactNode } from 'react';
 import { frameUrl } from '../api/client';
 import type { FocusDebug, LocalResult, Person } from '../api/client';
 import { fmt } from '../lib/format';
-import type { Cfg } from '../lib/explain';
-import { FACE_LM, GRADE_COLOR, KP_MIN_CONF, KP_NAMES, PERSON_COLORS, SKELETON, boxH, boxW, gradePerson } from '../lib/pose';
-import type { Layer } from '../lib/pose';
+import { TIER_COLOR } from '../api/client';
+import { FACE_LM, KP_MIN_CONF, KP_NAMES, PERSON_COLORS, SKELETON, boxH, boxW } from '../lib/pose';
+import type { Grade, Layer } from '../lib/pose';
 
 export type Hover = { title: string; body: ReactNode } | null;
 
 type OverlayProps = {
-  l: LocalResult; cfg: Cfg; layers: Set<Layer>; selected: number; onSelect: (i: number) => void;
+  l: LocalResult; grades: Grade[]; layers: Set<Layer>; selected: number; onSelect: (i: number) => void;
   heat?: FocusDebug['heatmap']; setHover: (h: Hover) => void;
   /** Labels, dots and hit areas shrink by this so they stay the same size on screen when zoomed. */
   zoom?: number;
@@ -21,7 +21,7 @@ type OverlayProps = {
  * with the same aspect ratio fits the one viewBox). Fills its positioned parent.
  */
 // Memoized: panning and hovering re-render the viewer around it, not the dozens of boxes and keypoints inside.
-export const OverlaySvg = memo(function OverlaySvg({ l, cfg, layers, selected, onSelect, heat, setHover, zoom = 1 }: OverlayProps) {
+export const OverlaySvg = memo(function OverlaySvg({ l, grades, layers, selected, onSelect, heat, setHover, zoom = 1 }: OverlayProps) {
   const W = l.width, H = l.height;
   const hatch = `hatch${useId().replace(/[^a-zA-Z0-9]/g, '')}`;   // unique per SVG: inline and fullscreen coexist
   const u = Math.max(W, H) / 1000 / zoom;    // one "unit" ≈ 0.1% of the long edge at zoom 1
@@ -43,8 +43,8 @@ export const OverlaySvg = memo(function OverlaySvg({ l, cfg, layers, selected, o
     const c = PERSON_COLORS[i % PERSON_COLORS.length];
     const primary = i === 0;
     const sel = i === selected;
-    const g = gradePerson(p, cfg);
-    const gc = GRADE_COLOR[g.grade ?? 'none'];
+    const g = grades[i];
+    const gc = TIER_COLOR[g.grade ?? 'none'];
     const kp = p.kp;
     const [bx0, by0, bx1, by1] = p.box;
     return (

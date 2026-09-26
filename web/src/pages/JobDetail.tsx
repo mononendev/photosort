@@ -5,6 +5,9 @@ import { useQuery } from '@tanstack/react-query';
 import { api, isFinished, isLive, thumbUrl } from '../api/client';
 import type { ActiveItem, JobDetail as JobDetailT, JobItem, JobStage, StageStats } from '../api/client';
 import JobRow from '../components/JobRow';
+import StatTile from '../components/StatTile';
+import Pager from '../components/Pager';
+import SegButton from '../components/SegButton';
 import ImageDetail from '../components/ImageDetail';
 import { TierBadge, Stars } from '../components/TierBadge';
 import Tip from '../components/Tip';
@@ -100,16 +103,6 @@ function StageLine({ name, st }: { name: StageName; st: JobStage }) {
 
 // ---- KPIs --------------------------------------------------------------------------
 
-function Kpi({ label, value, sub, tip }: { label: string; value: ReactNode; sub?: ReactNode; tip?: ReactNode }) {
-  return (
-    <div className="rounded-lg border border-gray-800 bg-gray-900 px-3 py-2">
-      <div className="text-[11px] uppercase tracking-wide text-gray-500">{tip ? <Tip tip={tip}>{label}</Tip> : label}</div>
-      <div className="text-xl font-semibold tabular-nums text-gray-100">{value}</div>
-      {sub && <div className="text-xs text-gray-500 tabular-nums">{sub}</div>}
-    </div>
-  );
-}
-
 function Kpis({ job }: { job: JobDetailT }) {
   const stageName = (job.stage === 'local' || job.stage === 'vlm' ? job.stage : job.stats.vlm ? 'vlm' : 'local') as 'local' | 'vlm';
   const s: StageStats | undefined = job.stats[stageName];
@@ -120,21 +113,21 @@ function Kpis({ job }: { job: JobDetailT }) {
   const elapsed = job.started ? (job.finished ?? job.now) - job.started : null;
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-      <Kpi label="Progress" value={job.total ? `${Math.round((job.done / job.total) * 100)}%` : '–'}
+      <StatTile compact label="Progress" value={job.total ? `${Math.round((job.done / job.total) * 100)}%` : '–'}
         sub={`${fmtNum(job.done)}/${fmtNum(job.total)} · ${stageName}`} />
-      <Kpi label={live ? 'ETA' : 'Elapsed'} value={live ? fmtDur(eta) : fmtDur(elapsed)}
+      <StatTile compact label={live ? 'ETA' : 'Elapsed'} value={live ? fmtDur(eta) : fmtDur(elapsed)}
         sub={live ? `elapsed ${fmtDur(elapsed)}` : job.finished ? `finished ${fmtClock(job.finished)}` : undefined}
         tip="Remaining images in the current stage divided by its recent rate (last 20 images). The vision stage can still follow the local one." />
-      <Kpi label="Images/min" value={rate ? (rate * 60).toFixed(1) : '–'}
+      <StatTile compact label="Images/min" value={rate ? (rate * 60).toFixed(1) : '–'}
         sub={s ? `avg ${fmtDur(s.avg_s)}/image · p95 ${fmtDur(s.p95_s)}` : undefined}
         tip={<>Throughput of the {stageName} stage, over the last 20 images while running and the whole stage otherwise. Per-image time is wall time for one image; with several workers, images overlap.</>} />
-      <Kpi label="Decode tok/s" value={v?.recent_tok_s ?? v?.tok_s ?? '–'}
+      <StatTile compact label="Decode tok/s" value={v?.recent_tok_s ?? v?.tok_s ?? '–'}
         sub={v?.tok_s ? `stage avg ${v.tok_s}` : 'vision stage only'}
         tip="Output tokens per second of model decode time, as the model server reports it (Ollama eval_count / eval_duration). The big number is the last 10 images." />
-      <Kpi label="Tokens in / out" value={v ? `${fmtK(v.tokens_in)} / ${fmtK(v.tokens_out)}` : '–'}
+      <StatTile compact label="Tokens in / out" value={v ? `${fmtK(v.tokens_in)} / ${fmtK(v.tokens_out)}` : '–'}
         sub={v?.avg_in ? `avg ${fmtNum(v.avg_in)} in · ${fmtNum(v.avg_out)} out` : undefined}
         tip="Prompt (images + text) and generated tokens across every image the vision model finished in this job." />
-      <Kpi label="Prefill / decode" value={v?.avg_prefill_s != null ? `${v.avg_prefill_s}s / ${v.avg_decode_s}s` : '–'}
+      <StatTile compact label="Prefill / decode" value={v?.avg_prefill_s != null ? `${v.avg_prefill_s}s / ${v.avg_decode_s}s` : '–'}
         sub={job.errors ? <span className="text-red-400">{job.errors} errors</span> : 'per image, average'}
         tip="Average time the model spends reading the prompt (prefill: images and text) versus writing the JSON (decode), per image." />
     </div>
@@ -178,10 +171,7 @@ function Charts({ job }: { job: JobDetailT }) {
   const tok = pts.filter((p) => p.tok_s != null);
   return (
     <Section title="Per-image timing" tip={`The last ${job.series.length} images this job finished, oldest on the left. Failed images are red.`}
-      right={have.length > 1 && have.map((st) => (
-        <button key={st} onClick={() => setPick(st)}
-          className={`text-xs px-2 py-0.5 rounded ${st === stage ? 'bg-gray-700 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-100'}`}>{st}</button>
-      ))}>
+      right={have.length > 1 && have.map((st) => <SegButton key={st} on={st === stage} onClick={() => setPick(st)}>{st}</SegButton>)}>
       <div className={`grid gap-4 ${tok.length ? 'lg:grid-cols-2' : ''}`}>
         <BarChart title="Seconds per image" values={pts.map((p) => p.s)} errs={pts.map((p) => p.err)}
           label={(i) => `${fmtClock(pts[i].t)} · ${fmtDur(pts[i].s)}${pts[i].err ? ' · failed' : ''}`} unit="s" />
@@ -241,10 +231,7 @@ function Items({ jobId, live, backend, model, onOpen }: { jobId: number; live: b
     queryFn: () => api.jobItems(jobId, { stage: stage || undefined, errors: errors || undefined, offset, limit }),
     refetchInterval: live && offset === 0 ? 2000 : false,
   });
-  const filterBtn = (label: string, on: boolean, click: () => void) => (
-    <button onClick={() => { click(); setOffset(0); }}
-      className={`text-xs px-2 py-0.5 rounded ${on ? 'bg-gray-700 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-100'}`}>{label}</button>
-  );
+  const filterBtn = (label: string, on: boolean, click: () => void) => <SegButton on={on} onClick={() => { click(); setOffset(0); }}>{label}</SegButton>;
   return (
     <Section title={`Processed images${data ? ` (${fmtNum(data.total)})` : ''}`}
       tip="Every image this job finished, newest first, with what each stage produced. Click a row for the vision model's input and output. Results shown are the image's current ones, so a later job or a manual override can have changed them."
@@ -278,13 +265,7 @@ function Items({ jobId, live, backend, model, onOpen }: { jobId: number; live: b
           </table>
         </div>
       )}
-      {data && data.total > limit && (
-        <div className="flex items-center gap-2 mt-3 text-xs text-gray-400">
-          <button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - limit))} className="px-2 py-0.5 rounded bg-gray-800 disabled:opacity-40">newer</button>
-          <span className="tabular-nums">{offset + 1}–{Math.min(offset + limit, data.total)} of {fmtNum(data.total)}</span>
-          <button disabled={offset + limit >= data.total} onClick={() => setOffset(offset + limit)} className="px-2 py-0.5 rounded bg-gray-800 disabled:opacity-40">older</button>
-        </div>
-      )}
+      {data && <Pager offset={offset} limit={limit} total={data.total} onPage={setOffset} prev="← newer" next="older →" className="mt-3" />}
     </Section>
   );
 }

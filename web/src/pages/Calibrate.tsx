@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, cropUrl, FOCUS_METRIC_LABEL } from '../api/client';
+import { api, cropUrl, FOCUS_METRIC_LABEL, TIER_COLOR } from '../api/client';
 import type { FocusMetric, RescoreResult, TruthMatrixRow, TruthSummary } from '../api/client';
+import SegButton from '../components/SegButton';
 import Tip from '../components/Tip';
 import { errMsg } from '../lib/format';
 
@@ -105,7 +106,7 @@ export default function Calibrate() {
       <p className="text-sm text-gray-400 max-w-3xl">Focus is judged on a band across both eyes when they can be located (face landmarks, else the pose model's eye keypoints). There the eye band must clear two thresholds: the contrast-normalized Laplacian and the FFT detail ratio, which drops faster for slight softness. When no eyes are found (helmet, visor, turned away), the head-box Laplacian is used. Crops below are the primary subject ordered softest to sharpest by the chosen metric. Find where "soft" becomes "usable" and "usable" becomes "crisp", enter those two numbers, and re-score. This only affects the <em>local</em> tier. Metrics added after an image was analyzed need a fresh local pass on it.</p>
       <div className="flex flex-wrap gap-1 text-sm">
         {(Object.keys(FOCUS_METRIC_LABEL) as FocusMetric[]).map((m) => (
-          <Tip key={m} plain tip={METRIC_TAB_TIP[m]}><button onClick={() => setMetric(m)} className={`px-3 py-1 rounded ${m === metric ? 'bg-gray-700 text-white' : 'bg-gray-900 text-gray-400 hover:text-white'}`}>{FOCUS_METRIC_LABEL[m]}</button></Tip>
+          <Tip key={m} plain tip={METRIC_TAB_TIP[m]}><SegButton on={m === metric} onClick={() => setMetric(m)} className="px-3 py-1">{FOCUS_METRIC_LABEL[m]}</SegButton></Tip>
         ))}
       </div>
       {data?.percentiles && (
@@ -125,7 +126,7 @@ export default function Calibrate() {
         {data?.samples.map((s) => (
           <div key={s.id} className="rounded-lg overflow-hidden border border-gray-800 bg-gray-900">
             <img src={cropUrl(s.id)} alt="" loading="lazy" className="w-full aspect-square object-cover" />
-            <div className="px-2 py-1 text-xs font-mono flex justify-between"><span>{s.sharp.toFixed(4)}</span><span className={s.tier === 2 ? 'text-emerald-300' : s.tier === 1 ? 'text-amber-300' : 'text-red-300'}>tier {s.tier}</span></div>
+            <div className="px-2 py-1 text-xs font-mono flex justify-between"><span>{s.sharp.toFixed(4)}</span><span style={{ color: TIER_COLOR[s.tier] }}>tier {s.tier}</span></div>
           </div>
         ))}
       </div>

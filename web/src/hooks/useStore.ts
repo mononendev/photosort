@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { DEFAULT_LAYERS } from '../lib/pose';
+import type { Layer } from '../lib/pose';
 
 interface AppState {
   selected: string[];                      // paths selected in Browse (relative to photos root)
@@ -8,6 +10,10 @@ interface AppState {
   clearSelected: () => void;
   jobDefaults: { vlm: boolean; skip_tier0: boolean; rescan: boolean };
   setJobDefaults: (d: Partial<AppState['jobDefaults']>) => void;
+  layers: Layer[];                         // overlay layers shown in the photo view
+  toggleLayer: (k: Layer) => void;
+  showMath: boolean;                       // the photo view's focus-math panel is open
+  setShowMath: (v: boolean) => void;
 }
 
 const useStore = create<AppState>()(
@@ -19,8 +25,12 @@ const useStore = create<AppState>()(
       clearSelected: () => set({ selected: [] }),
       jobDefaults: { vlm: true, skip_tier0: false, rescan: false },
       setJobDefaults: (d) => set((s) => ({ jobDefaults: { ...s.jobDefaults, ...d } })),
+      layers: DEFAULT_LAYERS,
+      toggleLayer: (k) => set((s) => ({ layers: s.layers.includes(k) ? s.layers.filter((x) => x !== k) : [...s.layers, k] })),
+      showMath: false,
+      setShowMath: (v) => set({ showMath: v }),
     }),
-    { name: 'photosort_ui', partialize: (s) => ({ selected: s.selected, jobDefaults: s.jobDefaults }) },
+    { name: 'photosort_ui', partialize: (s) => ({ selected: s.selected, jobDefaults: s.jobDefaults, layers: s.layers, showMath: s.showMath }) },
   ),
 );
 

@@ -1,10 +1,11 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { api, thumbUrl } from '../api/client';
 import type { ImageFilters } from '../api/client';
 import { TierBadge, Stars, StatusDot, LrBadge, RatingBadge } from '../components/TierBadge';
 import ImageDetail from '../components/ImageDetail';
+import Pager from '../components/Pager';
 import Tip from '../components/Tip';
 import { useBusy } from '../hooks/useJobs';
 
@@ -38,15 +39,25 @@ export default function Photos() {
   const open = openState === undefined ? (sp.get('open') ? Number(sp.get('open')) : null) : openState;
   const setOpen = (v: number | null) => setOpenState(v);
 
-  const set = (k: string, v: string | undefined) => setMany({ [k]: v });
-  const setMany = (kv: Record<string, string | undefined>) => {
-    const n = new URLSearchParams(sp);
-    for (const [k, v] of Object.entries(kv)) if (v === undefined || v === '') n.delete(k); else n.set(k, v);
-    if (!('offset' in kv)) n.delete('offset');
-    n.delete('open');
+  const setMany = useCallback((kv: Record<string, string | undefined>, replace = false) => {
+    setSp((cur) => {
+      const n = new URLSearchParams(cur);
+      for (const [k, v] of Object.entries(kv)) if (v === undefined || v === '') n.delete(k); else n.set(k, v);
+      if (!('offset' in kv)) n.delete('offset');
+      n.delete('open');
+      return n;
+    }, { replace });
     setOpenState(undefined);
-    setSp(n);
-  };
+  }, [setSp]);
+  const set = (k: string, v: string | undefined) => setMany({ [k]: v });
+  // The search box types into a draft; the URL (one history entry, one request) follows once typing pauses.
+  const [qDraft, setQDraft] = useState<string | null>(null);
+  const q = qDraft ?? filters.q ?? '';
+  useEffect(() => {
+    if (qDraft === null) return;
+    const t = setTimeout(() => { setMany({ q: qDraft }, true); setQDraft(null); }, 300);
+    return () => clearTimeout(t);
+  }, [qDraft, setMany]);
   const items = useMemo(() => data?.items ?? [], [data]);
   // Stable between renders, so the detail view's hotkey listener isn't re-bound on every poll.
   const nav = useCallback((dir: 1 | -1) => {
@@ -64,7 +75,7 @@ export default function Photos() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 sm:hidden">
-        <input value={filters.q ?? ''} onChange={(e) => set('q', e.target.value)} placeholder="search keywords / name" className={`${sel} flex-1 min-w-0`} />
+        <input value={q} onChange={(e) => setQDraft(e.target.value)} placeholder="search keywords / name" className={`${sel} flex-1 min-w-0`} />
         <button onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}
           className={`shrink-0 px-3 py-1.5 rounded border text-sm active:bg-gray-800 ${showFilters || nActive ? 'border-blue-500 text-blue-200' : 'border-gray-700 text-gray-300'}`}>
           filters{nActive ? ` · ${nActive}` : ''}
@@ -94,7 +105,7 @@ export default function Photos() {
         <select value={filters.lr_rating ?? ''} onChange={(e) => set('lr_rating', e.target.value)} className={`${sel} w-full sm:w-auto`}>
           <option value="">any LR rating</option>{[0, 1, 2, 3, 4, 5].map((r) => <option key={r} value={r}>LR {r}★</option>)}
         </select>
-        <input value={filters.q ?? ''} onChange={(e) => set('q', e.target.value)} placeholder="search keywords / name" className={`${sel} hidden sm:block w-56`} />
+        <input value={q} onChange={(e) => setQDraft(e.target.value)} placeholder="search keywords / name" className={`${sel} hidden sm:block w-56`} />
         <Tip plain tip="Eye sharpness sorts by the eye-band Laplacian (photos without located eyes go last). Head sharpness uses the head box. Score is the model's 1–5 (or yours)."><select value={filters.sort} onChange={(e) => set('sort', e.target.value)} className={`${sel} w-full sm:w-auto`}>
           <option value="path">by path</option><option value="newest">newest</option><option value="score">by score</option><option value="eye_sharpness">by eye sharpness</option><option value="sharpness">by head sharpness</option><option value="lr">by your LR rating</option>
         </select></Tip>
@@ -125,13 +136,7 @@ export default function Photos() {
           </button>
         ))}
       </div>
-      {total > PAGE && (
-        <div className="flex items-center justify-center gap-3 text-sm">
-          <button disabled={offset === 0} onClick={() => set('offset', String(Math.max(0, offset - PAGE)))} className="px-4 py-2 sm:px-3 sm:py-1 rounded bg-gray-800 active:bg-gray-700 disabled:opacity-40">← prev</button>
-          <span className="text-gray-500">{offset + 1}–{Math.min(offset + PAGE, total)} of {total}</span>
-          <button disabled={offset + PAGE >= total} onClick={() => set('offset', String(offset + PAGE))} className="px-4 py-2 sm:px-3 sm:py-1 rounded bg-gray-800 active:bg-gray-700 disabled:opacity-40">next →</button>
-        </div>
-      )}
+      <Pager offset={offset} limit={PAGE} total={total} onPage={(o) => set('offset', String(o))} className="justify-center" />
       {open !== null && <ImageDetail id={open} onClose={() => setOpen(null)} onNav={nav} />}
     </div>
   );

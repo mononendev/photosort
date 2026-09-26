@@ -17,7 +17,6 @@ export const FACE_LM = ['right eye', 'left eye', 'nose tip', 'right mouth corner
 /** Keypoints below this confidence are ignored by the head/torso geometry (local.py pt()). */
 export const KP_MIN_CONF = 0.3;
 export const PERSON_COLORS = ['#22d3ee', '#c084fc', '#f472b6', '#fb923c', '#a3e635', '#60a5fa'];
-export const GRADE_COLOR: Record<string, string> = { 2: '#34d399', 1: '#fbbf24', 0: '#f87171', none: '#9ca3af' };
 
 export type Layer = 'af' | 'people' | 'skeleton' | 'regions' | 'eyes' | 'crop' | 'mask' | 'heatmap';
 export const LAYERS: { key: Layer; label: string; tip: string }[] = [
@@ -32,7 +31,7 @@ export const LAYERS: { key: Layer; label: string; tip: string }[] = [
 ];
 export const DEFAULT_LAYERS: Layer[] = ['af', 'people', 'skeleton', 'regions', 'eyes'];
 
-type Grade = { grade: number | null; onEyes: boolean; checks: ReturnType<typeof gradeBasis>['checks'] };
+export type Grade = { grade: number | null; onEyes: boolean; checks: ReturnType<typeof gradeBasis>['checks'] };
 
 /** 2/1/0 for one person, as local.py's _grade decides it (null when nothing is measurable). */
 export function gradePerson(p: Person, cfg: Cfg): Grade {

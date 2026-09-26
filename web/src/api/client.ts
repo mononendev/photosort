@@ -284,15 +284,17 @@ export const fullUrl = (id: number) => `/media/full/${id}`;
 
 /** Your cull ratings, in key order (q w e r). 0-2 are the focus tiers; 3 is a banger. Exported as these LR color labels. */
 export const RATINGS = [
-  { value: 0, key: 'q', short: '0', label: 'nobody in focus', color: 'Red', cls: 'bg-red-900/70 text-red-200 border-red-700', solid: 'bg-red-600 border-red-400' },
-  { value: 1, key: 'w', short: '1', label: 'partly in focus', color: 'Yellow', cls: 'bg-amber-900/70 text-amber-200 border-amber-700', solid: 'bg-amber-500 border-amber-300 text-gray-950' },
-  { value: 2, key: 'e', short: '2', label: 'sharp', color: 'Green', cls: 'bg-emerald-900/70 text-emerald-200 border-emerald-700', solid: 'bg-emerald-600 border-emerald-400' },
-  { value: 3, key: 'r', short: '★', label: 'banger', color: 'Blue', cls: 'bg-blue-900/70 text-blue-200 border-blue-600', solid: 'bg-blue-600 border-blue-400' },
+  { value: 0, key: 'q', short: '0', label: 'nobody in focus', color: 'Red', hex: '#f87171', cls: 'bg-red-900/70 text-red-200 border-red-700', solid: 'bg-red-600 border-red-400' },
+  { value: 1, key: 'w', short: '1', label: 'partly in focus', color: 'Yellow', hex: '#fbbf24', cls: 'bg-amber-900/70 text-amber-200 border-amber-700', solid: 'bg-amber-500 border-amber-300 text-gray-950' },
+  { value: 2, key: 'e', short: '2', label: 'sharp', color: 'Green', hex: '#34d399', cls: 'bg-emerald-900/70 text-emerald-200 border-emerald-700', solid: 'bg-emerald-600 border-emerald-400' },
+  { value: 3, key: 'r', short: '★', label: 'banger', color: 'Blue', hex: '#60a5fa', cls: 'bg-blue-900/70 text-blue-200 border-blue-600', solid: 'bg-blue-600 border-blue-400' },
 ] as const;
 
 /** Focus tiers 0-2 share their label and colors with the matching cull rating. */
 export const TIER_LABEL: Record<number, string> = Object.fromEntries(RATINGS.slice(0, 3).map((r) => [r.value, r.label]));
 export const TIER_CLASS: Record<number, string> = Object.fromEntries(RATINGS.slice(0, 3).map((r) => [r.value, r.cls]));
+/** Text/stroke color per tier (or per-person grade), for SVG and inline styles; `none` when nothing was measurable. */
+export const TIER_COLOR: Record<string, string> = { ...Object.fromEntries(RATINGS.slice(0, 3).map((r) => [r.value, r.hex])), none: '#9ca3af' };
 
 /** A job a worker holds right now. */
 export const isLive = (j: Pick<Job, 'state'> | undefined) => !!j && (j.state === 'running' || j.state === 'cancelling');

@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import Tip from './Tip';
 import { fmt } from '../lib/format';
+import { TIER_COLOR } from '../api/client';
 
 /**
  * A metric on a log axis with its tier zones: red below the tier-1 threshold, amber between, green above tier 2.
@@ -15,7 +16,7 @@ export default function Gauge({ label, value, t1, t2, refs = [], tip, note }: {
   const hi = Math.log10(Math.max(...known, 1e-3) * 2.5);
   const x = (v: number) => `${Math.max(0, Math.min(100, ((Math.log10(Math.max(v, 1e-9)) - lo) / (hi - lo)) * 100))}%`;
   const hasThr = t1 != null && t2 != null;
-  const color = value == null || !hasThr ? '#e5e7eb' : value >= t2 ? '#34d399' : value >= t1 ? '#fbbf24' : '#f87171';
+  const color = value == null || !hasThr ? '#e5e7eb' : TIER_COLOR[value >= t2 ? 2 : value >= t1 ? 1 : 0];
   // Axis labels that would overprint go on separate rows. Labels are centred on their mark, 9px mono ≈ 5.5px/char.
   const bar = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(300);

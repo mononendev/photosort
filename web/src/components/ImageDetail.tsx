@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, cropUrl, RATINGS } from '../api/client';
 import { TierBadge, Stars, LrBadge, RatingBadge } from './TierBadge';
@@ -7,8 +7,9 @@ import FrameOverlay from './FrameOverlay';
 import FrameViewer from './FrameViewer';
 import LayerBar from './LayerBar';
 import { FocusMath, PersonInspector } from './PersonInspector';
-import { DEFAULT_LAYERS } from '../lib/pose';
-import type { Layer } from '../lib/pose';
+import { gradePerson } from '../lib/pose';
+import useHotkeys from '../hooks/useHotkeys';
+import useStore from '../hooks/useStore';
 import { METRIC_TIPS, TIER_MEANING, explainDisagree, explainFinal, explainLocal, explainPrior } from '../lib/explain';
 
 function Row({ k, v, tip }: { k: string; v: React.ReactNode; tip?: React.ReactNode }) {
@@ -20,19 +21,14 @@ function Row({ k, v, tip }: { k: string; v: React.ReactNode; tip?: React.ReactNo
   );
 }
 
-function stored<T>(key: string, fallback: T): T {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) as T : fallback; } catch { return fallback; }
-}
-function store(key: string, v: unknown) {
-  try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* private window */ }
-}
-
 export default function ImageDetail({ id, onClose, onNav }: { id: number; onClose: () => void; onNav?: (dir: 1 | -1) => void }) {
   const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ['image', id], queryFn: () => api.image(id) });
   const { data: cfg } = useQuery({ queryKey: ['config'], queryFn: api.config, staleTime: 30_000 });
   const [note, setNote] = useState('');
-  const [layers, setLayers] = useState<Set<Layer>>(() => new Set(stored<Layer[]>('detail.layers', DEFAULT_LAYERS)));
+  const layerList = useStore((s) => s.layers);
+  const layers = useMemo(() => new Set(layerList), [layerList]);
+  const toggle = useStore((s) => s.toggleLayer);
   const [full, setFull] = useState(false);
   useEffect(() => {  // the gallery behind must not scroll while this is open (wheel over the backdrop, or past the end)
     const html = document.documentElement;
@@ -42,16 +38,11 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
     return () => { html.style.overflow = prev.overflow; html.style.scrollbarGutter = prev.gutter; };
   }, []);
   const closeFull = useCallback(() => setFull(false), []);
-  const [showMath, setShowMath] = useState<boolean>(() => stored('detail.math', false));
+  const showMath = useStore((s) => s.showMath);
+  const setShowMath = useStore((s) => s.setShowMath);
   const [sel, setSel] = useState({ id, person: 0 });   // the inspected person resets when navigating to another image
   const person = sel.id === id ? sel.person : 0;
-  const setPerson = (i: number) => setSel({ id, person: i });
-  const toggle = (k: Layer) => setLayers((cur) => {
-    const n = new Set(cur);
-    if (n.has(k)) n.delete(k); else n.add(k);
-    store('detail.layers', [...n]);
-    return n;
-  });
+  const setPerson = useCallback((i: number) => setSel({ id, person: i }), [id]);
   const needDebug = (layers.has('heatmap') || showMath) && !!data?.local;
   const dbg = useQuery({ queryKey: ['focus-debug', id], queryFn: () => api.focusDebug(id), enabled: needDebug, staleTime: 5 * 60_000, retry: false });
   // The id travels with the mutation: rating advances to the next photo before the save lands.
@@ -67,20 +58,16 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
   const ov = { mutate: (o: Parameters<typeof api.override>[1]) => save({ id, o }) };
   // Culling: q/w/e/r (or the bottom bar on a phone) rate the photo, mark it reviewed, and move on to the next one.
   const rate = useCallback((r: number) => { save({ id, o: { rating: r } }); onNav?.(1); }, [save, id, onNav]);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || t?.closest('input, textarea, select, [contenteditable]')) return;
-      const r = RATINGS.find((x) => x.key === e.key.toLowerCase());
-      if (!r) return;
-      e.preventDefault();
-      rate(r.value);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [rate]);
+  useHotkeys({
+    Escape: onClose,
+    ...(onNav && { ArrowRight: () => onNav(1), ArrowLeft: () => onNav(-1) }),
+    ...Object.fromEntries(RATINGS.map((r) => [r.key, (e: KeyboardEvent) => { if (!e.repeat) rate(r.value); }])),
+  });
   const v = data?.vlm;
   const l = data?.local;
+  // Once per result, not on every keystroke in the note field or every poll.
+  const grades = useMemo(() => (l?.people ?? []).map((q) => gradePerson(q, cfg)), [l, cfg]);
+  const localTip = useMemo(() => l && explainLocal(l, cfg), [l, cfg]);
   const p = l?.people?.[0];
   const heat = dbg.data?.heatmap;
   // Horizontal swipe on a touch screen steps to the next/previous photo (vertical scrolling wins when ambiguous).
@@ -99,7 +86,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
   };
   const layerBar = <LayerBar layers={layers} toggle={toggle} heat={heat} heatLoading={dbg.isFetching} />;
   return (
-    <div className="fixed inset-0 z-50 flex" onKeyDown={(e) => { if (e.key === 'Escape') onClose(); if (e.key === 'ArrowRight') onNav?.(1); if (e.key === 'ArrowLeft') onNav?.(-1); }} tabIndex={-1}>
+    <div className="fixed inset-0 z-50 flex">
       <div className="absolute inset-0 bg-black/70 animate-[fade-in_150ms_ease-out]" onClick={onClose} />
       <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
         className="relative sm:m-auto w-full h-[100dvh] sm:h-auto sm:w-[min(1200px,96vw)] sm:max-h-[94vh] overflow-auto overscroll-contain sm:rounded-xl sm:border border-gray-700 bg-gray-950 shadow-2xl animate-[sheet-in_180ms_ease-out]">
@@ -134,8 +121,8 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
         <div className="grid md:grid-cols-[1fr_380px] gap-4 p-3 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="space-y-3">
             {l && layerBar}
-            <FrameOverlay id={id} l={l} cfg={cfg} layers={layers} selected={person} onSelect={setPerson} heat={heat} onOpen={() => setFull(true)} />
-            {full && l && <FrameViewer id={id} name={data?.rel ?? String(id)} l={l} cfg={cfg} layers={layers} selected={person} onSelect={setPerson} heat={heat} bar={layerBar} onClose={closeFull} onNav={onNav} />}
+            <FrameOverlay id={id} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} onOpen={() => setFull(true)} />
+            {full && l && <FrameViewer id={id} name={data?.rel ?? String(id)} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} bar={layerBar} onClose={closeFull} onNav={onNav} />}
             {data?.has_crop && (
               <div className="flex flex-col sm:flex-row gap-3 items-start">
                 <img src={cropUrl(id)} alt="head crop" className="w-full max-w-64 sm:w-64 shrink-0 rounded-lg bg-gray-900" />
@@ -150,17 +137,17 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
                         <Tip tip={METRIC_TIPS.head}>head {p.sharp_head ?? '–'}</Tip> · <Tip tip={METRIC_TIPS.torso}>torso {p.sharp_torso ?? '–'}</Tip> · <Tip tip={METRIC_TIPS.body}>body {p.sharp_body ?? '–'}</Tip> · <Tip tip={METRIC_TIPS.bg}>bg {l.bg_sharp ?? '–'}</Tip>
                       </div>
                       <div className="text-gray-500">
-                        <Tip tip={METRIC_TIPS.headSrc[p.head_src]}>head via {p.head_src}</Tip> · <Tip tip={METRIC_TIPS.people}>{l.n_people} people</Tip> · <Tip tip={explainLocal(l, cfg)}>local tier {l.local_tier} ({l.local_reason})</Tip>
+                        <Tip tip={METRIC_TIPS.headSrc[p.head_src]}>head via {p.head_src}</Tip> · <Tip tip={METRIC_TIPS.people}>{l.n_people} people</Tip> · <Tip tip={localTip}>local tier {l.local_tier} ({l.local_reason})</Tip>
                       </div>
                     </div>
                   )}
                 </div>
               </div>
             )}
-            {l && <PersonInspector l={l} cfg={cfg} selected={person} onSelect={setPerson} />}
+            {l && <PersonInspector l={l} cfg={cfg} grades={grades} localTip={localTip} selected={person} onSelect={setPerson} />}
             {l && l.people?.length > 0 && (
               <div className="rounded-lg border border-gray-800 p-3 space-y-2">
-                <button onClick={() => { setShowMath(!showMath); store('detail.math', !showMath); }} className="text-xs uppercase tracking-wide text-gray-500 hover:text-gray-300">
+                <button onClick={() => setShowMath(!showMath)} className="text-xs uppercase tracking-wide text-gray-500 hover:text-gray-300">
                   {showMath ? '▾' : '▸'} focus math · person #{person + 1}
                 </button>
                 {showMath && <FocusMath d={dbg.data?.people?.[person]} p={l.people[person]} loading={dbg.isFetching && !dbg.data} error={dbg.error ? String(dbg.error.message) : undefined} />}
@@ -201,7 +188,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
             )}
             {data?.local && (
               <div className="text-xs text-gray-500">
-                <Tip tip={explainLocal(data.local, cfg)}>local: tier {data.local.local_tier}</Tip> · {data.local.width}×{data.local.height} {data.local.orientation}
+                <Tip tip={localTip}>local: tier {data.local.local_tier}</Tip> · {data.local.width}×{data.local.height} {data.local.orientation}
                 {data.focus_tier_local !== null && data.focus_tier_vlm != null && data.focus_tier_local !== data.focus_tier_vlm && (
                   <> · <Tip tip={explainDisagree(data.local, data.focus_tier_vlm, v?.focus_notes, cfg)} className="text-amber-300">local ({data.focus_tier_local}) and model ({data.focus_tier_vlm}) disagree</Tip></>
                 )}

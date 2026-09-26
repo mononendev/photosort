@@ -144,3 +144,24 @@ def test_metric_terms_reproduce_the_ratios():
     assert t["lap_var"] / (t["gray_var"] + local.EPS) == local.sharpness(g, local.EYE_MIN_PX)
     assert h["band_e"] / h["total_e"] == local.hf_ratio(g)
     assert local.sharpness_parts(g[:10], local.EYE_MIN_PX) is None and local.hf_parts(np.full((64, 64), 0.5, np.float32)) is None
+
+
+def _det(box, conf, head=None):
+    kp = [[0.0, 0.0]] * 17
+    kpc = [0.0] * 17
+    for i, p in zip(local.HEAD_KP, head or []):
+        kp[i], kpc[i] = list(p), 0.9
+    return {"box": list(box), "conf": conf, "kp": kp, "kpc": kpc}
+
+
+def test_dedup_drops_shifted_duplicate_of_one_rider():
+    # Two boxes on one rider at IoU ~0.6 (below YOLO's 0.7 NMS), heads within ~50px on a ~900px box.
+    a = _det((480, 685, 1327, 1765), 0.9, [(808, 700), (788, 688), (833, 690)])
+    b = _det((390, 493, 1265, 1590), 0.6, [(830, 668), (800, 637), (864, 637)])
+    assert local.dedup_detections([b, a], {}) == [a]
+
+
+def test_dedup_keeps_overlapping_people_with_distinct_heads():
+    front = _det((400, 300, 900, 1500), 0.9, [(650, 400), (630, 390), (670, 390)])
+    behind = _det((600, 250, 1100, 1300), 0.8, [(850, 330), (830, 320), (870, 320)])
+    assert len(local.dedup_detections([front, behind], {})) == 2

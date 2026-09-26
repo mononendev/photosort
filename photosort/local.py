@@ -214,6 +214,40 @@ def _pose_eyes(det: dict, scale: float, min_conf: float = 0.5):
     return (kp[REYE][0] * scale, kp[REYE][1] * scale), (kp[LEYE][0] * scale, kp[LEYE][1] * scale)
 
 
+def _iou(a, b) -> float:
+    iw = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    ih = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    inter = iw * ih
+    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _same_head(a: dict, b: dict, tol: float) -> bool:
+    """Both detections put their confident head keypoints in the same place (within tol * sqrt of the
+    smaller box's area, averaged over the head keypoints both see)."""
+    if not (a.get("kp") and a.get("kpc") and b.get("kp") and b.get("kpc")):
+        return False
+    shared = [i for i in HEAD_KP if a["kpc"][i] >= 0.3 and b["kpc"][i] >= 0.3]
+    if not shared:
+        return False
+    size = min(np.sqrt((d["box"][2] - d["box"][0]) * (d["box"][3] - d["box"][1])) for d in (a, b))
+    dist = np.mean([np.hypot(a["kp"][i][0] - b["kp"][i][0], a["kp"][i][1] - b["kp"][i][1]) for i in shared])
+    return dist <= tol * size
+
+
+def dedup_detections(dets: list[dict], cfg: dict) -> list[dict]:
+    """Drop duplicate detections of one person that slip past YOLO's NMS (its IoU cut is 0.7; a second,
+    shifted box with a hallucinated limb often lands at 0.5-0.7). A lower-confidence box is a duplicate when
+    it overlaps a kept one by dedup_iou, or by dedup_head_iou with the heads in the same spot. The head test
+    keeps two real people apart even when one stands in front of the other."""
+    d_iou, h_iou, h_tol = cfg.get("dedup_iou", 0.6), cfg.get("dedup_head_iou", 0.25), cfg.get("dedup_head_tol", 0.1)
+    kept: list[dict] = []
+    for d in sorted(dets, key=lambda d: -d["conf"]):
+        if not any((o := _iou(d["box"], k["box"])) >= d_iou or (o >= h_iou and _same_head(d, k, h_tol)) for k in kept):
+            kept.append(d)
+    return kept
+
+
 def _person_regions(det: dict, scale: float, W: int, H: int) -> dict:
     """Derive head / torso / upper-body boxes (full-res pixels) from a detection."""
     x0, y0, x1, y1 = [v * scale for v in det["box"]]
@@ -383,7 +417,7 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
     W, H = im.size
     small = I.resize_long_edge(im, cfg["detect_long_edge"])
     scale = W / small.size[0]
-    dets = [d for d in detector(small)
+    dets = [d for d in dedup_detections(detector(small), cfg)
             if ((d["box"][2] - d["box"][0]) * (d["box"][3] - d["box"][1]) * scale * scale) / (W * H) >= cfg["min_person_frac"]]
 
     gray = np.asarray(im.convert("L"), dtype=np.float32) / 255.0

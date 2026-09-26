@@ -130,7 +130,7 @@ export const METRIC_TIPS = {
     keypoints: <>The head box is centered on the nose, eye and ear keypoints from YOLO pose, sized from the shoulder width.</>,
     box_top: <>No head keypoints were confident, so the head box assumes an upright person and uses the top of their box.</>,
   } as Record<string, ReactNode>,
-  people: <>People found by YOLO pose, ignoring anyone smaller than min_person_frac of the frame. Eye bands are measured for the most prominent few (eye_max_people).</>,
+  people: <>People found by YOLO pose, ignoring anyone smaller than min_person_frac of the frame and dropping duplicate boxes on one person (dedup_iou, or dedup_head_iou with the heads in the same spot). Eye bands are measured for the most prominent few (eye_max_people).</>,
 };
 
 export function explainPrior(pr: NonNullable<LocalResult['exif_prior']>, cfg: Cfg): { dof: ReactNode; motion: ReactNode } {

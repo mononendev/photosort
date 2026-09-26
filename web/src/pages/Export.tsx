@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type { ExportResult } from '../api/client';
+import { errMsg, fmtTime } from '../lib/format';
 
 export default function Export() {
   const [name, setName] = useState('export');
@@ -32,7 +33,7 @@ export default function Export() {
         <span className="flex flex-wrap gap-4"><label className="flex items-center gap-1"><input type="checkbox" checked={xmp} onChange={(e) => setXmp(e.target.checked)} /> XMP sidecars</label><label className="flex items-center gap-1"><input type="checkbox" checked={tree} onChange={(e) => setTree(e.target.checked)} /> sorted tree</label></span>
       </div>
       <button onClick={() => run.mutate()} disabled={run.isPending} className="w-full sm:w-auto px-4 py-2.5 sm:py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.98] transition disabled:opacity-40 text-sm font-medium">{run.isPending ? 'Exporting…' : 'Run export'}</button>
-      {run.error && <p className="text-sm text-red-400">{(run.error as Error).message}</p>}
+      {run.error && <p className="text-sm text-red-400">{errMsg(run.error)}</p>}
       {result && (
         <div className="rounded-lg border border-gray-800 bg-gray-900 p-3 text-sm">
           <div>Wrote <b>{result.images}</b> records to <code className="break-all">{result.out}</code>{result.xmp_written ? `, ${result.xmp_written} XMP files` : ''}.</div>
@@ -42,7 +43,7 @@ export default function Export() {
       {exports && exports.length > 0 && (
         <div>
           <h2 className="text-sm font-semibold text-gray-300 mb-1">Previous exports</h2>
-          <ul className="text-sm text-gray-400 space-y-0.5">{exports.map((e) => <li key={e.name} className="break-all"><code>{e.path}</code> · {new Date(e.mtime * 1000).toLocaleString()}</li>)}</ul>
+          <ul className="text-sm text-gray-400 space-y-0.5">{exports.map((e) => <li key={e.name} className="break-all"><code>{e.path}</code> · {fmtTime(e.mtime)}</li>)}</ul>
         </div>
       )}
     </div>

@@ -1,9 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
-import { api } from '../api/client';
 import JobRow from '../components/JobRow';
+import { useJobs } from '../hooks/useJobs';
 
 export default function Jobs() {
-  const { data: jobs } = useQuery({ queryKey: ['jobs'], queryFn: api.jobs, refetchInterval: 2000 });
+  const { data: jobs } = useJobs();
   return (
     <div className="space-y-2">
       <h1 className="text-lg font-semibold mb-3">Jobs</h1>

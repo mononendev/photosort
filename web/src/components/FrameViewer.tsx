@@ -41,6 +41,7 @@ export default function FrameViewer({ id, name, l, cfg, layers, selected, onSele
   const [loadedFor, setLoadedFor] = useState<number | null>(null);
   const drag = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
   const dragged = useRef(false);
+  const selectUnlessDragged = useCallback((i: number) => { if (!dragged.current) onSelect(i); }, [onSelect]);
   const pts = useRef(new Map<number, { x: number; y: number }>());   // active pointers, client coords
   const pinch = useRef<{ d: number; mx: number; my: number; v: View } | null>(null);
   const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
@@ -189,7 +190,7 @@ export default function FrameViewer({ id, name, l, cfg, layers, selected, onSele
             {showFull && <img src={fullUrl(id)} alt="" draggable={false} onLoad={() => setLoadedFor(id)}
               className={`absolute inset-0 w-full h-full ${fullLoaded ? '' : 'opacity-0'}`} style={{ imageRendering: scale > 2 ? 'pixelated' : 'auto' }} />}
             <OverlaySvg l={l} cfg={cfg} layers={layers} selected={selected} heat={heat} setHover={setHover}
-              zoom={0.4 + 0.6 * view.zoom} onSelect={(i) => { if (!dragged.current) onSelect(i); }} />
+              zoom={0.4 + 0.6 * view.zoom} onSelect={selectUnlessDragged} />
           </div>
         )}
       </div>

@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, isFinished, isLive } from '../api/client';
 import type { Job, JobOptions } from '../api/client';
+import { errMsg, fmtEta } from '../lib/format';
 import Progress from './Progress';
 import Tip from './Tip';
 
@@ -9,13 +10,6 @@ const STATE_CLASS: Record<string, string> = {
   queued: 'text-gray-400', running: 'text-blue-300', cancelling: 'text-amber-300',
   done: 'text-emerald-300', cancelled: 'text-gray-500', failed: 'text-red-400',
 };
-
-function fmtEta(s: number | null | undefined): string {
-  if (!s) return '';
-  if (s < 90) return `${s}s`;
-  if (s < 5400) return `${Math.round(s / 60)}m`;
-  return `${(s / 3600).toFixed(1)}h`;
-}
 
 export default function JobRow({ job, compact }: { job: Job; compact?: boolean }) {
   const qc = useQueryClient();
@@ -26,8 +20,8 @@ export default function JobRow({ job, compact }: { job: Job; compact?: boolean }
     mutationFn: (extra: JobOptions) => api.createJob(job.paths, { ...job.options, retry_errors: true, ...extra }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['jobs'] }),
   });
-  const live = job.state === 'running' || job.state === 'cancelling';
-  const finished = job.state === 'done' || job.state === 'cancelled' || job.state === 'failed';
+  const live = isLive(job);
+  const finished = isFinished(job);
   const incomplete = finished && (job.state !== 'done' || job.errors > 0 || job.done < job.total);
   return (
     <div className="rounded-lg border border-gray-800 bg-gray-900 p-3">
@@ -57,7 +51,7 @@ export default function JobRow({ job, compact }: { job: Job; compact?: boolean }
           </Tip>
         )}
         {rerun.isSuccess && <span className="text-xs text-emerald-300">queued #{rerun.data.id}</span>}
-        {rerun.isError && <span className="text-xs text-red-400">{(rerun.error as Error).message}</span>}
+        {rerun.isError && <span className="text-xs text-red-400">{errMsg(rerun.error)}</span>}
       </div>
       {(live || job.state === 'queued') && <Progress done={job.done} total={job.total} className="mt-2" />}
       {!compact && (

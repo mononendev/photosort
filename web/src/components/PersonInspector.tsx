@@ -1,8 +1,8 @@
 import type { FocusDebug, FocusView, LocalResult, MetricTerms, Person, SpectrumView } from '../api/client';
 import Gauge from './Gauge';
 import Tip from './Tip';
-import { fmt } from './CheckTable';
-import { METRIC_TIPS, explainLocal } from '../lib/explain';
+import { fmt } from '../lib/format';
+import { METRIC_TIPS, explainLocal, focusThr } from '../lib/explain';
 import type { Cfg } from '../lib/explain';
 import { GRADE_COLOR, PERSON_COLORS, gradePerson } from '../lib/pose';
 
@@ -48,7 +48,7 @@ export function PersonInspector({ l, cfg, selected, onSelect }: { l: LocalResult
     { label: 'head', value: p.sharp_head }, { label: 'torso', value: p.sharp_torso },
     { label: 'body', value: p.sharp_body }, { label: 'bg', value: l.bg_sharp },
   ];
-  const thr = (cfg?.focus ?? {}) as Record<string, number>;
+  const thr = focusThr(cfg) as Record<string, number>;
   return (
     <div className="rounded-lg border border-gray-800 p-3 space-y-3">
       <div className="flex flex-wrap items-center gap-1 text-xs">

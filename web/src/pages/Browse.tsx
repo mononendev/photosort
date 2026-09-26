@@ -2,9 +2,11 @@ import { useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, thumbUrl } from '../api/client';
 import type { TreeDir } from '../api/client';
 import useStore from '../hooks/useStore';
+import { useBusy } from '../hooks/useJobs';
+import { errMsg, pct } from '../lib/format';
 import { StatusDot, TierBadge, Stars } from '../components/TierBadge';
 import Progress from '../components/Progress';
 import Tip from '../components/Tip';
@@ -21,7 +23,7 @@ function RowCheck({ checked, onToggle }: { checked: boolean; onToggle: ToggleFn 
 
 function DirRow({ d, checked, onToggle }: { d: TreeDir; checked: boolean; onToggle: ToggleFn }) {
   const done = d.vlm_done;
-  const pct = d.tracked ? Math.round((done / d.tracked) * 100) : 0;
+  const donePct = pct(done, d.tracked);
   return (
     <div className="flex items-center gap-2 sm:gap-3 px-3 py-2.5 sm:py-2 border-b border-gray-800 hover:bg-gray-900/60">
       <RowCheck checked={checked} onToggle={onToggle} />
@@ -31,8 +33,8 @@ function DirRow({ d, checked, onToggle }: { d: TreeDir; checked: boolean; onTogg
         {d.tracked > 0 ? (
           <>
             <Progress done={done} total={d.tracked} className="flex-1" />
-            <Tip tip="Tagged by the vision model / tracked (registered by a job) across this folder and its subfolders. Images never included in a job aren't tracked yet." className="hidden sm:inline text-xs text-gray-400 tabular-nums w-24 text-right">{done}/{d.tracked} · {pct}%</Tip>
-            <span className="sm:hidden text-xs text-gray-400 tabular-nums">{pct}%</span>
+            <Tip tip="Tagged by the vision model / tracked (registered by a job) across this folder and its subfolders. Images never included in a job aren't tracked yet." className="hidden sm:inline text-xs text-gray-400 tabular-nums w-24 text-right">{done}/{d.tracked} · {donePct}%</Tip>
+            <span className="sm:hidden text-xs text-gray-400 tabular-nums">{donePct}%</span>
           </>
         ) : (
           <span className="text-xs text-gray-600 truncate"><span className="hidden sm:inline">not processed</span><span className="sm:hidden">—</span></span>
@@ -49,7 +51,8 @@ export default function Browse() {
   const nav = useNavigate();
   const path = decodeURIComponent(loc.pathname.replace(/^\/browse\/?/, '')).replace(/\/$/, '');
   const qc = useQueryClient();
-  const { data, isLoading, error } = useQuery({ queryKey: ['tree', path], queryFn: () => api.tree(path), refetchInterval: 5000 });
+  const busy = useBusy();
+  const { data, isLoading, error } = useQuery({ queryKey: ['tree', path], queryFn: () => api.tree(path), refetchInterval: busy ? 5000 : false });
   const selected = useStore((s) => s.selected);
   const toggle = useStore((s) => s.toggleSelected);
   const setSelected = useStore((s) => s.setSelected);
@@ -65,7 +68,7 @@ export default function Browse() {
       setMsg(`Queued job #${job.id} for ${job.paths.length} path(s)`);
       clear();
     },
-    onError: (e) => setMsg(`Failed: ${(e as Error).message}`),
+    onError: (e) => setMsg(`Failed: ${errMsg(e)}`),
   });
 
   const crumbs = path ? path.split('/') : [];
@@ -113,7 +116,7 @@ export default function Browse() {
           <span className="w-20 sm:w-56">tagged<span className="hidden sm:inline"> / tracked</span></span>
         </div>
         {isLoading && <div className="p-3 text-sm text-gray-500">Loading…</div>}
-        {error && <div className="p-3 text-sm text-red-400">{(error as Error).message}</div>}
+        {error && <div className="p-3 text-sm text-red-400">{errMsg(error)}</div>}
         {data?.dirs.map((d) => (
           <DirRow key={d.path} d={d} checked={selected.includes(d.path)} onToggle={onRowClick(d.path)} />
         ))}
@@ -127,7 +130,7 @@ export default function Browse() {
             >
               {f.name}
             </button>
-            {f.id ? <img src={`/media/thumb/${f.id}`} alt="" className="h-8 w-12 object-cover rounded bg-gray-800" loading="lazy" /> : null}
+            {f.id ? <img src={thumbUrl(f.id)} alt="" className="h-8 w-12 object-cover rounded bg-gray-800" loading="lazy" /> : null}
             <TierBadge tier={f.focus_tier} small />
             <span className="hidden sm:inline"><Stars n={f.quality_score} /></span>
             <span className="hidden sm:inline text-xs text-gray-500 w-24 truncate">{f.subject !== 'unknown' ? f.subject : ''}</span>

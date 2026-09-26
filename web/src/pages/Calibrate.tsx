@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, cropUrl, FOCUS_METRIC_LABEL } from '../api/client';
 import type { FocusMetric, RescoreResult, TruthMatrixRow, TruthSummary } from '../api/client';
 import Tip from '../components/Tip';
+import { errMsg } from '../lib/format';
 
 const METRIC_TAB_TIP: Record<FocusMetric, string> = {
   eye: 'Laplacian on the band across both eyes. Decides the tier (together with the FFT ratio) whenever the eyes were located.',
@@ -37,8 +38,8 @@ function GroundTruth({ onApply, applying }: { onApply: (values: Record<string, n
     setMsg(`${r.verdicts} verdicts read, ${r.matched} matched to tracked images, ${r.unmatched} unmatched (not scanned yet, or different filename)`);
     qc.invalidateQueries({ queryKey: ['truth'] }); qc.invalidateQueries({ queryKey: ['images'] });
   };
-  const upload = useMutation({ mutationFn: (files: FileList) => api.truthUpload(files, folder), onSuccess: done, onError: (e) => setMsg((e as Error).message) });
-  const imp = useMutation({ mutationFn: () => api.truthImport(dir, folder), onSuccess: done, onError: (e) => setMsg((e as Error).message) });
+  const upload = useMutation({ mutationFn: (files: FileList) => api.truthUpload(files, folder), onSuccess: done, onError: (e) => setMsg(errMsg(e)) });
+  const imp = useMutation({ mutationFn: () => api.truthImport(dir, folder), onSuccess: done, onError: (e) => setMsg(errMsg(e)) });
   const clear = useMutation({ mutationFn: api.truthClear, onSuccess: () => { setMsg('cleared'); qc.invalidateQueries({ queryKey: ['truth'] }); } });
   const sel = 'bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm';
   const s: TruthSummary | undefined = data;
@@ -117,7 +118,7 @@ export default function Calibrate() {
           <button onClick={() => save.mutate({ [k1]: Number(shown(k1)), [k2]: Number(shown(k2)) })} disabled={save.isPending} className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40">save + re-score</button>
           {save.isPending && <span className="text-gray-500">re-scoring…</span>}
           {save.data && <RescoreSummary r={save.data} />}
-          {save.error && <span className="text-red-400">re-score failed: {String((save.error as Error).message ?? save.error)}</span>}
+          {save.error && <span className="text-red-400">re-score failed: {errMsg(save.error)}</span>}
         </div>
       )}
       <div className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(110px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]">

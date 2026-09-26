@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, isLive } from '../api/client';
 import useStore from '../hooks/useStore';
+import { useJobs, useRefreshOnJobEnd } from '../hooks/useJobs';
 
 const NAV = [
   { label: 'Dashboard', to: '/', end: true },
@@ -15,9 +16,10 @@ const NAV = [
 
 export default function Layout() {
   const selected = useStore((s) => s.selected);
-  const { data: health } = useQuery({ queryKey: ['health'], queryFn: api.health, refetchInterval: 10000 });
-  const { data: jobs } = useQuery({ queryKey: ['jobs'], queryFn: api.jobs, refetchInterval: 3000 });
-  const active = jobs?.find((j) => j.state === 'running' || j.state === 'cancelling');
+  const { data: health } = useQuery({ queryKey: ['health'], queryFn: api.health, refetchInterval: 30000 });
+  const { data: jobs } = useJobs();
+  useRefreshOnJobEnd();
+  const active = jobs?.find(isLive);
   const queued = jobs?.filter((j) => j.state === 'queued').length ?? 0;
   // The phone menu closes on navigation: remember which page it was opened on.
   const { pathname } = useLocation();

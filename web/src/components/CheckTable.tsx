@@ -1,7 +1,6 @@
-export type Check = { label: string; value: number | null | undefined; t2: number; t1: number };
+import { fmt } from '../lib/format';
 
-// eslint-disable-next-line react-refresh/only-export-components
-export const fmt = (v: number | null | undefined) => (v === null || v === undefined ? '–' : v < 0.01 ? v.toFixed(4) : v.toFixed(3));
+export type Check = { label: string; value: number | null | undefined; t2: number; t1: number };
 
 /** Metric values against the tier-2 / tier-1 thresholds, with pass/fail marks. */
 export default function CheckTable({ checks }: { checks: Check[] }) {

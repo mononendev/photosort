@@ -10,7 +10,7 @@ interface AppState {
   setJobDefaults: (d: Partial<AppState['jobDefaults']>) => void;
 }
 
-export const useStore = create<AppState>()(
+const useStore = create<AppState>()(
   persist(
     (set) => ({
       selected: [],

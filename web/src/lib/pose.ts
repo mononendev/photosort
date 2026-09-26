@@ -32,7 +32,7 @@ export const LAYERS: { key: Layer; label: string; tip: string }[] = [
 ];
 export const DEFAULT_LAYERS: Layer[] = ['af', 'people', 'skeleton', 'regions', 'eyes'];
 
-export type Grade = { grade: number | null; onEyes: boolean; checks: ReturnType<typeof gradeBasis>['checks'] };
+type Grade = { grade: number | null; onEyes: boolean; checks: ReturnType<typeof gradeBasis>['checks'] };
 
 /** 2/1/0 for one person, as local.py's _grade decides it (null when nothing is measurable). */
 export function gradePerson(p: Person, cfg: Cfg): Grade {

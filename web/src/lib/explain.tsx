@@ -11,7 +11,7 @@ export type Cfg = Record<string, unknown> | undefined;
 type Thr = Record<string, number | boolean>;
 
 export const focusThr = (cfg: Cfg): Thr => (cfg?.focus as Thr) ?? {};
-export const focusSource = (cfg: Cfg): string => (cfg?.focus_source as string) ?? 'vlm';
+const focusSource = (cfg: Cfg): string => (cfg?.focus_source as string) ?? 'vlm';
 
 export const TIER_MEANING: Record<number, string> = {
   2: "the primary person's head (eyes, face, or helmet edges) is crisply in focus",
@@ -19,7 +19,7 @@ export const TIER_MEANING: Record<number, string> = {
   0: 'nobody in focus: no people, everyone blurry, or focus landed on the background or foreground',
 };
 
-export const REASON_TEXT: Record<string, string> = {
+const REASON_TEXT: Record<string, string> = {
   no_people: 'the pose model found no person big enough to judge',
   subject_too_small: 'a person was found, but every region was too small to measure',
   primary_eyes_sharp: "the primary subject's eye band cleared both tier-2 thresholds",

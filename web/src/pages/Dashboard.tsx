@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import JobRow from '../components/JobRow';
+import { useBusy, useJobs } from '../hooks/useJobs';
 import Tip from '../components/Tip';
 
 function Tile({ label, value, to, sub, tip }: { label: string; value: number | string; to?: string; sub?: string; tip?: string }) {
@@ -16,8 +17,9 @@ function Tile({ label, value, to, sub, tip }: { label: string; value: number | s
 }
 
 export default function Dashboard() {
-  const { data: stats } = useQuery({ queryKey: ['stats'], queryFn: api.stats, refetchInterval: 5000 });
-  const { data: jobs } = useQuery({ queryKey: ['jobs'], queryFn: api.jobs, refetchInterval: 3000 });
+  const busy = useBusy();
+  const { data: stats } = useQuery({ queryKey: ['stats'], queryFn: api.stats, refetchInterval: busy ? 5000 : false });
+  const { data: jobs } = useJobs();
   const { data: health } = useQuery({ queryKey: ['health'], queryFn: api.health });
   const recent = jobs?.slice(0, 5) ?? [];
   const t = stats?.tiers;

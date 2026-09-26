@@ -109,7 +109,7 @@ export interface VlmResult {
   quality_remarks: string; quality_score: number; keeper: boolean;
 }
 
-export interface Override { rating?: number; focus_tier?: number; quality_score?: number; keeper?: boolean; note?: string; reviewed?: boolean }
+export interface Override { rating?: number; focus_tier?: number; quality_score?: number; keeper?: boolean; note?: string }
 
 export interface ImageDetail extends ImageSummary {
   local: LocalResult | null;
@@ -248,7 +248,6 @@ export const api = {
   override: (id: number, o: Override & { clear?: boolean }) =>
     request<ImageDetail>(`/api/images/${id}`, { method: 'PATCH', body: JSON.stringify(o) }),
   jobs: () => request<Job[]>('/api/jobs'),
-  job: (id: number) => request<Job>(`/api/jobs/${id}`),
   createJob: (paths: string[], options: JobOptions) =>
     request<Job>('/api/jobs', { method: 'POST', body: JSON.stringify({ paths, ...options }) }),
   jobDetail: (id: number) => request<JobDetail>(`/api/jobs/${id}/detail`),
@@ -283,13 +282,6 @@ export const cropUrl = (id: number) => `/media/crop/${id}`;
 /** The original at native resolution (rendered on first request, then cached). */
 export const fullUrl = (id: number) => `/media/full/${id}`;
 
-export const TIER_LABEL: Record<number, string> = { 0: 'nobody in focus', 1: 'partly in focus', 2: 'sharp' };
-export const TIER_CLASS: Record<number, string> = {
-  0: 'bg-red-900/70 text-red-200 border-red-700',
-  1: 'bg-amber-900/70 text-amber-200 border-amber-700',
-  2: 'bg-emerald-900/70 text-emerald-200 border-emerald-700',
-};
-
 /** Your cull ratings, in key order (q w e r). 0-2 are the focus tiers; 3 is a banger. Exported as these LR color labels. */
 export const RATINGS = [
   { value: 0, key: 'q', short: '0', label: 'nobody in focus', color: 'Red', cls: 'bg-red-900/70 text-red-200 border-red-700', solid: 'bg-red-600 border-red-400' },
@@ -297,3 +289,13 @@ export const RATINGS = [
   { value: 2, key: 'e', short: '2', label: 'sharp', color: 'Green', cls: 'bg-emerald-900/70 text-emerald-200 border-emerald-700', solid: 'bg-emerald-600 border-emerald-400' },
   { value: 3, key: 'r', short: '★', label: 'banger', color: 'Blue', cls: 'bg-blue-900/70 text-blue-200 border-blue-600', solid: 'bg-blue-600 border-blue-400' },
 ] as const;
+
+/** Focus tiers 0-2 share their label and colors with the matching cull rating. */
+export const TIER_LABEL: Record<number, string> = Object.fromEntries(RATINGS.slice(0, 3).map((r) => [r.value, r.label]));
+export const TIER_CLASS: Record<number, string> = Object.fromEntries(RATINGS.slice(0, 3).map((r) => [r.value, r.cls]));
+
+/** A job a worker holds right now. */
+export const isLive = (j: Pick<Job, 'state'> | undefined) => !!j && (j.state === 'running' || j.state === 'cancelling');
+/** A job that will still change: live or waiting in the queue. */
+export const isBusy = (j: Pick<Job, 'state'>) => isLive(j) || j.state === 'queued';
+export const isFinished = (j: Pick<Job, 'state'>) => j.state === 'done' || j.state === 'cancelled' || j.state === 'failed';

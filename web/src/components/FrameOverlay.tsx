@@ -1,8 +1,8 @@
-import { useId, useState } from 'react';
+import { memo, useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import { frameUrl } from '../api/client';
 import type { FocusDebug, LocalResult, Person } from '../api/client';
-import { fmt } from './CheckTable';
+import { fmt } from '../lib/format';
 import type { Cfg } from '../lib/explain';
 import { FACE_LM, GRADE_COLOR, KP_MIN_CONF, KP_NAMES, PERSON_COLORS, SKELETON, boxH, boxW, gradePerson } from '../lib/pose';
 import type { Layer } from '../lib/pose';
@@ -20,7 +20,8 @@ type OverlayProps = {
  * Everything the local stage found, as an SVG in the original's pixel coordinates (any downscale of the frame
  * with the same aspect ratio fits the one viewBox). Fills its positioned parent.
  */
-export function OverlaySvg({ l, cfg, layers, selected, onSelect, heat, setHover, zoom = 1 }: OverlayProps) {
+// Memoized: panning and hovering re-render the viewer around it, not the dozens of boxes and keypoints inside.
+export const OverlaySvg = memo(function OverlaySvg({ l, cfg, layers, selected, onSelect, heat, setHover, zoom = 1 }: OverlayProps) {
   const W = l.width, H = l.height;
   const hatch = `hatch${useId().replace(/[^a-zA-Z0-9]/g, '')}`;   // unique per SVG: inline and fullscreen coexist
   const u = Math.max(W, H) / 1000 / zoom;    // one "unit" ≈ 0.1% of the long edge at zoom 1
@@ -141,7 +142,7 @@ export function OverlaySvg({ l, cfg, layers, selected, onSelect, heat, setHover,
       })}
     </svg>
   );
-}
+});
 
 export function HoverBar({ hover, l }: { hover: Hover; l: LocalResult }) {
   const people = l.people ?? [];

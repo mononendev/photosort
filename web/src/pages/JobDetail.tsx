@@ -2,37 +2,26 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { api, thumbUrl } from '../api/client';
+import { api, isFinished, isLive, thumbUrl } from '../api/client';
 import type { ActiveItem, JobDetail as JobDetailT, JobItem, JobStage, StageStats } from '../api/client';
 import JobRow from '../components/JobRow';
 import ImageDetail from '../components/ImageDetail';
 import { TierBadge, Stars } from '../components/TierBadge';
 import Tip from '../components/Tip';
+import { errMsg, fmtClock, fmtDur, fmtK, fmtNum, fmtTime } from '../lib/format';
 
 type StageName = 'scan' | 'local' | 'vlm';
 const STAGES: StageName[] = ['scan', 'local', 'vlm'];
 const STAGE_LABEL: Record<StageName, string> = { scan: 'Scan', local: 'Local stage', vlm: 'Vision model' };
 
-function fmtDur(s: number | null | undefined): string {
-  if (s === null || s === undefined || !isFinite(s)) return '–';
-  if (s < 10) return `${s.toFixed(1)}s`;
-  if (s < 90) return `${Math.round(s)}s`;
-  if (s < 5400) return `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
-  return `${Math.floor(s / 3600)}h ${Math.round((s % 3600) / 60)}m`;
-}
-const fmtNum = (n: number | null | undefined) => (n === null || n === undefined ? '–' : n.toLocaleString());
-const fmtK = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 100_000 ? 0 : 1)}k` : String(n));
-const fmtTime = (t: number | null | undefined) => (t ? new Date(t * 1000).toLocaleString() : '–');
-const fmtClock = (t: number) => new Date(t * 1000).toLocaleTimeString();
-
 export default function JobDetail() {
   const id = Number(useParams().id);
   const { data: job, error } = useQuery({
     queryKey: ['job-detail', id], queryFn: () => api.jobDetail(id),
-    refetchInterval: (q) => (isLive(q.state.data) ? 1000 : 5000),
+    refetchInterval: (q) => (isLive(q.state.data) ? 1000 : q.state.data && isFinished(q.state.data) ? false : 5000),
   });
   const [open, setOpen] = useState<number | null>(null);
-  if (error) return <p className="text-sm text-red-400">{(error as Error).message}</p>;
+  if (error) return <p className="text-sm text-red-400">{errMsg(error)}</p>;
   if (!job) return <p className="text-sm text-gray-500">Loading…</p>;
   const live = isLive(job);
   const vlmStage = job.stages.vlm;
@@ -55,10 +44,6 @@ export default function JobDetail() {
       {open !== null && <ImageDetail id={open} onClose={() => setOpen(null)} />}
     </div>
   );
-}
-
-function isLive(j: JobDetailT | undefined) {
-  return !!j && (j.state === 'running' || j.state === 'cancelling');
 }
 
 function Section({ title, tip, right, children }: { title: string; tip?: ReactNode; right?: ReactNode; children: ReactNode }) {
@@ -390,7 +375,7 @@ function ItemIO({ it, backend, model, onOpen }: { it: JobItem; backend?: string;
                 {req.build_error && <p className="text-[11px] text-amber-300">Couldn't build the {req.backend} request here: {req.build_error}</p>}
                 <p className="text-[10px] text-gray-500">Rebuilt from the current cache and config, so it matches what was sent unless either changed since.</p>
               </>
-            ) : reqErr ? <p className="text-xs text-red-400">{(reqErr as Error).message}</p> : <p className="text-xs text-gray-500">Loading…</p>
+            ) : reqErr ? <p className="text-xs text-red-400">{errMsg(reqErr)}</p> : <p className="text-xs text-gray-500">Loading…</p>
           ) : (
             <p className="text-xs text-gray-400">The original file, <span className="text-gray-300">{it.rel}</span>, downscaled for person detection and scored at native resolution around the eyes.</p>
           )}

@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import Tip from './Tip';
-import { fmt } from './CheckTable';
+import { fmt } from '../lib/format';
 
 /**
  * A metric on a log axis with its tier zones: red below the tier-1 threshold, amber between, green above tier 2.

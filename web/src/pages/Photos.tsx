@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { api, thumbUrl } from '../api/client';
@@ -6,6 +6,7 @@ import type { ImageFilters } from '../api/client';
 import { TierBadge, Stars, StatusDot, LrBadge, RatingBadge } from '../components/TierBadge';
 import ImageDetail from '../components/ImageDetail';
 import Tip from '../components/Tip';
+import { useBusy } from '../hooks/useJobs';
 
 const SUBJECTS = ['rider_action', 'rider_posed', 'group', 'crowd_spectators', 'gear_board', 'venue_scenery', 'other', 'no_people'];
 const PAGE = 60;
@@ -30,7 +31,8 @@ export default function Photos() {
     offset: Number(sp.get('offset') ?? 0),
     limit: PAGE,
   }), [sp]);
-  const { data, isFetching } = useQuery({ queryKey: ['images', filters], queryFn: () => api.images(filters), placeholderData: keepPreviousData, refetchInterval: 8000 });
+  const busy = useBusy();
+  const { data, isFetching } = useQuery({ queryKey: ['images', filters], queryFn: () => api.images(filters), placeholderData: keepPreviousData, refetchInterval: busy ? 8000 : false });
   // `open` comes from the URL until the user navigates within the modal; `undefined` = follow the URL.
   const [openState, setOpenState] = useState<number | null | undefined>(undefined);
   const open = openState === undefined ? (sp.get('open') ? Number(sp.get('open')) : null) : openState;
@@ -45,13 +47,14 @@ export default function Photos() {
     setOpenState(undefined);
     setSp(n);
   };
-  const items = data?.items ?? [];
-  const nav = (dir: 1 | -1) => {
+  const items = useMemo(() => data?.items ?? [], [data]);
+  // Stable between renders, so the detail view's hotkey listener isn't re-bound on every poll.
+  const nav = useCallback((dir: 1 | -1) => {
     if (open === null) return;
     const i = items.findIndex((x) => x.id === open);
     const nx = items[i + dir];
-    if (nx?.id) setOpen(nx.id);
-  };
+    if (nx?.id) setOpenState(nx.id);
+  }, [items, open]);
   const total = data?.total ?? 0;
   const offset = filters.offset ?? 0;
   const sel = 'bg-gray-900 border border-gray-700 rounded px-2 py-1.5 sm:py-1 text-sm';

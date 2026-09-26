@@ -175,7 +175,8 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         d["options"] = json.loads(d.pop("options_json") or "{}")
         d["stages"] = json.loads(d.pop("stages_json", None) or "{}")
         if d["started"] and d["done"] and d["state"] == "running":
-            el = time.time() - d["started"]
+            # done/total count the current stage, so time it from that stage's start, not the job's
+            el = time.time() - (d["stages"].get(d["stage"], {}).get("started") or d["started"])
             d["rate"] = round(d["done"] / el, 2) if el else None
             d["eta_s"] = round((d["total"] - d["done"]) / d["rate"]) if d.get("rate") else None
         return d
@@ -240,8 +241,8 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         for r in rows:
             by_stage.setdefault(r["stage"], []).append(r)
         out["stats"] = {st: stage_stats(rs) for st, rs in by_stage.items()}
-        series = []
-        for r in rows[-points:]:
+        series = []   # the last `points` images of each stage, so a finished stage keeps its charts
+        for r in (r for rs in by_stage.values() for r in rs[-points:]):
             u = jcol(r, "usage_json", {})
             series.append({"t": r["finished"], "stage": r["stage"], "s": r["seconds"], "err": bool(r["failed"]),
                            "tok_s": u.get("tok_s"), "out": u.get("out")})

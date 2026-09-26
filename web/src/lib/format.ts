@@ -27,6 +27,14 @@ export const fmtK = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 100_0
 /** Unix seconds as a local date and time. */
 export const fmtTime = (t: N) => (t ? new Date(t * 1000).toLocaleString() : '–');
 export const fmtClock = (t: number) => new Date(t * 1000).toLocaleTimeString();
+/** When something `s` seconds from now lands, in the device's timezone ("3:42 PM", "Sat 3:42 PM" past today). */
+export function fmtFinishAt(s: N): string {
+  if (s === null || s === undefined || !isFinite(s)) return '–';
+  const at = new Date(Date.now() + s * 1000);
+  const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (at.toDateString() === new Date().toDateString()) return time;
+  return `${at.toLocaleDateString([], { weekday: 'short', ...(s > 6 * 86400 ? { month: 'short', day: 'numeric' } : {}) })} ${time}`;
+}
 
 /** done/total as a whole percentage, 0 when there is no total. */
 export const pct = (done: number, total: number) => (total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0);

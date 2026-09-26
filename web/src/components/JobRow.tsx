@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, isFinished, isLive } from '../api/client';
 import type { Job, JobOptions } from '../api/client';
-import { errMsg, fmtEta } from '../lib/format';
+import { errMsg, fmtEta, fmtFinishAt } from '../lib/format';
 import Progress from './Progress';
 import Tip from './Tip';
 
@@ -34,7 +34,7 @@ export default function JobRow({ job, compact }: { job: Job; compact?: boolean }
         </Link>
         <Tip tip={<>Progress of the current stage ({job.stage === 'done' ? 'the last stage that had work' : job.stage}). The local stage counts images analyzed; the vlm stage counts images sent to the vision model. The note below keeps the local stage's summary.</>} className="text-gray-400 tabular-nums">{job.done}/{job.total}</Tip>
         {job.errors > 0 && <Tip tip="Images that failed in the local or vision stage, both added up. Filter Photos by status = error for the messages; resume retries them." className="text-red-400">{job.errors} err</Tip>}
-        {live && job.rate ? <span className="text-gray-500">{job.rate}/s · eta {fmtEta(job.eta_s)}</span> : null}
+        {live && job.rate ? <Tip tip={`Rate and time left in the ${job.stage} stage, since that stage started; the clock time is in your timezone.`} className="text-gray-500">{job.rate}/s · eta {fmtEta(job.eta_s)} · done {fmtFinishAt(job.eta_s)}</Tip> : null}
         {(job.state === 'queued' || job.state === 'running') && (
           <button onClick={() => cancel.mutate()} className="text-xs px-2 py-1 -my-1 rounded text-gray-400 hover:text-red-300 active:bg-gray-800">cancel</button>
         )}

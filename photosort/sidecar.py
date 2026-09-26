@@ -1,5 +1,6 @@
 """Read the photographer's own verdicts from existing Lightroom/Bridge XMP sidecars (rating, label)."""
 from __future__ import annotations
+import os
 import re
 from pathlib import Path
 from typing import Optional
@@ -17,16 +18,17 @@ def rating_label(text: str) -> tuple[Optional[int], Optional[str]]:
     return rating, label or None
 
 
-def sidecar_for(path: Path) -> Optional[Path]:
+def sidecar_for(path: Path, siblings: Optional[set[str]] = None) -> Optional[Path]:
+    """The .xmp/.XMP next to `path`. `siblings`, the names in its folder, saves a stat per candidate."""
     for cand in (path.with_suffix(".xmp"), path.with_suffix(".XMP")):
-        if cand.exists():
+        if cand.name in siblings if siblings is not None else cand.exists():
             return cand
     return None
 
 
-def read_sidecar(path: Path) -> dict:
+def read_sidecar(path: Path, siblings: Optional[set[str]] = None) -> dict:
     """Returns {} when there is no sidecar; otherwise {"rating": int|None, "label": str|None, "sidecar": name}."""
-    sc = sidecar_for(path)
+    sc = sidecar_for(path, siblings)
     if sc is None:
         return {}
     try:
@@ -39,9 +41,15 @@ def read_sidecar(path: Path) -> dict:
 
 def ingest(db, rows) -> int:
     """Store sidecar verdicts for rows whose lr_json is NULL. Returns how many had a sidecar."""
-    n = 0
-    for r in rows:
-        d = read_sidecar(Path(r["path"]))
-        db.set_lr(r["id"], d)
-        n += bool(d)
-    return n
+    listings: dict[Path, set[str]] = {}
+
+    def siblings(folder: Path) -> set[str]:   # one directory listing per folder instead of two stats per image
+        if folder not in listings:
+            try:
+                listings[folder] = set(os.listdir(folder))
+            except OSError:
+                listings[folder] = set()
+        return listings[folder]
+    found = [(r["id"], read_sidecar(p, siblings(p.parent))) for r in rows for p in [Path(r["path"])]]
+    db.set_lr_many(found)
+    return sum(1 for _, d in found if d)

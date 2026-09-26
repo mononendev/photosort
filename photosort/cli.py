@@ -24,7 +24,7 @@ def cmd_scan(args):
     paths = I.find_images(map(Path, args.dirs), args.skip_raw_dupes)
     n = db.add_paths(paths)
     from . import sidecar
-    m = sidecar.ingest(db, db.rows("lr_json IS NULL"))
+    m = sidecar.ingest(db, db.rows("lr_json IS NULL", cols="id, path"))
     print(f"found {len(paths)} images, {n} new ({m} with Lightroom sidecars); total tracked {db.count()}")
 
 

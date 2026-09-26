@@ -45,7 +45,6 @@ CREATE TABLE IF NOT EXISTS job_items (
 );
 CREATE INDEX IF NOT EXISTS idx_job_items ON job_items(job_id, id);
 CREATE INDEX IF NOT EXISTS idx_batch ON images(batch_id);
-CREATE INDEX IF NOT EXISTS idx_folder ON images(folder);
 CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state);
 """
 MIGRATIONS = [
@@ -91,6 +90,13 @@ class DB:
                     c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
             for r in c.execute("SELECT id, path FROM images WHERE folder IS NULL").fetchall():
                 c.execute("UPDATE images SET folder=? WHERE id=?", (str(Path(r[1]).parent), r[0]))
+            # After the migrations: they add the columns these index.
+            c.execute("CREATE INDEX IF NOT EXISTS idx_folder ON images(folder)")
+            # The dashboard groups by these expressions on every poll; indexed, SQLite reads the index instead of
+            # parsing each row's JSON.
+            c.execute(f"CREATE INDEX IF NOT EXISTS idx_final_tier ON images({FINAL_TIER_SQL}) WHERE local_json IS NOT NULL")
+            c.execute(f"CREATE INDEX IF NOT EXISTS idx_tier_lr ON images({FINAL_TIER_SQL}, json_extract(lr_json,'$.rating')) "
+                      "WHERE local_json IS NOT NULL")
             c.commit()
 
     @property
@@ -106,9 +112,14 @@ class DB:
 
     # ---- images -----------------------------------------------------------
     def add_paths(self, paths: Iterable[Path]) -> int:
+        """Register new image files; ones already tracked are skipped without a stat (a rescan of a big shoot on a
+        network mount is mostly those)."""
         n = 0
+        known = {r[0] for r in self.conn.execute("SELECT path FROM images")}
         with self.lock, self.conn as c:
             for p in paths:
+                if str(p) in known:
+                    continue
                 try:
                     st = p.stat()
                 except OSError:
@@ -118,8 +129,9 @@ class DB:
                 n += cur.rowcount
         return n
 
-    def rows(self, where: str = "1", params=(), order: str = "path", limit: Optional[int] = None, offset: int = 0) -> list[sqlite3.Row]:
-        q = f"SELECT * FROM images WHERE {where} ORDER BY {order}"
+    def rows(self, where: str = "1", params=(), order: str = "path", limit: Optional[int] = None, offset: int = 0,
+             cols: str = "*") -> list[sqlite3.Row]:
+        q = f"SELECT {cols} FROM images WHERE {where} ORDER BY {order}"
         if limit is not None:
             q += f" LIMIT {int(limit)} OFFSET {int(offset)}"
         return self.conn.execute(q, params).fetchall()
@@ -168,13 +180,27 @@ class DB:
         self.set_vlm(int(res.key), res.data if ok else None, res.usage, None if ok else res.error)
         return ok
 
-    def set_lr(self, img_id: int, data: Optional[dict]):
+    def set_local_many(self, items: list[tuple[int, dict]]):
+        """set_local for many images in one transaction."""
+        now = time.time()
         with self.lock, self.conn as c:
-            c.execute("UPDATE images SET lr_json=? WHERE id=?", (json.dumps(data) if data else "{}", img_id))
+            c.executemany("UPDATE images SET local_json=?, error=NULL, local_at=? WHERE id=?",
+                          [(json.dumps(d), now, i) for i, d in items])
+
+    def set_lr(self, img_id: int, data: Optional[dict]):
+        self.set_lr_many([(img_id, data)])
+
+    def set_lr_many(self, items: list[tuple[int, Optional[dict]]]):
+        """Lightroom sidecar verdicts; an image without one stores {} so it isn't looked up again."""
+        with self.lock, self.conn as c:
+            c.executemany("UPDATE images SET lr_json=? WHERE id=?", [(json.dumps(d) if d else "{}", i) for i, d in items])
 
     def set_truth(self, img_id: int, data: Optional[dict]):
+        self.set_truth_many([(img_id, data)])
+
+    def set_truth_many(self, items: list[tuple[int, Optional[dict]]]):
         with self.lock, self.conn as c:
-            c.execute("UPDATE images SET truth_json=? WHERE id=?", (json.dumps(data) if data else None, img_id))
+            c.executemany("UPDATE images SET truth_json=? WHERE id=?", [(json.dumps(d) if d else None, i) for i, d in items])
 
     def clear_truth(self) -> int:
         with self.lock, self.conn as c:

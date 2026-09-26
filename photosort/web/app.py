@@ -139,7 +139,15 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         base = safe_path(path)
         if not base.is_dir():
             raise HTTPException(404, "not a directory")
-        fstats = db.folder_stats(str(base))
+        # Every tracked folder under base, rolled up into the child of base it sits in.
+        agg: dict[str, dict] = {}
+        for folder, st in db.folder_stats(str(base)).items():
+            child = Path(folder).relative_to(base).parts[:1]
+            if child:
+                a = agg.setdefault(child[0], {"tracked": 0, "local_done": 0, "vlm_done": 0, "errors": 0})
+                a["tracked"] += st["n"]; a["local_done"] += st["local_done"] or 0
+                a["vlm_done"] += st["vlm_done"] or 0; a["errors"] += st["errors"] or 0
+        here = {r["path"]: r for r in db.rows("folder = ?", [str(base)])}
         dirs, files = [], []
         try:
             entries = sorted(os.scandir(base), key=lambda e: e.name.lower())
@@ -149,19 +157,14 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             if e.name.startswith("."):
                 continue
             if e.is_dir(follow_symlinks=False):
-                sub = str(Path(e.path))
-                agg = {"tracked": 0, "local_done": 0, "vlm_done": 0, "errors": 0}
-                for folder, st in fstats.items():
-                    if folder == sub or folder.startswith(sub + "/"):
-                        agg["tracked"] += st["n"]; agg["local_done"] += st["local_done"] or 0
-                        agg["vlm_done"] += st["vlm_done"] or 0; agg["errors"] += st["errors"] or 0
                 try:
                     n_direct = sum(1 for x in os.scandir(e.path) if x.is_file() and I.is_image(Path(x.name)))
                 except PermissionError:
                     n_direct = 0
-                dirs.append({"name": e.name, "path": rel(e.path), "images_direct": n_direct, **agg})
+                dirs.append({"name": e.name, "path": rel(e.path), "images_direct": n_direct,
+                             **agg.get(e.name, {"tracked": 0, "local_done": 0, "vlm_done": 0, "errors": 0})})
             elif e.is_file() and I.is_image(Path(e.name)):
-                row = db.conn.execute("SELECT * FROM images WHERE path=?", (e.path,)).fetchone()
+                row = here.get(e.path)
                 files.append(summary(row) if row else {"id": None, "name": e.name, "rel": rel(e.path), "path": e.path, "status": "untracked"})
         return {"path": rel(str(base)) if base != photos_root else "", "dirs": dirs, "files": files}
 
@@ -494,16 +497,13 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         import numpy as np
         if metric not in truth.METRICS:
             raise HTTPException(400, f"metric must be one of {sorted(truth.METRICS)}")
-        key = truth.METRICS[metric][0][2:]
-        vals = []
-        for r in db.rows("local_json IS NOT NULL"):
-            d = json.loads(r["local_json"])
-            if d.get(key) is not None:
-                vals.append((d[key], r["id"], d["local_tier"]))
+        path = truth.METRICS[metric][0]
+        vals = [tuple(r) for r in db.conn.execute(
+            f"SELECT json_extract(local_json, '{path}') v, id, json_extract(local_json, '$.local_tier') FROM images "
+            "WHERE local_json IS NOT NULL AND v IS NOT NULL ORDER BY v, id")]
         base = {"metric": metric, "thresholds": cfg["focus"], "keys": truth.METRICS[metric][1:]}
         if not vals:
             return {**base, "percentiles": {}, "samples": []}
-        vals.sort()
         arr = np.array([v[0] for v in vals])
         idx = np.linspace(0, len(vals) - 1, min(n, len(vals))).astype(int)
         return {**base, "count": len(vals), "percentiles": {f"p{q}": round(float(np.percentile(arr, q)), 4) for q in (5, 10, 25, 50, 75, 90, 95)},
@@ -511,27 +511,35 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
 
     # ---- ground truth -----------------------------------------------------------------
     def truth_summary():
+        """Confusion matrices and suggested thresholds from the images that carry a verdict (usually a few
+        hundred), read in one pass instead of one scan of the whole table per matrix and metric."""
         c = db.conn
-        n = db.count("truth_json IS NOT NULL")
-        with_tier = db.count("json_extract(truth_json,'$.focus_tier') IS NOT NULL")
+        paths = {m: p for m, (p, _, _) in truth.METRICS.items()}
+        rows = c.execute(
+            "SELECT json_extract(truth_json,'$.focus_tier') truth, json_extract(local_json,'$.local_tier') local, "
+            "json_extract(vlm_json,'$.focus_tier') vlm, "
+            + ", ".join(f"json_extract(local_json,'{p}') {m}" for m, p in paths.items())
+            + " FROM images WHERE truth_json IS NOT NULL").fetchall()
+        with_tier = [r for r in rows if r["truth"] is not None]
+
         def matrix(col):
-            return [dict(r) for r in c.execute(
-                f"SELECT json_extract(truth_json,'$.focus_tier') truth, {col} pred, COUNT(*) n FROM images "
-                f"WHERE json_extract(truth_json,'$.focus_tier') IS NOT NULL AND {col} IS NOT NULL GROUP BY truth, pred")]
-        local_m = matrix("json_extract(local_json,'$.local_tier')")
-        vlm_m = matrix("json_extract(vlm_json,'$.focus_tier')")
+            n: dict[tuple, int] = {}
+            for r in with_tier:
+                if r[col] is not None:
+                    n[(r["truth"], r[col])] = n.get((r["truth"], r[col]), 0) + 1
+            return [{"truth": t, "pred": p, "n": k} for (t, p), k in sorted(n.items())]
+
         def acc(m):
             tot = sum(r["n"] for r in m); ok = sum(r["n"] for r in m if r["truth"] == r["pred"])
             return round(ok / tot, 3) if tot else None
+        local_m, vlm_m = matrix("local"), matrix("vlm")
         suggested = {}
-        for m, (path, k2, k1) in truth.METRICS.items():
-            pairs = [(r[0], int(r[1])) for r in c.execute(
-                f"SELECT json_extract(local_json,'{path}'), json_extract(truth_json,'$.focus_tier') FROM images "
-                f"WHERE json_extract(truth_json,'$.focus_tier') IS NOT NULL AND json_extract(local_json,'{path}') IS NOT NULL")]
+        for m, (_, k2, k1) in truth.METRICS.items():
+            pairs = [(r[m], int(r["truth"])) for r in with_tier if r[m] is not None]
             sug = truth.suggest_thresholds(pairs)
             if sug:
                 suggested[m] = {"n": len(pairs), **{(k2 if k == "tier2_min" else k1): v for k, v in sug.items()}}
-        return {"images_with_truth": n, "with_tier": with_tier, "local": {"matrix": local_m, "accuracy": acc(local_m)},
+        return {"images_with_truth": len(rows), "with_tier": len(with_tier), "local": {"matrix": local_m, "accuracy": acc(local_m)},
                 "vlm": {"matrix": vlm_m, "accuracy": acc(vlm_m)}, "suggested": suggested,
                 "mapping": cfg.get("truth")}
 

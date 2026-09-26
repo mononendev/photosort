@@ -309,11 +309,15 @@ def local_tier(primary: Optional[dict], others: list[dict], thr: dict, prior: Op
     return 0, "nothing_sharp"
 
 
+THUMB_LONG_EDGE = 400
+
+
 @dataclass
 class LocalResult:
     data: dict
     frame_jpeg: bytes
     crop_jpeg: Optional[bytes] = None
+    thumb_jpeg: Optional[bytes] = None
 
 
 def _eye_metrics(r: dict, det: dict, scale: float, rgb: np.ndarray, gray: np.ndarray, W: int, H: int,
@@ -424,7 +428,9 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
     prior = X.prior(exif, cfg.get("exif"))
     tier, reason = local_tier(primary, people[1:], cfg["focus"], prior, cfg.get("exif", {}).get("shake_margin", 1.5))
 
-    frame = I.to_jpeg(I.resize_long_edge(im, cfg["frame_long_edge"]), cfg["frame_quality"])
+    frame_im = I.resize_long_edge(im, cfg["frame_long_edge"])
+    frame = I.to_jpeg(frame_im, cfg["frame_quality"])
+    thumb = I.to_jpeg(I.resize_long_edge(frame_im, THUMB_LONG_EDGE), 80)
     crop_jpeg, crop_used = None, None
     if primary:
         crop_im, crop_used = I.crop_box(im, primary["upper"], cfg["crop_pad"], cfg["crop_size"])
@@ -443,7 +449,7 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
         "exif": exif, "exif_prior": prior,
         "local_tier": tier, "local_reason": reason,
     }
-    return LocalResult(data, frame, crop_jpeg)
+    return LocalResult(data, frame, crop_jpeg, thumb)
 
 
 def rescore(db, cfg: dict, backfill_exif: bool = True) -> dict:
@@ -454,7 +460,8 @@ def rescore(db, cfg: dict, backfill_exif: bool = True) -> dict:
     """
     changed = backfilled = af_new = reordered = errors = 0
     first_error = None
-    for r in db.rows("local_json IS NOT NULL"):
+    updates: list[tuple[int, dict]] = []
+    for r in db.rows("local_json IS NOT NULL", cols="id, path, local_json"):
         try:
             d = json.loads(r["local_json"])
             dirty = False
@@ -487,15 +494,13 @@ def rescore(db, cfg: dict, backfill_exif: bool = True) -> dict:
                 if tier != d.get("local_tier"):
                     changed += 1
                 d["local_tier"], d["local_reason"] = tier, reason
-                db.set_local(r["id"], d)
+                updates.append((r["id"], d))
         except Exception as e:  # one malformed row must not abort the pass
             errors += 1
             first_error = first_error or f"{r['path']}: {type(e).__name__}: {e}"
+    db.set_local_many(updates)
     return {"changed": changed, "exif_backfilled": backfilled, "af_backfilled": af_new, "primary_changed": reordered,
             "errors": errors, "first_error": first_error}
-
-
-THUMB_LONG_EDGE = 400
 
 
 def write_cache(cache_dir: Path, img_id: int, res: "LocalResult"):
@@ -506,9 +511,7 @@ def write_cache(cache_dir: Path, img_id: int, res: "LocalResult"):
     elif cp.exists():
         cp.unlink()
     (cache_dir / f"{img_id}_full.jpg").unlink(missing_ok=True)  # the viewer re-renders it from the file on demand
-    import io
-    thumb = I.resize_long_edge(Image.open(io.BytesIO(res.frame_jpeg)), THUMB_LONG_EDGE)
-    (cache_dir / f"{img_id}_thumb.jpg").write_bytes(I.to_jpeg(thumb, 80))
+    (cache_dir / f"{img_id}_thumb.jpg").write_bytes(res.thumb_jpeg)
 
 
 def run_local(db, cfg: dict, cache_dir: Path, ids_paths: list[tuple[int, str]], device: Optional[str] = None,

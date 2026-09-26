@@ -89,19 +89,16 @@ def resolve_tier(v: dict, cfg: dict) -> Optional[int]:
 def apply(db, verdicts: dict[str, dict], cfg: dict, folder: Optional[str] = None) -> dict:
     """Attach verdicts to tracked images by filename stem. Returns counts."""
     where, params = under_folder(folder) if folder else ("1", [])
-    matched = 0
-    seen = set()
-    for r in db.rows(where, params):
+    found, seen = [], set()
+    for r in db.rows(where, params, cols="id, path"):
         stem = Path(r["path"]).stem.lower()
         v = verdicts.get(stem)
         if v is None:
             continue
-        v = dict(v)
-        v["focus_tier"] = resolve_tier(v, cfg)
-        db.set_truth(r["id"], v)
-        matched += 1
+        found.append((r["id"], {**v, "focus_tier": resolve_tier(v, cfg)}))
         seen.add(stem)
-    return {"verdicts": len(verdicts), "matched": matched, "unmatched": len(set(verdicts) - seen)}
+    db.set_truth_many(found)
+    return {"verdicts": len(verdicts), "matched": len(found), "unmatched": len(set(verdicts) - seen)}
 
 
 # Which stored per-image value each threshold pair calibrates: metric -> (local_json path, tier2 key, tier1 key)

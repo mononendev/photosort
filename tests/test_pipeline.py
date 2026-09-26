@@ -172,3 +172,21 @@ def test_runner_that_lost_its_job_writes_nothing(tmp_path, monkeypatch):
     db.claim_job(jid, "new-server")
     old._stopped(jid); old._finish(jid, "done")
     assert db.job_lease(jid) == ("running", "new-server")
+
+
+def test_old_database_is_migrated_and_indexed(tmp_path):
+    import sqlite3
+    p = tmp_path / "old.db"
+    c = sqlite3.connect(p)   # the first schema: no folder, overrides, Lightroom or truth columns
+    c.executescript("CREATE TABLE images (id INTEGER PRIMARY KEY, path TEXT UNIQUE NOT NULL, size INTEGER, mtime REAL, "
+                    "local_json TEXT, batch_id TEXT, vlm_json TEXT, vlm_usage TEXT, error TEXT);"
+                    "INSERT INTO images(path, local_json) VALUES ('/p/a.jpg', '{\"local_tier\": 1}');")
+    c.commit(); c.close()
+    db = DB(p)
+    assert db.row(1)["folder"] == "/p" and db.row(1)["lr_json"] is None
+    idx = {r[0] for r in db.conn.execute("SELECT name FROM sqlite_master WHERE type='index'")}
+    assert {"idx_final_tier", "idx_tier_lr"} <= idx
+    from photosort.db import FINAL_TIER_SQL
+    plan = db.conn.execute(f"EXPLAIN QUERY PLAN SELECT {FINAL_TIER_SQL} t, COUNT(*) FROM images "
+                           "WHERE local_json IS NOT NULL GROUP BY t").fetchall()
+    assert "idx_final_tier" in str([tuple(r) for r in plan])

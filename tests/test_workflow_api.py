@@ -228,6 +228,27 @@ def test_calibration_and_ground_truth(api):
     assert api.delete("/api/truth").json() == {"cleared": 3} and api.get("/api/truth").json()["images_with_truth"] == 0
 
 
+def test_your_ratings_are_calibration_truth(api):
+    api.run([""], vlm=False)   # local: sharp 3, soft 0, empty 0
+    ids = {n: i["id"] for n, i in by_name(api).items()}
+    api.patch(f"/api/images/{ids['sharp.jpg']}", json={"rating": 4})   # a banger counts as sharp
+    api.patch(f"/api/images/{ids['soft.jpg']}", json={"rating": 1})
+    api.patch(f"/api/images/{ids['empty.jpg']}", json={"note": "not a rating"})
+    t = api.get("/api/truth", params={"source": "ratings"}).json()
+    assert (t["source"], t["rated"], t["imported"], t["with_tier"]) == ("ratings", 2, 0, 2)
+    assert t["local"]["matrix"] == [{"truth": 1, "pred": 0, "n": 1}, {"truth": 3, "pred": 3, "n": 1}]
+
+    (api.photos / "verdicts").mkdir()
+    (api.photos / "verdicts" / "v.csv").write_text("name,focus_tier\nsharp.jpg,0\nempty.jpg,2\n")
+    api.post("/api/truth/import", json={"dir": "verdicts"})
+    both = api.get("/api/truth").json()   # default: both, and your rating beats the imported verdict
+    assert (both["source"], both["rated"], both["imported"], both["with_tier"]) == ("both", 2, 2, 3)
+    assert {"truth": 3, "pred": 3, "n": 1} in both["local"]["matrix"] and {"truth": 2, "pred": 0, "n": 1} in both["local"]["matrix"]
+    imp = api.get("/api/truth", params={"source": "imported"}).json()
+    assert imp["with_tier"] == 2 and {"truth": 0, "pred": 3, "n": 1} in imp["local"]["matrix"]
+    assert api.get("/api/truth", params={"source": "nope"}).status_code == 400
+
+
 def test_export(api):
     api.run([""])
     ids = {n: i["id"] for n, i in by_name(api).items()}

@@ -102,6 +102,15 @@ def apply(db, verdicts: dict[str, dict], cfg: dict, folder: Optional[str] = None
     return {"verdicts": len(verdicts), "matched": len(found), "unmatched": len(set(verdicts) - seen)}
 
 
+# Where a photo's truth tier comes from: your in-app rating (q/w/e/r/t; a banger counts as sharp), the verdicts you
+# imported, or both, with your rating winning where a photo has both.
+RATED_TIER_SQL = ("CASE WHEN json_extract(override_json,'$.reviewed') "
+                  "THEN MIN(json_extract(override_json,'$.rating'), 3) END")
+IMPORTED_TIER_SQL = "json_extract(truth_json,'$.focus_tier')"
+TRUTH_SOURCES = {"both": f"COALESCE({RATED_TIER_SQL}, {IMPORTED_TIER_SQL})",
+                 "ratings": RATED_TIER_SQL, "imported": IMPORTED_TIER_SQL}
+
+
 # Which stored per-image value each threshold set calibrates: metric -> (local_json path, tier3 key, tier2 key, tier1 key)
 METRICS = {
     "head": ("$.primary_head_sharp", "tier3_min", "tier2_min", "tier1_min"),
@@ -113,18 +122,27 @@ METRICS = {
 def suggest_thresholds(pairs: list[tuple[float, int]]) -> dict:
     """pairs of (metric value, truth_tier). Grid-search a cut per tier maximizing balanced accuracy for
     tier-N-or-better vs the rest, keyed tier3_min/tier2_min/tier1_min. A tier without enough photos on
-    each side of it is left out."""
+    each side of it is left out. Cuts come out ordered (tier1 <= tier2 <= tier3): with few photos a lower
+    tier's best cut can land above a higher one's, and is then pulled down to it."""
     import numpy as np
     if len(pairs) < 10:
         return {}
     x = np.array([p[0] for p in pairs]); y = np.array([p[1] for p in pairs])
     cands = np.unique(np.quantile(x, np.linspace(0.02, 0.98, 97)))
 
-    def best(pos_mask):
+    def score(pos_mask, c):
+        return ((x[pos_mask] >= c).mean() + (x[~pos_mask] < c).mean()) / 2
+
+    def best(pos_mask, ceiling):
         if pos_mask.sum() < 3 or (~pos_mask).sum() < 3:
             return None
-        scores = [((x[pos_mask] >= c).mean() + (x[~pos_mask] < c).mean()) / 2 for c in cands]
-        i = int(np.argmax(scores))
-        return {"value": round(float(cands[i]), 4), "balanced_accuracy": round(float(scores[i]), 3)}
+        scores = [score(pos_mask, c) for c in cands]
+        c = min(float(cands[int(np.argmax(scores))]), ceiling)
+        return {"value": round(c, 4), "balanced_accuracy": round(float(score(pos_mask, c)), 3)}
 
-    return {f"tier{t}_min": b for t in (3, 2, 1) if (b := best(y >= t))}
+    out, ceiling = {}, float("inf")
+    for t in (3, 2, 1):
+        b = best(y >= t, ceiling)
+        if b:
+            out[f"tier{t}_min"], ceiling = b, b["value"]
+    return out

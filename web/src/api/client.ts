@@ -37,7 +37,10 @@ export interface TruthMatrixRow { truth: number; pred: number; n: number }
 /** head = head-box Laplacian (fallback), eye = eye-band Laplacian, hf = eye-band FFT ratio */
 export type FocusMetric = 'head' | 'eye' | 'hf';
 export const FOCUS_METRIC_LABEL: Record<FocusMetric, string> = { eye: 'eye band · Laplacian', hf: 'eye band · FFT detail ratio', head: 'head box · Laplacian (no eyes found)' };
+/** Where calibration truth comes from: your in-app ratings, imported verdicts, or both (your rating wins). */
+export type TruthSource = 'both' | 'ratings' | 'imported';
 export interface TruthSummary {
+  source: TruthSource; rated: number; imported: number;
   images_with_truth: number; with_tier: number;
   local: { matrix: TruthMatrixRow[]; accuracy: number | null };
   vlm: { matrix: TruthMatrixRow[]; accuracy: number | null };
@@ -261,7 +264,7 @@ export const api = {
     request<Record<string, unknown>>('/api/config', { method: 'PUT', body: JSON.stringify({ values }) }),
   rescore: () => request<RescoreResult>('/api/rescore', { method: 'POST' }),
   calibration: (n = 48, metric: FocusMetric = 'eye') => request<Calibration>(`/api/calibration${qs({ n, metric })}`),
-  truth: () => request<TruthSummary>('/api/truth'),
+  truth: (source: TruthSource = 'both') => request<TruthSummary>(`/api/truth?source=${source}`),
   truthClear: () => request<{ cleared: number }>('/api/truth', { method: 'DELETE' }),
   truthImport: (dir: string, folder = '') =>
     request<TruthImportResult>('/api/truth/import', { method: 'POST', body: JSON.stringify({ dir, folder }) }),

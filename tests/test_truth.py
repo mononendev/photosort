@@ -36,3 +36,13 @@ def test_metrics_map_to_config_keys():
     from photosort.config import DEFAULTS
     for path, *keys in truth.METRICS.values():
         assert path.startswith("$.primary_") and len(keys) == 3 and all(k in DEFAULTS["focus"] for k in keys)
+
+
+def test_suggested_cuts_stay_ordered():
+    import random
+    rng = random.Random(7)
+    for _ in range(20):   # small, noisy sets: each tier's best cut on its own can cross the next one's
+        pairs = [(rng.uniform(0.001, 0.1), rng.randint(0, 3)) for _ in range(40)]
+        s = truth.suggest_thresholds(pairs)
+        cuts = [s[k]["value"] for k in ("tier1_min", "tier2_min", "tier3_min") if k in s]
+        assert cuts == sorted(cuts)

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, cropUrl, FOCUS_METRIC_LABEL, TIER_COLOR, TIERS } from '../api/client';
-import type { FocusMetric, RescoreResult, TruthMatrixRow, TruthSummary } from '../api/client';
+import type { FocusMetric, RescoreResult, TruthMatrixRow, TruthSource, TruthSummary } from '../api/client';
 import SegButton from '../components/SegButton';
 import Tip from '../components/Tip';
 import { errMsg } from '../lib/format';
@@ -30,7 +30,8 @@ function Matrix({ rows, title, accuracy, tip }: { rows: TruthMatrixRow[]; title:
 
 function GroundTruth({ onApply, applying }: { onApply: (values: Record<string, number>) => void; applying: boolean }) {
   const qc = useQueryClient();
-  const { data } = useQuery({ queryKey: ['truth'], queryFn: api.truth });
+  const [source, setSource] = useState<TruthSource>('both');
+  const { data } = useQuery({ queryKey: ['truth', source], queryFn: () => api.truth(source) });
   const [dir, setDir] = useState('');
   const [folder, setFolder] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
@@ -41,13 +42,23 @@ function GroundTruth({ onApply, applying }: { onApply: (values: Record<string, n
   };
   const upload = useMutation({ mutationFn: (files: FileList) => api.truthUpload(files, folder), onSuccess: done, onError: (e) => setMsg(errMsg(e)) });
   const imp = useMutation({ mutationFn: () => api.truthImport(dir, folder), onSuccess: done, onError: (e) => setMsg(errMsg(e)) });
-  const clear = useMutation({ mutationFn: api.truthClear, onSuccess: () => { setMsg('cleared'); qc.invalidateQueries({ queryKey: ['truth'] }); } });
+  const clear = useMutation({ mutationFn: api.truthClear, onSuccess: () => { setMsg('imported verdicts cleared'); qc.invalidateQueries({ queryKey: ['truth'] }); } });
   const sel = 'bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm';
   const s: TruthSummary | undefined = data;
   return (
     <section className="space-y-3 rounded-lg border border-gray-800 p-3 sm:p-4">
-      <h2 className="font-semibold">Ground truth (your exported verdicts)</h2>
-      <p className="text-sm text-gray-400 max-w-3xl">Export known-good metadata from Lightroom (select photos → Metadata → Save Metadata to File, or export the sidecars), then upload the <code>.xmp</code> files (or a <code>.zip</code>, or a <code>.csv</code> with <code>name,rating,label,focus_tier,keywords</code>). Files are matched to tracked images by filename. A focus tier is taken from a <code>focus:3</code>-style keyword or an explicit CSV column first, otherwise from the color label ({s?.mapping ? Object.entries(s.mapping.label_tiers).map(([k, v]) => `${k}→${v}`).join(', ') : '…'}), otherwise from the star rating ({s?.mapping ? Object.entries(s.mapping.rating_tiers).map(([k, v]) => `${k}★→${v ?? '–'}`).join(', ') : '…'}).</p>
+      <h2 className="font-semibold">Ground truth (your ratings and exported verdicts)</h2>
+      <p className="text-sm text-gray-400 max-w-3xl">Every photo you rate with q/w/e/r/t is a verdict: the more you cull, the better the suggestions below get (a ★ banger counts as sharp). They're worked out when you open this page; nothing changes until you apply them. You can also import verdicts from Lightroom.</p>
+      <div className="flex flex-wrap items-center gap-1 text-sm">
+        <span className="text-gray-500 mr-1">use</span>
+        {([['both', 'ratings + imported'], ['ratings', 'your ratings'], ['imported', 'imported only']] as [TruthSource, string][]).map(([k, label]) => (
+          <Tip key={k} plain tip={k === 'both' ? 'Your in-app ratings, plus imported verdicts for photos you haven’t rated. Where a photo has both, your rating wins.' : k === 'ratings' ? 'Only photos you rated here (q/w/e/r/t).' : 'Only verdicts imported from Lightroom sidecars or a CSV.'}>
+            <SegButton on={source === k} onClick={() => setSource(k)} className="px-3 py-1">{label}</SegButton>
+          </Tip>
+        ))}
+        {s && <span className="ml-2 text-xs text-gray-500">{s.rated} rated here · {s.imported} imported</span>}
+      </div>
+      <p className="text-sm text-gray-400 max-w-3xl">To import: export known-good metadata from Lightroom (select photos → Metadata → Save Metadata to File, or export the sidecars), then upload the <code>.xmp</code> files (or a <code>.zip</code>, or a <code>.csv</code> with <code>name,rating,label,focus_tier,keywords</code>). Files are matched to tracked images by filename. A focus tier is taken from a <code>focus:3</code>-style keyword or an explicit CSV column first, otherwise from the color label ({s?.mapping ? Object.entries(s.mapping.label_tiers).map(([k, v]) => `${k}→${v}`).join(', ') : '…'}), otherwise from the star rating ({s?.mapping ? Object.entries(s.mapping.rating_tiers).map(([k, v]) => `${k}★→${v ?? '–'}`).join(', ') : '…'}).</p>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <input value={folder} onChange={(e) => setFolder(e.target.value)} placeholder="limit matching to photos subfolder (optional)" className={`${sel} w-full sm:w-80`} />
         <input ref={fileRef} type="file" multiple accept=".xmp,.xml,.csv,.zip" className="text-xs max-w-full" />
@@ -55,12 +66,12 @@ function GroundTruth({ onApply, applying }: { onApply: (values: Record<string, n
         <span className="text-gray-600">or</span>
         <input value={dir} onChange={(e) => setDir(e.target.value)} placeholder="folder on the photos or data volume" className={`${sel} w-full sm:w-72`} />
         <button onClick={() => imp.mutate()} disabled={!dir || imp.isPending} className="px-3 py-1 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-40">import from folder</button>
-        {s && s.images_with_truth > 0 && <button onClick={() => clear.mutate()} className="ml-auto text-xs text-gray-500 hover:text-red-300">clear truth</button>}
+        {s && s.imported > 0 && <Tip plain tip="Forget the imported verdicts. Your ratings stay."><button onClick={() => clear.mutate()} className="ml-auto text-xs text-gray-500 hover:text-red-300">clear imported</button></Tip>}
       </div>
       {msg && <div className="text-xs text-gray-400">{msg}</div>}
       {s && s.images_with_truth > 0 && (
         <div className="space-y-3">
-          <div className="text-sm text-gray-300">{s.images_with_truth} images have verdicts, {s.with_tier} with a focus tier. <Link to="/photos?truth_mismatch=1" className="text-blue-400 hover:underline">show mismatches →</Link></div>
+          <div className="text-sm text-gray-300">{s.images_with_truth} images have verdicts, {s.with_tier} with a focus tier.{s.imported > 0 && <> <Link to="/photos?truth_mismatch=1" className="text-blue-400 hover:underline">show imported mismatches →</Link></>}</div>
           <div className="grid md:grid-cols-2 gap-3">
             <Matrix rows={s.local.matrix} title="local sharpness tier" accuracy={s.local.accuracy} tip="Your tier vs the local tier from the current thresholds. This is the one the thresholds below change; re-score and it updates." />
             <Matrix rows={s.vlm.matrix} title="vision model tier" accuracy={s.vlm.accuracy} tip="Your tier vs the vision model's tier. Thresholds don't affect it; it only changes when the model re-tags." />

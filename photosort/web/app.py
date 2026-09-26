@@ -512,16 +512,21 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
                 "samples": [{"id": vals[i][1], "sharp": vals[i][0], "tier": vals[i][2]} for i in idx]}
 
     # ---- ground truth -----------------------------------------------------------------
-    def truth_summary():
+    def truth_summary(source: str = "both"):
         """Confusion matrices and suggested thresholds from the images that carry a verdict (usually a few
-        hundred), read in one pass instead of one scan of the whole table per matrix and metric."""
+        hundred), read in one pass instead of one scan of the whole table per matrix and metric. `source` picks
+        the verdicts: your in-app ratings, imported ones, or both (your rating wins)."""
         c = db.conn
         paths = {m: v[0] for m, v in truth.METRICS.items()}
+        has = {"ratings": f"{truth.RATED_TIER_SQL} IS NOT NULL", "imported": "truth_json IS NOT NULL"}
+        where = " OR ".join(has.values()) if source == "both" else has[source]
         rows = c.execute(
-            "SELECT json_extract(truth_json,'$.focus_tier') truth, json_extract(local_json,'$.local_tier') local, "
+            f"SELECT {truth.TRUTH_SOURCES[source]} truth, json_extract(local_json,'$.local_tier') local, "
             "json_extract(vlm_json,'$.focus_tier') vlm, "
             + ", ".join(f"json_extract(local_json,'{p}') {m}" for m, p in paths.items())
-            + " FROM images WHERE truth_json IS NOT NULL").fetchall()
+            + f" FROM images WHERE {where}").fetchall()
+        counts = c.execute(f"SELECT COUNT(*) FILTER (WHERE {has['ratings']}) rated, "
+                           f"COUNT(*) FILTER (WHERE {truth.IMPORTED_TIER_SQL} IS NOT NULL) imported FROM images").fetchone()
         with_tier = [r for r in rows if r["truth"] is not None]
 
         def matrix(col):
@@ -541,13 +546,16 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             sug = truth.suggest_thresholds(pairs)
             if sug:   # suggest_thresholds names the head keys; keys[i] is this metric's key for tier 3 - i
                 suggested[m] = {"n": len(pairs), **{keys[3 - int(k[4])]: v for k, v in sug.items()}}
-        return {"images_with_truth": len(rows), "with_tier": len(with_tier), "local": {"matrix": local_m, "accuracy": acc(local_m)},
+        return {"source": source, "rated": counts["rated"], "imported": counts["imported"],
+                "images_with_truth": len(rows), "with_tier": len(with_tier), "local": {"matrix": local_m, "accuracy": acc(local_m)},
                 "vlm": {"matrix": vlm_m, "accuracy": acc(vlm_m)}, "suggested": suggested,
                 "mapping": cfg.get("truth")}
 
     @app.get("/api/truth")
-    def get_truth():
-        return truth_summary()
+    def get_truth(source: str = "both"):
+        if source not in truth.TRUTH_SOURCES:
+            raise HTTPException(400, f"source must be one of {sorted(truth.TRUTH_SOURCES)}")
+        return truth_summary(source)
 
     @app.post("/api/truth/upload")
     async def truth_upload(files: list[UploadFile] = File(...), folder: str = ""):

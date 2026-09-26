@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -26,6 +26,15 @@ FACE_WEIGHTS = "face_detection_yunet_2023mar.onnx"
 EPS = 2e-3   # contrast floor in the Laplacian normalization: keeps flat regions from dividing by ~0
 
 
+def _rnd(v):
+    return None if v is None else round(v, 4)
+
+
+def _ratio(t: Optional[dict]) -> Optional[float]:
+    """The contrast-normalized Laplacian from its terms (see sharpness_parts)."""
+    return None if t is None else t["lap_var"] / (t["gray_var"] + EPS)
+
+
 def _fit512(gray: np.ndarray) -> np.ndarray:
     h, w = gray.shape[:2]
     if max(h, w) > 512:
@@ -34,12 +43,17 @@ def _fit512(gray: np.ndarray) -> np.ndarray:
     return gray
 
 
+def _laplacian(gray: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """The lightly blurred region and its Laplacian: the blur keeps sensor noise out of the metric."""
+    g = cv2.GaussianBlur(gray, (0, 0), 1.0)
+    return g, cv2.Laplacian(g, cv2.CV_32F, ksize=3)
+
+
 def sharpness_parts(gray: np.ndarray, min_px: int = MIN_REGION_PX) -> Optional[dict]:
     """The terms of the sharpness metric: {"lap_var", "gray_var", "px": [w, h] measured at}, or None."""
     if gray is None or min(gray.shape[:2]) < min_px:
         return None
-    g = cv2.GaussianBlur(_fit512(gray), (0, 0), 1.0)
-    lap = cv2.Laplacian(g, cv2.CV_32F, ksize=3)
+    g, lap = _laplacian(_fit512(gray))
     return {"lap_var": float(lap.var()), "gray_var": float(g.var()), "px": [g.shape[1], g.shape[0]]}
 
 
@@ -50,8 +64,7 @@ def sharpness(gray: np.ndarray, min_px: int = MIN_REGION_PX) -> Optional[float]:
     metric at high ISO). Normalizing by the region's own variance makes a low-contrast
     but sharp region comparable to a high-contrast one. Higher = sharper.
     """
-    t = sharpness_parts(gray, min_px)
-    return None if t is None else t["lap_var"] / (t["gray_var"] + EPS)
+    return _ratio(sharpness_parts(gray, min_px))
 
 
 def hf_parts(gray: np.ndarray, band=(0.25, 0.75), floor: float = 0.03, min_px: int = EYE_MIN_PX) -> Optional[dict]:
@@ -183,11 +196,6 @@ class FaceLandmarks:
         bx0, by0 = to_full(f[0], f[1])
         return {"eyes": lm[:2], "score": float(f[14]), "lm": lm,
                 "box": [bx0, by0, bx0 + float(f[2]) / k, by0 + float(f[3]) / k], "search": [sx0, sy0, sx1, sy1]}
-
-    def eyes(self, rgb: np.ndarray, head: tuple, W: int, H: int) -> Optional[tuple]:
-        """((x, y) right eye, (x, y) left eye, score) for the face nearest the head box, or None."""
-        f = self.face(rgb, head, W, H)
-        return (f["eyes"][0], f["eyes"][1], f["score"]) if f else None
 
 
 def eye_band(e1, e2, W: int, H: int) -> Optional[tuple]:
@@ -321,7 +329,7 @@ def _eye_metrics(r: dict, det: dict, scale: float, rgb: np.ndarray, gray: np.nda
     region = gray[band[1]:band[3], band[0]:band[2]] if band else None
     lt = sharpness_parts(region, EYE_MIN_PX) if band else None
     ht = hf_parts(region) if lt else None
-    lap = lt["lap_var"] / (lt["gray_var"] + EPS) if lt else None
+    lap = _ratio(lt)
     r.update({"eyes": [[round(e1[0]), round(e1[1])], [round(e2[0]), round(e2[1])]] if lap is not None else None,
               "eye_src": src if lap is not None else None, "eye": band if lap is not None else None,
               "sharp_eye": lap, "hf_eye": ht["band_e"] / ht["total_e"] if ht else None})
@@ -354,13 +362,11 @@ def pick_primary(people: list[dict], af: Optional[dict], cfg: dict) -> str:
 
 
 def _primary_fields(primary: Optional[dict]) -> dict:
-    def rnd(v):
-        return None if v is None else round(v, 4)
     return {
-        "primary_head_sharp": rnd(primary["sharp_head"]) if primary else None,
-        "primary_body_sharp": rnd(primary["sharp_body"]) if primary else None,
-        "primary_eye_sharp": rnd(primary.get("sharp_eye")) if primary else None,
-        "primary_eye_hf": rnd(primary.get("hf_eye")) if primary else None,
+        "primary_head_sharp": _rnd(primary["sharp_head"]) if primary else None,
+        "primary_body_sharp": _rnd(primary["sharp_body"]) if primary else None,
+        "primary_eye_sharp": _rnd(primary.get("sharp_eye")) if primary else None,
+        "primary_eye_hf": _rnd(primary.get("hf_eye")) if primary else None,
         "primary_eye_src": primary.get("eye_src") if primary else None,
     }
 
@@ -389,7 +395,7 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
         r["terms"] = {}
         for name, key in (("head", "head"), ("torso", "torso"), ("body", "box")):
             t = sharpness_parts(_region(gray, r[key]))
-            r[f"sharp_{name}"] = t["lap_var"] / (t["gray_var"] + EPS) if t else None
+            r[f"sharp_{name}"] = _ratio(t)
             r["terms"][name] = _sig(t)
         r["priority"] = round(area_frac * (1 - 0.5 * center_dist) * (0.5 + 0.5 * r["conf"]), 5)
         r["_det"] = d
@@ -400,13 +406,10 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
     s = 1024 / max(W, H)
     g_small = cv2.resize(gray, (max(1, round(W * s)), max(1, round(H * s))), interpolation=cv2.INTER_AREA)
     m_small = cv2.resize(mask.astype(np.uint8), g_small.shape[::-1], interpolation=cv2.INTER_NEAREST).astype(bool)
-    gb = cv2.GaussianBlur(g_small, (0, 0), 1.0)
-    lap = cv2.Laplacian(gb, cv2.CV_32F, ksize=3)
+    gb, lap = _laplacian(g_small)
     bg_terms = {"lap_var": float(lap[m_small].var()), "gray_var": float(gb[m_small].var()), "px_count": int(m_small.sum())} \
         if m_small.sum() > 5000 else None
-    bg_sharp = bg_terms["lap_var"] / (bg_terms["gray_var"] + EPS) if bg_terms else None
     global_terms = {"lap_var": float(lap.var()), "gray_var": float(gb.var()), "px": [g_small.shape[1], g_small.shape[0]]}
-    global_sharp = global_terms["lap_var"] / (global_terms["gray_var"] + EPS)
 
     af, af_note = A.read_with_note(path, W, H, (cfg.get("af") or {}).get("y_up", True))
     primary_by = pick_primary(people, af, cfg)
@@ -427,15 +430,12 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
         crop_im, crop_used = I.crop_box(im, primary["upper"], cfg["crop_pad"], cfg["crop_size"])
         crop_jpeg = I.to_jpeg(crop_im, cfg["crop_quality"])
 
-    def rnd(v):
-        return None if v is None else round(v, 4)
-
     data = {
         "width": W, "height": H, "orientation": "portrait" if H > W else "landscape",
         "n_people": len(people),
-        "people": [{k: (rnd(v) if k.startswith(("sharp", "hf_")) else v) for k, v in p.items()} for p in people[:6]],
+        "people": [{k: (_rnd(v) if k.startswith(("sharp", "hf_")) else v) for k, v in p.items()} for p in people[:6]],
         "mask_boxes": [p["box"] for p in people],  # every person, masked out of the background metric
-        "bg_sharp": rnd(bg_sharp), "global_sharp": rnd(global_sharp),
+        "bg_sharp": _rnd(_ratio(bg_terms)), "global_sharp": _rnd(_ratio(global_terms)),
         "bg_terms": _sig(bg_terms), "global_terms": _sig(global_terms), "eps": EPS,
         **_primary_fields(primary),
         "af": af, "af_note": af_note, "primary_by": primary_by,

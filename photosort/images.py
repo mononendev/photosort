@@ -1,6 +1,8 @@
 from __future__ import annotations
 import io
+import os
 from pathlib import Path
+from typing import Iterable
 from PIL import Image, ImageOps
 
 try:
@@ -18,6 +20,24 @@ Image.MAX_IMAGE_PIXELS = 400_000_000
 
 def is_image(p: Path) -> bool:
     return p.suffix.lower() in ALL_EXT and not p.name.startswith(".")
+
+
+def find_images(paths: Iterable[Path], skip_raw_dupes: bool = False) -> list[Path]:
+    """Image files among `paths` and under the folders in it. With skip_raw_dupes, a RAW whose stem also has a
+    JPEG/HEIC/... next to it is dropped (the other decodes faster). os.walk reads file types from the directory
+    listing, so a network mount isn't stat'ed once per file."""
+    files: list[Path] = []
+    for p in paths:
+        p = Path(p)
+        if p.is_dir():
+            for root, _, names in os.walk(p):
+                files += [Path(root, n) for n in names if is_image(Path(n))]
+        elif p.is_file() and is_image(p):
+            files.append(p)
+    if skip_raw_dupes:
+        stems = {f.with_suffix("").as_posix() for f in files if f.suffix.lower() not in RAW_EXT}
+        files = [f for f in files if f.suffix.lower() not in RAW_EXT or f.with_suffix("").as_posix() not in stems]
+    return files
 
 
 def _load_raw(path: Path) -> Image.Image:

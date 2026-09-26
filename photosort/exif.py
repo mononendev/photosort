@@ -10,8 +10,6 @@ import math
 from pathlib import Path
 from typing import Optional
 
-FIELDS = ("camera", "lens", "f_number", "shutter_s", "iso", "focal_mm", "focal_35mm", "taken")
-
 _TAGS = {
     "camera": ("Image Model",),
     "lens": ("EXIF LensModel", "MakerNote LensModel", "MakerNote LensType"),

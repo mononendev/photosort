@@ -20,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional
 
-from . import images as I, schema
+from . import images as I
 from .db import DB
 
 log = logging.getLogger("photosort.pipeline")
@@ -178,15 +178,7 @@ class JobRunner(threading.Thread):
         self._stage(jid, "scan")
 
         # 1) scan
-        files = []
-        for p in paths:
-            if p.is_file() and I.is_image(p):
-                files.append(p)
-            elif p.is_dir():
-                files += [f for f in p.rglob("*") if f.is_file() and I.is_image(f)]
-        if opts.get("skip_raw_dupes", True):
-            stems = {f.with_suffix("").as_posix() for f in files if f.suffix.lower() not in I.RAW_EXT}
-            files = [f for f in files if f.suffix.lower() not in I.RAW_EXT or f.with_suffix("").as_posix() not in stems]
+        files = I.find_images(paths, opts.get("skip_raw_dupes", True))
         self.db.add_paths(files)
         from . import sidecar
         if paths:
@@ -228,7 +220,6 @@ class JobRunner(threading.Thread):
         """Counters switch to the vlm stage only when it has work, so a local-only re-analysis keeps its
         own done/total; errors from both stages add up. The message keeps the local stage's summary."""
         from . import backends
-        from .backends import Item
         bname = opts.get("backend") or self.cfg.get("backend", "ollama")
         backend = backends.get(bname, opts.get("base_url") or self.cfg.get("base_url"))
         if not getattr(backend, "sync", False):
@@ -256,11 +247,7 @@ class JobRunner(threading.Thread):
                 return None
             prog.start(r["id"], r["path"])
             try:
-                local = json.loads(r["local_json"])
-                frame = (self.cache_dir / f"{r['id']}.jpg").read_bytes()
-                cp = self.cache_dir / f"{r['id']}_crop.jpg"
-                item = Item(str(r["id"]), frame, cp.read_bytes() if cp.exists() else None, schema.context_text(local))
-                return backend.classify(item, model, self.cfg)
+                return backend.classify(backends.load_item(r, self.cache_dir), model, self.cfg)
             except Exception as e:
                 prog.finish(r["id"], f"{type(e).__name__}: {e}")
                 raise
@@ -271,10 +258,7 @@ class JobRunner(threading.Thread):
                 res = f.result()
                 if res is None:
                     continue
-                if res.data:
-                    self.db.set_vlm(int(res.key), res.data, res.usage, None)
-                else:
-                    self.db.set_vlm(int(res.key), None, res.usage, res.error)
+                if not self.db.set_vlm_result(res):
                     errors += 1
                 prog.finish(int(res.key), res.error, res.usage)
                 prog.update(1)

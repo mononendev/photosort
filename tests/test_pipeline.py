@@ -1,8 +1,7 @@
 """Job counters: a local re-analysis whose vision stage has nothing new must keep its local done/total."""
 import json
-from pathlib import Path
 
-from photosort import backends, local, pipeline
+from photosort import backends, local, pipeline, schema
 from photosort.config import DEFAULTS
 from photosort.db import DB
 
@@ -30,7 +29,7 @@ def _runner(tmp_path, monkeypatch, vlm_rows_done: bool):
 
     monkeypatch.setattr(local, "run_local", fake_local)
     monkeypatch.setattr(backends, "get", lambda *a, **k: Backend())
-    monkeypatch.setattr(pipeline.schema, "context_text", lambda d: "")
+    monkeypatch.setattr(schema, "context_text", lambda d: "")
     r = pipeline.JobRunner(db, json.loads(json.dumps(DEFAULTS)), tmp_path, photos)
     r._detector = object()
     (tmp_path / "cache").mkdir()

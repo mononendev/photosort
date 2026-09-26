@@ -234,10 +234,6 @@ def read_with_note(path: Path, W: int, H: int, y_up: bool = True) -> tuple[Optio
         return None, f"AF read failed: {type(e).__name__}: {e}"
 
 
-def read(path: Path, W: int, H: int, y_up: bool = True) -> Optional[dict]:
-    return read_with_note(path, W, H, y_up)[0]
-
-
 def _overlap(a, b) -> float:
     """Fraction of box a that lies inside box b."""
     ix = max(0, min(a[2], b[2]) - max(a[0], b[0]))

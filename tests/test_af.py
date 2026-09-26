@@ -71,7 +71,7 @@ def test_read_missing_is_none(tmp_path):
     from PIL import Image
     p = tmp_path / "x.jpg"
     Image.new("RGB", (32, 32)).save(p)
-    assert af.read(p, 32, 32) is None
+    assert af.read_with_note(p, 32, 32)[0] is None
 
 
 def _tiff(words, orientation=8):
@@ -114,7 +114,7 @@ def test_real_1dx_cr2_if_present():
     p = Path(__file__).parent.parent / "dev-data" / "cr2" / "IMG_1010.CR2"
     if not p.exists():
         pytest.skip("local CR2 sample not present (dev-data/cr2 is gitignored)")
-    got = af.read(p, 3456, 5184)
+    got = af.read_with_note(p, 3456, 5184)[0]
     assert got["mode_name"] == "spot" and got["active"] == [30] and got["n_points"] == 61
 
 

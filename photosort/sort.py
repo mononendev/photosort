@@ -7,6 +7,8 @@ import shutil
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+from .db import jcol
+
 TIER_NAMES = {0: "focus_0_none", 1: "focus_1_partial", 2: "focus_2_sharp"}
 # Your cull rating from the UI: 0-2 are the focus tiers, 3 is a banger (sharp and a favorite). Exported as the
 # matching Lightroom color label.
@@ -15,9 +17,8 @@ RATING_LABELS = {0: "Red", 1: "Yellow", 2: "Green", 3: "Blue"}
 
 
 def final_record(row, source: str) -> dict:
-    local = json.loads(row["local_json"]) if row["local_json"] else None
-    vlm = json.loads(row["vlm_json"]) if row["vlm_json"] else None
-    ov = json.loads(row["override_json"]) if ("override_json" in row.keys() and row["override_json"]) else {}
+    local, vlm = jcol(row, "local_json"), jcol(row, "vlm_json")
+    ov = jcol(row, "override_json", {}) if "override_json" in row.keys() else {}
     lt = local["local_tier"] if local else None
     vt = vlm["focus_tier"] if vlm else None
     if source == "local" or vt is None:

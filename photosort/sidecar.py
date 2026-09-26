@@ -8,6 +8,15 @@ _RATING = re.compile(r'xmp:Rating\s*=\s*"(-?\d)"|<xmp:Rating>\s*(-?\d)\s*</xmp:R
 _LABEL = re.compile(r'xmp:Label\s*=\s*"([^"]*)"|<xmp:Label>\s*([^<]*?)\s*</xmp:Label>')
 
 
+def rating_label(text: str) -> tuple[Optional[int], Optional[str]]:
+    """xmp:Rating and xmp:Label from XMP text, in attribute or element form."""
+    m = _RATING.search(text)
+    rating = int(next(g for g in m.groups() if g is not None)) if m else None
+    m = _LABEL.search(text)
+    label = next((g for g in m.groups() if g is not None), None) if m else None
+    return rating, label or None
+
+
 def sidecar_for(path: Path) -> Optional[Path]:
     for cand in (path.with_suffix(".xmp"), path.with_suffix(".XMP")):
         if cand.exists():
@@ -24,11 +33,8 @@ def read_sidecar(path: Path) -> dict:
         text = sc.read_text(errors="ignore")
     except OSError:
         return {}
-    m = _RATING.search(text)
-    rating = int(next(g for g in m.groups() if g is not None)) if m else None
-    m = _LABEL.search(text)
-    label = next((g for g in m.groups() if g is not None), None) if m else None
-    return {"rating": rating, "label": label or None, "sidecar": sc.name}
+    rating, label = rating_label(text)
+    return {"rating": rating, "label": label, "sidecar": sc.name}
 
 
 def ingest(db, rows) -> int:

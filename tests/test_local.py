@@ -59,9 +59,9 @@ def test_face_landmarks_find_eyes_in_head_box():
         pytest.skip(f"face model unavailable: {e}")
     rgb = np.asarray(Image.open(Path(__file__).parent.parent / "dev-data" / "zidane_sharp.jpg").convert("RGB"))
     H, W = rgb.shape[:2]
-    found = fl.eyes(rgb, (2719, 1385, 3111, 1891), W, H)
+    found = fl.face(rgb, (2719, 1385, 3111, 1891), W, H)
     assert found is not None
-    (x1, y1), (x2, y2), score = found
+    (x1, y1), (x2, y2), score = *found["eyes"], found["score"]
     assert 2800 < x1 < x2 < 3100 and 1450 < y1 < 1650 and 1450 < y2 < 1650 and score > 0.6
 
 

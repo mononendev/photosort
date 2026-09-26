@@ -55,6 +55,25 @@ MIGRATIONS = [
     ("jobs", "owner", "TEXT"), ("jobs", "heartbeat", "REAL"),
 ]
 
+def jcol(row, key: str, default=None):
+    """A JSON column of a row, parsed, or `default` when it is NULL/empty."""
+    v = row[key]
+    return json.loads(v) if v else default
+
+
+# The tier a photo ends up with (your override, else the model's, else the local stage's) and whether the two
+# stages disagree, as SQL over the images table. sort.final_record is the Python twin (it also knows focus_source).
+FINAL_TIER_SQL = ("COALESCE(json_extract(override_json,'$.focus_tier'), json_extract(vlm_json,'$.focus_tier'), "
+                  "json_extract(local_json,'$.local_tier'))")
+REVIEW_SQL = ("local_json IS NOT NULL AND vlm_json IS NOT NULL AND "
+              "json_extract(local_json,'$.local_tier') != json_extract(vlm_json,'$.focus_tier')")
+
+
+def under_folder(folder: str, col: str = "folder") -> tuple[str, list]:
+    """SQL for `col` being `folder` or anything below it. substr() rather than LIKE keeps '_' and '%' literal."""
+    folder = folder.rstrip("/")
+    return f"({col} = ? OR substr({col}, 1, ?) = ?)", [folder, len(folder) + 1, folder + "/"]
+
 
 class DB:
     """SQLite state. One connection per thread; writes serialized by a process-wide lock."""
@@ -143,6 +162,12 @@ class DB:
                       (json.dumps(data) if data else None, json.dumps(usage) if usage else None, error,
                        time.time() if data else None, img_id))
 
+    def set_vlm_result(self, res) -> bool:
+        """Store a backend Result for the image it is keyed by; says whether it carried data."""
+        ok = bool(res.data)
+        self.set_vlm(int(res.key), res.data if ok else None, res.usage, None if ok else res.error)
+        return ok
+
     def set_lr(self, img_id: int, data: Optional[dict]):
         with self.lock, self.conn as c:
             c.execute("UPDATE images SET lr_json=? WHERE id=?", (json.dumps(data) if data else "{}", img_id))
@@ -161,13 +186,10 @@ class DB:
 
     def folder_stats(self, prefix: str) -> dict[str, dict]:
         """Per-folder counts for every folder under prefix (recursive)."""
-        out = {}
-        for r in self.conn.execute(
+        where, params = under_folder(prefix)
+        return {r["folder"]: dict(r) for r in self.conn.execute(
             "SELECT folder, COUNT(*) n, SUM(local_json IS NOT NULL) local_done, SUM(vlm_json IS NOT NULL) vlm_done, "
-            "SUM(error IS NOT NULL) errors FROM images WHERE folder = ? OR folder LIKE ? GROUP BY folder",
-                (prefix, prefix.rstrip("/") + "/%")):
-            out[r["folder"]] = dict(r)
-        return out
+            f"SUM(error IS NOT NULL) errors FROM images WHERE {where} GROUP BY folder", params)}
 
     # ---- batches (cloud backends) ------------------------------------------
     def set_batch(self, ids: list[int], batch_id: str):
@@ -186,9 +208,11 @@ class DB:
         with self.lock, self.conn as c:
             c.execute("UPDATE batches SET state=?, fetched=? WHERE id=?", (state, int(fetched), batch_id))
 
-    def clear_batch(self, batch_id: str):
+    def clear_batch(self, batch_id: str, errored_too: bool = True):
+        """Release a batch's untagged images for resubmission (with errored_too=False, only ones with no error)."""
         with self.lock, self.conn as c:
-            c.execute("UPDATE images SET batch_id=NULL WHERE batch_id=? AND vlm_json IS NULL", (batch_id,))
+            c.execute("UPDATE images SET batch_id=NULL WHERE batch_id=? AND vlm_json IS NULL"
+                      + ("" if errored_too else " AND error IS NULL"), (batch_id,))
 
     # ---- jobs ---------------------------------------------------------------
     def add_job(self, paths: list[str], options: dict) -> int:

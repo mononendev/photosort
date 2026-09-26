@@ -170,7 +170,6 @@ def test_stats(api):
     assert st["lr_rated"] == 1 and st["lr_by_tier"] == [{"tier": 1, "rating": 3, "n": 1}]
 
 
-@pytest.mark.xfail(strict=True, reason="an override without a focus_tier hides the photo from the tier counts")
 def test_stats_tiers_with_partial_overrides(api):
     api.run([""])
     ids = {n: i["id"] for n, i in by_name(api).items()}
@@ -244,3 +243,21 @@ def test_health(api):
 
 def test_vlm_answer_fixture_is_schema_valid():
     assert vlm_answer(primary_subject="bogus")["primary_subject"] == "other"
+
+
+def test_folder_filters_treat_underscore_literally(api):
+    (api.photos / "dayX2" / "sub").mkdir(parents=True)
+    (api.photos / "day_2" / "empty.jpg").rename(api.photos / "dayX2" / "sub" / "empty.jpg")
+    (api.photos / "day_2" / "other.jpg").write_bytes((api.photos / "sharp.jpg").read_bytes())
+    api.run([""], vlm=False)
+    assert set(by_name(api, folder="day_2")) == {"other.jpg"}        # LIKE 'day_2/%' would also match dayX2/sub
+    assert api.post("/api/export", json={"name": "d", "folder": "day_2", "tree": False, "xmp": False}).json()["images"] == 1
+    t = {d["name"]: d for d in api.get("/api/tree").json()["dirs"]}
+    assert (t["day_2"]["tracked"], t["dayX2"]["tracked"]) == (1, 1)
+
+
+def test_stats_keepers_follow_overrides(api):
+    api.run([""])
+    ids = {n: i["id"] for n, i in by_name(api).items()}
+    api.patch(f"/api/images/{ids['soft.jpg']}", json={"keeper": False})
+    assert api.get("/api/stats").json()["keepers"] == 2 == len(by_name(api, keeper=True))

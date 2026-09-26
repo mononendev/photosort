@@ -1,7 +1,11 @@
 from __future__ import annotations
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
+
+from .. import schema
 
 # Interactive $/1M tokens (input, output). Batch is half. Checked 2026-09-25 against provider pricing pages.
 PRICES: dict[str, tuple[float, float]] = {
@@ -41,6 +45,14 @@ class Item:
     frame: bytes
     crop: Optional[bytes]
     context: str
+
+
+def load_item(row, cache_dir: Path) -> Item:
+    """The request for one analyzed image: its cached frame and crop, and the detector summary."""
+    frame = (cache_dir / f"{row['id']}.jpg").read_bytes()
+    cp = cache_dir / f"{row['id']}_crop.jpg"
+    return Item(str(row["id"]), frame, cp.read_bytes() if cp.exists() else None,
+                schema.context_text(json.loads(row["local_json"])))
 
 
 @dataclass

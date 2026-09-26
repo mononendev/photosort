@@ -14,7 +14,7 @@ import cv2
 import numpy as np
 
 from . import images as I
-from .local import EPS, EYE_MIN_PX, MIN_REGION_PX, _fit512, hf_ratio
+from .local import EPS, EYE_MIN_PX, MIN_REGION_PX, _fit512, _laplacian, hf_parts
 
 HEAT_TILES = 96          # tiles along the frame's long edge
 PROFILE_BINS = 60        # radial spectrum bins from 0 to 1.0 x Nyquist
@@ -34,8 +34,7 @@ def laplacian_view(gray: np.ndarray, min_px: int) -> Optional[dict]:
     """|Laplacian| of the lightly blurred region, colormapped, plus the two variances the metric divides."""
     if gray is None or min(gray.shape[:2]) < min_px:
         return None
-    g = cv2.GaussianBlur(_fit512(gray), (0, 0), 1.0)
-    lap = cv2.Laplacian(g, cv2.CV_32F, ksize=3)
+    g, lap = _laplacian(_fit512(gray))
     mag = np.abs(lap)
     top = float(np.percentile(mag, 99.5)) or 1e-6
     img = cv2.applyColorMap(np.clip(mag / top * 255, 0, 255).astype(np.uint8), cv2.COLORMAP_INFERNO)
@@ -62,22 +61,18 @@ def spectrum_view(gray: np.ndarray, band=(0.25, 0.75), floor: float = 0.03) -> O
     ok = (idx >= 0) & (idx < PROFILE_BINS)
     energy = np.bincount(idx[ok], weights=p.ravel()[ok], minlength=PROFILE_BINS)
     counted = float(p[(r >= floor) & (r <= band[1])].sum())
-    # The ratio's own sums, over the half spectrum exactly as local.hf_ratio takes them.
-    ph = np.abs(np.fft.rfft2(win)) ** 2
-    rh = np.hypot(np.fft.fftfreq(h)[:, None], np.fft.rfftfreq(w)[None, :]) / 0.5
-    total = float(ph[(rh >= floor) & (rh <= band[1])].sum())
-    in_band = float(ph[(rh >= band[0]) & (rh <= band[1])].sum())
+    t = hf_parts(gray, band, floor)   # the ratio's own sums, over the half spectrum
     return {"img": _jpg(img), "size": [w, h], "band": list(band), "floor": floor,
             "profile": {"edges": edges.round(4).tolist(), "energy": (energy / (counted or 1)).tolist()},
-            "band_energy": in_band, "total_energy": total, "value": hf_ratio(gray, band, floor)}
+            "band_energy": t["band_e"] if t else 0.0, "total_energy": t["total_e"] if t else 0.0,
+            "value": t["band_e"] / t["total_e"] if t else None}
 
 
 def heatmap(gray: np.ndarray) -> dict:
     """Contrast-normalized Laplacian variance per tile over the whole frame at native resolution."""
     H, W = gray.shape
     t = max(16, int(np.ceil(max(W, H) / HEAT_TILES)))
-    g = cv2.GaussianBlur(gray, (0, 0), 1.0)
-    lap = cv2.Laplacian(g, cv2.CV_32F, ksize=3)
+    g, lap = _laplacian(gray)
     ny, nx = H // t, W // t
     tiles = lambda a: a[: ny * t, : nx * t].reshape(ny, t, nx, t).swapaxes(1, 2).reshape(ny, nx, t * t)
     v = tiles(lap).var(axis=2) / (tiles(g).var(axis=2) + EPS)

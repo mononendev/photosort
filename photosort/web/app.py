@@ -6,12 +6,12 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .. import __version__, config, images as I, schema, sort as sorter, truth
-from ..db import DB
+from ..db import DB, FINAL_TIER_SQL, jcol, REVIEW_SQL, under_folder
 from ..pipeline import JobRunner
 
 
@@ -88,9 +88,9 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
 
     def summary(row) -> dict:
         rec = sorter.final_record(row, cfg.get("focus_source", "vlm"))
-        local = json.loads(row["local_json"]) if row["local_json"] else None
-        lr = json.loads(row["lr_json"]) if row["lr_json"] else {}
-        tr = json.loads(row["truth_json"]) if row["truth_json"] else {}
+        local = jcol(row, "local_json")
+        lr = jcol(row, "lr_json", {})
+        tr = jcol(row, "truth_json", {})
         return {
             "id": row["id"], "path": row["path"], "rel": rel(row["path"]), "name": Path(row["path"]).name,
             "folder": rel(row["folder"] or str(Path(row["path"]).parent)),
@@ -113,25 +113,24 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
                 "models_dir": str(config.models_dir()),
                 "device": dev, "backend": cfg.get("backend"), "ollama": cfg.get("base_url"), "current_job": db.running_job()}
 
+    KEEPER_SQL = "COALESCE(json_extract(override_json,'$.keeper'), json_extract(vlm_json,'$.keeper'))"
+
     @app.get("/api/stats")
     def stats():
         c = db.conn
-        tiers = {0: 0, 1: 0, 2: 0}
-        for r in c.execute("SELECT local_json, vlm_json, override_json FROM images WHERE local_json IS NOT NULL"):
-            rec = sorter.final_record(r, cfg.get("focus_source", "vlm")) if False else None  # cheap path below
-            src = r["override_json"] or r["vlm_json"] or r["local_json"]
-            d = json.loads(src)
-            t = d.get("focus_tier", d.get("local_tier"))
-            if t is not None:
-                tiers[int(t)] += 1
-        return {"tracked": db.count(), "analyzed": db.count("local_json IS NOT NULL"), "tagged": db.count("vlm_json IS NOT NULL"),
-                "errors": db.count("error IS NOT NULL"), "review": db.count("local_json IS NOT NULL AND vlm_json IS NOT NULL AND json_extract(local_json,'$.local_tier') != json_extract(vlm_json,'$.focus_tier')"),
-                "tiers": {f"tier{k}": v for k, v in tiers.items()},
-                "keepers": db.count("json_extract(vlm_json,'$.keeper') = 1"),
-                "lr_rated": db.count("json_extract(lr_json,'$.rating') > 0"),
-                "lr_by_tier": [dict(r) for r in c.execute(
-                    "SELECT COALESCE(json_extract(override_json,'$.focus_tier'), json_extract(vlm_json,'$.focus_tier'), json_extract(local_json,'$.local_tier')) tier, "
-                    "json_extract(lr_json,'$.rating') rating, COUNT(*) n FROM images WHERE local_json IS NOT NULL AND json_extract(lr_json,'$.rating') IS NOT NULL "
+        r = c.execute(
+            "SELECT COUNT(*) tracked, COUNT(*) FILTER (WHERE local_json IS NOT NULL) analyzed, "
+            "COUNT(*) FILTER (WHERE vlm_json IS NOT NULL) tagged, COUNT(*) FILTER (WHERE error IS NOT NULL) errors, "
+            f"COUNT(*) FILTER (WHERE {REVIEW_SQL}) review, COUNT(*) FILTER (WHERE {KEEPER_SQL} = 1) keepers, "
+            "COUNT(*) FILTER (WHERE json_extract(lr_json,'$.rating') > 0) lr_rated FROM images").fetchone()
+        tiers = {f"tier{k}": 0 for k in (0, 1, 2)}
+        for t in c.execute(f"SELECT {FINAL_TIER_SQL} t, COUNT(*) n FROM images WHERE local_json IS NOT NULL GROUP BY t"):
+            if t["t"] is not None:
+                tiers[f"tier{int(t['t'])}"] += t["n"]
+        return {**dict(r), "tiers": tiers,
+                "lr_by_tier": [dict(x) for x in c.execute(
+                    f"SELECT {FINAL_TIER_SQL} tier, json_extract(lr_json,'$.rating') rating, COUNT(*) n FROM images "
+                    "WHERE local_json IS NOT NULL AND json_extract(lr_json,'$.rating') IS NOT NULL "
                     "GROUP BY tier, rating ORDER BY tier, rating")]}
 
     # ---- browse -----------------------------------------------------------------
@@ -240,7 +239,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         out["stats"] = {st: stage_stats(rs) for st, rs in by_stage.items()}
         series = []
         for r in rows[-points:]:
-            u = json.loads(r["usage_json"]) if r["usage_json"] else {}
+            u = jcol(r, "usage_json", {})
             series.append({"t": r["finished"], "stage": r["stage"], "s": r["seconds"], "err": bool(r["failed"]),
                            "tok_s": u.get("tok_s"), "out": u.get("out")})
         out["series"] = series
@@ -254,11 +253,11 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         return out
 
     def item_out(r) -> dict:
-        local = json.loads(r["local_json"]) if r["local_json"] else None
-        vlm = json.loads(r["vlm_json"]) if r["vlm_json"] else None
+        local = jcol(r, "local_json")
+        vlm = jcol(r, "vlm_json")
         d = {"id": r["id"], "image_id": r["image_id"], "stage": r["stage"], "started": r["started"],
              "finished": r["finished"], "seconds": r["seconds"], "error": r["error"],
-             "usage": json.loads(r["usage_json"]) if r["usage_json"] else None,
+             "usage": jcol(r, "usage_json"),
              "name": Path(r["path"]).name if r["path"] else None, "rel": rel(r["path"]) if r["path"] else None,
              "has_crop": bool(local and local.get("n_people"))}
         if local:
@@ -297,7 +296,8 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         if folder:
             base = str(safe_path(folder))
             if recursive:
-                where.append("(folder = ? OR folder LIKE ?)"); params += [base, base + "/%"]
+                w, p = under_folder(base)
+                where.append(w); params += p
             else:
                 where.append("folder = ?"); params.append(base)
         if status == "pending":
@@ -309,14 +309,14 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         elif status == "error":
             where.append("error IS NOT NULL")
         if tier is not None:
-            where.append("COALESCE(json_extract(override_json,'$.focus_tier'), json_extract(vlm_json,'$.focus_tier'), json_extract(local_json,'$.local_tier')) = ?")
+            where.append(f"{FINAL_TIER_SQL} = ?")
             params.append(tier)
         if keeper is not None:
-            where.append("COALESCE(json_extract(override_json,'$.keeper'), json_extract(vlm_json,'$.keeper')) = ?"); params.append(int(keeper))
+            where.append(f"{KEEPER_SQL} = ?"); params.append(int(keeper))
         if subject:
             where.append("json_extract(vlm_json,'$.primary_subject') = ?"); params.append(subject)
         if review:
-            where.append("local_json IS NOT NULL AND vlm_json IS NOT NULL AND json_extract(local_json,'$.local_tier') != json_extract(vlm_json,'$.focus_tier')")
+            where.append(REVIEW_SQL)
         if lr_rating is not None:
             where.append("json_extract(lr_json,'$.rating') = ?"); params.append(lr_rating)
         if lr_label:
@@ -325,7 +325,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             where.append("json_extract(truth_json,'$.focus_tier') = ?"); params.append(truth_tier)
         if truth_mismatch:
             where.append("json_extract(truth_json,'$.focus_tier') IS NOT NULL AND local_json IS NOT NULL AND "
-                         "json_extract(truth_json,'$.focus_tier') != COALESCE(json_extract(override_json,'$.focus_tier'), json_extract(vlm_json,'$.focus_tier'), json_extract(local_json,'$.local_tier'))")
+                         f"json_extract(truth_json,'$.focus_tier') != {FINAL_TIER_SQL}")
         if rating is not None:
             where.append("json_extract(override_json,'$.rating') = ?"); params.append(rating)
         if reviewed is not None:
@@ -346,10 +346,10 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         r = db.row(img_id)
         if not r:
             raise HTTPException(404)
-        return {**summary(r), "local": json.loads(r["local_json"]) if r["local_json"] else None,
-                "vlm": json.loads(r["vlm_json"]) if r["vlm_json"] else None,
-                "override": json.loads(r["override_json"]) if r["override_json"] else None,
-                "usage": json.loads(r["vlm_usage"]) if r["vlm_usage"] else None,
+        return {**summary(r), "local": jcol(r, "local_json"),
+                "vlm": jcol(r, "vlm_json"),
+                "override": jcol(r, "override_json"),
+                "usage": jcol(r, "vlm_usage"),
                 "final": sorter.final_record(r, cfg.get("focus_source", "vlm"))}
 
     @app.get("/api/images/{img_id}/vlm-request")
@@ -358,7 +358,6 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         replaced by their size. Built from the current cache and config, so it matches what was sent as long
         as neither changed since."""
         from .. import backends
-        from ..backends import Item
         r = db.row(img_id)
         if not r or not r["local_json"]:
             raise HTTPException(404, "not analyzed")
@@ -371,8 +370,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         except SystemExit as e:
             raise HTTPException(400, str(e))
         mname = model or cfg.get("model") or be.default_model
-        context = schema.context_text(json.loads(r["local_json"]))
-        item = Item(str(img_id), fp.read_bytes(), cp.read_bytes() if cp.exists() else None, context)
+        item = backends.load_item(r, cache)
         images = [{"label": "frame", "url": f"/media/frame/{img_id}", "bytes": fp.stat().st_size}]
         if cp.exists():
             images.append({"label": "crop", "url": f"/media/crop/{img_id}", "bytes": cp.stat().st_size})
@@ -395,7 +393,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
                 request = json.loads(json.dumps(redact(build(item, mname, cfg)), default=str))
             except Exception as e:  # e.g. the cloud SDK isn't installed here
                 build_error = f"{type(e).__name__}: {e}"
-        return {"backend": bname, "model": mname, "system": schema.SYSTEM_PROMPT, "context": context,
+        return {"backend": bname, "model": mname, "system": schema.SYSTEM_PROMPT, "context": item.context,
                 "images": images, "request": request, "build_error": build_error}
 
     @app.patch("/api/images/{img_id}")
@@ -403,7 +401,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         r = db.row(img_id)
         if not r:
             raise HTTPException(404)
-        cur = json.loads(r["override_json"]) if r["override_json"] else {}
+        cur = jcol(r, "override_json", {})
         if o.clear:
             cur = {}
         else:
@@ -570,7 +568,8 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         where, params = ["local_json IS NOT NULL"], []
         if e.folder:
             base = str(safe_path(e.folder))
-            where.append("(folder = ? OR folder LIKE ?)"); params += [base, base + "/%"]
+            w, p = under_folder(base)
+            where.append(w); params += p
         rows = db.rows(" AND ".join(where), params)
         recs = [sorter.final_record(r, e.focus_source or cfg.get("focus_source", "vlm")) for r in rows]
         sorter.export(recs, out)

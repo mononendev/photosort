@@ -1,6 +1,5 @@
 """Output contract for the vision model, shared by all backends."""
 from __future__ import annotations
-import json
 
 SUBJECTS = ["rider_action", "rider_posed", "group", "crowd_spectators", "gear_board", "venue_scenery", "other", "no_people"]
 COMPOSITIONS = ["full_body", "three_quarter", "half_body", "close_up", "environmental", "no_subject"]
@@ -113,6 +112,3 @@ def validate(d: dict) -> dict:
         d["composition"] = "no_subject"
     return d
 
-
-if __name__ == "__main__":
-    print(json.dumps(json_schema(True), indent=2))

@@ -3,13 +3,12 @@ import argparse
 import json
 import os
 import random
-import sys
 import time
 from pathlib import Path
 
 from tqdm import tqdm
 
-from . import config, images as I, schema
+from . import config, images as I
 from .db import DB
 
 
@@ -22,17 +21,7 @@ def _ctx(args):
 
 def cmd_scan(args):
     workdir, cfg, db = _ctx(args)
-    paths = []
-    for d in args.dirs:
-        d = Path(d)
-        if d.is_file() and I.is_image(d):
-            paths.append(d)
-        else:
-            paths += [p for p in d.rglob("*") if p.is_file() and I.is_image(p)]
-    if args.skip_raw_dupes:
-        # when a JPEG and RAW share a stem, keep only the JPEG (faster to decode)
-        jpg_stems = {p.with_suffix("").as_posix() for p in paths if p.suffix.lower() not in I.RAW_EXT}
-        paths = [p for p in paths if p.suffix.lower() not in I.RAW_EXT or p.with_suffix("").as_posix() not in jpg_stems]
+    paths = I.find_images(map(Path, args.dirs), args.skip_raw_dupes)
     n = db.add_paths(paths)
     from . import sidecar
     m = sidecar.ingest(db, db.rows("lr_json IS NULL"))
@@ -61,11 +50,11 @@ def cmd_local(args):
 
 
 def _local_summary(db):
-    rows = db.rows("local_json IS NOT NULL")
-    tiers = {0: 0, 1: 0, 2: 0}
-    for r in rows:
-        tiers[json.loads(r["local_json"])["local_tier"]] += 1
-    print("local focus tiers:", {f"tier{k}": v for k, v in tiers.items()})
+    tiers = {f"tier{k}": 0 for k in (0, 1, 2)}
+    for r in db.conn.execute("SELECT json_extract(local_json,'$.local_tier') t, COUNT(*) n FROM images "
+                             "WHERE local_json IS NOT NULL GROUP BY t"):
+        tiers[f"tier{r['t']}"] = r["n"]
+    print("local focus tiers:", tiers)
 
 
 def cmd_calibrate(args):
@@ -132,10 +121,9 @@ def cmd_rescore(args):
     _local_summary(db)
 
 
-def _estimate(backend, model, db, cfg, rows=None):
-    rows = rows if rows is not None else db.rows("local_json IS NOT NULL AND vlm_json IS NULL AND batch_id IS NULL")
-    with_crop = sum(1 for r in rows if json.loads(r["local_json"])["n_people"] > 0)
-    return backend.estimate(model, with_crop, len(rows) - with_crop, cfg), len(rows)
+def _with_crop(rows) -> int:
+    """How many analyzed rows have a subject crop (a person) to send along with the frame."""
+    return sum(1 for r in rows if json.loads(r["local_json"])["n_people"] > 0)
 
 
 def cmd_estimate(args):
@@ -143,7 +131,7 @@ def cmd_estimate(args):
     workdir, cfg, db = _ctx(args)
     n = db.count("local_json IS NOT NULL AND vlm_json IS NULL AND batch_id IS NULL") or db.count()
     rows = db.rows("local_json IS NOT NULL")
-    with_crop = sum(1 for r in rows if json.loads(r["local_json"])["n_people"] > 0) if rows else int(n * 0.9)
+    with_crop = _with_crop(rows) if rows else int(n * 0.9)
     without = (len(rows) - with_crop) if rows else n - with_crop
     print(f"{n} images pending ({with_crop} with a subject crop). Batch price is what you pay; interactive shown for reference.")
     print(f"{'model':26s} {'in tokens':>12s} {'out tokens':>11s} {'interactive':>12s} {'batch':>9s}")
@@ -155,14 +143,8 @@ def cmd_estimate(args):
 
 
 def _items_for(rows, workdir):
-    from .backends import Item
-    items = []
-    for r in rows:
-        local = json.loads(r["local_json"])
-        frame = (workdir / "cache" / f"{r['id']}.jpg").read_bytes()
-        cp = workdir / "cache" / f"{r['id']}_crop.jpg"
-        items.append(Item(str(r["id"]), frame, cp.read_bytes() if cp.exists() else None, schema.context_text(local)))
-    return items
+    from .backends import load_item
+    return [load_item(r, workdir / "cache") for r in rows]
 
 
 def cmd_submit(args):
@@ -180,7 +162,8 @@ def cmd_submit(args):
     if not rows:
         print("nothing to submit (run `local` first, or everything is already submitted)")
         return
-    est, _ = _estimate(backend, model, db, cfg, rows)
+    with_crop = _with_crop(rows)
+    est = backend.estimate(model, with_crop, len(rows) - with_crop, cfg)
     print(f"backend={bname} model={model} images={len(rows)} est. input tokens={est['input_tokens']:,} "
           f"batch cost ≈ ${est['batch_usd']}" + ("" if est["priced"] else " (model not in price table)"))
     if args.dry_run:
@@ -217,11 +200,10 @@ def _run_sync(backend, model, rows, cfg, workdir, db, concurrency):
         futs = {ex.submit(backend.classify, it, model, cfg): it for it in _items_for(rows, workdir)}
         for f in as_completed(futs):
             res = f.result()
-            img_id = int(res.key)
-            if res.data:
-                db.set_vlm(img_id, res.data, res.usage, None); ok += 1
+            if db.set_vlm_result(res):
+                ok += 1
             else:
-                db.set_vlm(img_id, None, res.usage, res.error); err += 1
+                err += 1
             if res.usage and res.usage.get("seconds"):
                 secs.append(res.usage["seconds"])
             bar.update(1)
@@ -249,20 +231,13 @@ def cmd_poll(args):
                 results = backend.fetch(b["id"])
                 ok = 0
                 for res in results:
-                    try:
-                        img_id = int(res.key)
-                    except (TypeError, ValueError):
+                    if not str(res.key).isdigit():
                         continue
-                    if res.data:
-                        db.set_vlm(img_id, res.data, res.usage, None)
-                        ok += 1
-                    else:
-                        db.set_vlm(img_id, None, None, res.error)
+                    ok += db.set_vlm_result(res)
                 db.set_batch_state(b["id"], "ended", fetched=True)
                 print(f"batch {b['id']}: {ok}/{len(results)} parsed ok")
                 # anything submitted but missing from results can be resubmitted
-                db.conn.execute("UPDATE images SET batch_id=NULL WHERE batch_id=? AND vlm_json IS NULL AND error IS NULL", (b["id"],))
-                db.conn.commit()
+                db.clear_batch(b["id"], errored_too=False)
             elif st.startswith("failed"):
                 db.set_batch_state(b["id"], st, fetched=True)
                 db.clear_batch(b["id"])
@@ -279,13 +254,13 @@ def cmd_poll(args):
 
 
 def _usage_summary(db):
-    rows = db.rows("vlm_usage IS NOT NULL")
-    if not rows:
+    n, tot_in, tot_out = db.conn.execute(
+        "SELECT COUNT(*), COALESCE(SUM(json_extract(vlm_usage,'$.in')), 0), COALESCE(SUM(json_extract(vlm_usage,'$.out')), 0) "
+        "FROM images WHERE vlm_usage IS NOT NULL").fetchone()
+    if not n:
         return
-    tot_in = sum((json.loads(r["vlm_usage"]).get("in") or 0) for r in rows)
-    tot_out = sum((json.loads(r["vlm_usage"]).get("out") or 0) for r in rows)
-    print(f"results so far: {len(rows)} images, {tot_in:,} input tokens, {tot_out:,} output tokens "
-          f"(avg {tot_in//max(1,len(rows)):,} in / {tot_out//max(1,len(rows)):,} out per image)")
+    print(f"results so far: {n} images, {tot_in:,} input tokens, {tot_out:,} output tokens "
+          f"(avg {tot_in//n:,} in / {tot_out//n:,} out per image)")
 
 
 def cmd_sort(args):

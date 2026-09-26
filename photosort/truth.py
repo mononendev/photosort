@@ -13,26 +13,21 @@ import zipfile
 from pathlib import Path
 from typing import Iterable, Optional
 
-from .sidecar import _LABEL, _RATING
+from .config import DEFAULTS
+from .db import under_folder
+from .sidecar import rating_label
 
 _SUBJECT = re.compile(r"<dc:subject>(.*?)</dc:subject>", re.S)
 _LI = re.compile(r"<rdf:li[^>]*>(.*?)</rdf:li>", re.S)
 _FOCUS_KW = re.compile(r"^(?:focus|tier)[:_ -]?([012])$", re.I)
-DEFAULT_TRUTH_CFG = {
-    "label_tiers": {"Blue": 2, "Green": 2, "Yellow": 1, "Red": 0},
-    "rating_tiers": {"5": 2, "4": 2, "3": 1, "2": 1, "1": 0, "0": None},
-}
 
 
 def parse_xmp(text: str) -> dict:
-    m = _RATING.search(text)
-    rating = int(next(g for g in m.groups() if g is not None)) if m else None
-    m = _LABEL.search(text)
-    label = next((g for g in m.groups() if g is not None), None) if m else None
+    rating, label = rating_label(text)
     kws: list[str] = []
     for block in _SUBJECT.findall(text):
         kws += [k.strip() for k in _LI.findall(block) if k.strip()]
-    return {"rating": rating, "label": label or None, "keywords": kws, "focus_tier": None}
+    return {"rating": rating, "label": label, "keywords": kws, "focus_tier": None}
 
 
 def parse_csv(text: str) -> dict[str, dict]:
@@ -82,7 +77,7 @@ def resolve_tier(v: dict, cfg: dict) -> Optional[int]:
         m = _FOCUS_KW.match(k)
         if m:
             return int(m.group(1))
-    t = cfg.get("truth", DEFAULT_TRUTH_CFG)
+    t = cfg.get("truth", DEFAULTS["truth"])
     if v.get("label") and v["label"] in t.get("label_tiers", {}):
         return t["label_tiers"][v["label"]]
     if v.get("rating") is not None:
@@ -93,9 +88,7 @@ def resolve_tier(v: dict, cfg: dict) -> Optional[int]:
 
 def apply(db, verdicts: dict[str, dict], cfg: dict, folder: Optional[str] = None) -> dict:
     """Attach verdicts to tracked images by filename stem. Returns counts."""
-    where, params = "1", []
-    if folder:
-        where, params = "(folder = ? OR folder LIKE ?)", [folder, folder.rstrip("/") + "/%"]
+    where, params = under_folder(folder) if folder else ("1", [])
     matched = 0
     seen = set()
     for r in db.rows(where, params):

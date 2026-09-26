@@ -6,7 +6,7 @@ import Tip from '../components/Tip';
 
 function Tile({ label, value, to, sub, tip }: { label: string; value: number | string; to?: string; sub?: string; tip?: string }) {
   const body = (
-    <div className="rounded-lg border border-gray-800 bg-gray-900 p-4 hover:border-gray-700">
+    <div className="h-full rounded-lg border border-gray-800 bg-gray-900 p-3 sm:p-4 hover:border-gray-700 transition active:scale-[0.97] active:border-gray-600">
       <div className="text-xs uppercase tracking-wide text-gray-500">{tip ? <Tip tip={tip}>{label}</Tip> : label}</div>
       <div className="text-2xl font-semibold mt-1 tabular-nums">{value}</div>
       {sub && <div className="text-xs text-gray-500 mt-1">{sub}</div>}
@@ -34,7 +34,7 @@ export default function Dashboard() {
       </div>
 
       <section>
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-2">
           <h2 className="text-sm font-semibold text-gray-300">Recent jobs</h2>
           <Link to="/browse" className="text-sm text-blue-400 hover:underline">Pick folders to process →</Link>
         </div>
@@ -48,16 +48,16 @@ export default function Dashboard() {
       {stats?.lr_by_tier && stats.lr_by_tier.length > 0 && (
         <section>
           <h2 className="text-sm font-semibold text-gray-300 mb-2">Your Lightroom ratings vs focus tier <span className="text-gray-500 font-normal">({stats.lr_rated} rated)</span></h2>
-          <table className="text-xs text-gray-300">
+          <div className="overflow-x-auto"><table className="text-xs text-gray-300">
             <thead><tr><th className="text-left pr-4 text-gray-500">focus tier</th>{[0, 1, 2, 3, 4, 5].map((r) => <th key={r} className="px-2 text-gray-500">LR {r}★</th>)}</tr></thead>
             <tbody>{[0, 1, 2].map((t) => (
               <tr key={t}><td className="pr-4">{t}</td>{[0, 1, 2, 3, 4, 5].map((r) => <td key={r} className="px-2 text-center tabular-nums">{stats.lr_by_tier?.find((x) => x.tier === t && x.rating === r)?.n ?? ''}</td>)}</tr>
             ))}</tbody>
-          </table>
+          </table></div>
         </section>
       )}
       {health && (
-        <section className="text-xs text-gray-500">
+        <section className="text-xs text-gray-500 break-words">
           photos: <code>{health.photos_root}</code> · state: <code>{health.workdir}</code> · model server: <code>{health.ollama ?? 'n/a'}</code>
           {health.device ? <> · detector on <code>{health.device}</code></> : null}
         </section>

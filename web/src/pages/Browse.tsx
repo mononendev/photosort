@@ -23,22 +23,23 @@ function DirRow({ d, checked, onToggle }: { d: TreeDir; checked: boolean; onTogg
   const done = d.vlm_done;
   const pct = d.tracked ? Math.round((done / d.tracked) * 100) : 0;
   return (
-    <div className="flex items-center gap-3 px-3 py-2 border-b border-gray-800 hover:bg-gray-900/60">
+    <div className="flex items-center gap-2 sm:gap-3 px-3 py-2.5 sm:py-2 border-b border-gray-800 hover:bg-gray-900/60">
       <RowCheck checked={checked} onToggle={onToggle} />
-      <Link to={`/browse/${d.path}`} className="text-blue-300 hover:underline truncate flex-1">📁 {d.name}</Link>
-      <span className="text-xs text-gray-500 w-28 text-right">{d.images_direct} here</span>
-      <div className="w-56 flex items-center gap-2">
+      <Link to={`/browse/${d.path}`} className="text-blue-300 hover:underline truncate flex-1 min-w-[7rem] py-1 -my-1">📁 {d.name}</Link>
+      <span className="hidden sm:inline text-xs text-gray-500 w-28 text-right">{d.images_direct} here</span>
+      <div className="w-20 sm:w-56 flex items-center gap-2">
         {d.tracked > 0 ? (
           <>
             <Progress done={done} total={d.tracked} className="flex-1" />
-            <Tip tip="Tagged by the vision model / tracked (registered by a job) across this folder and its subfolders. Images never included in a job aren't tracked yet." className="text-xs text-gray-400 tabular-nums w-24 text-right">{done}/{d.tracked} · {pct}%</Tip>
+            <Tip tip="Tagged by the vision model / tracked (registered by a job) across this folder and its subfolders. Images never included in a job aren't tracked yet." className="hidden sm:inline text-xs text-gray-400 tabular-nums w-24 text-right">{done}/{d.tracked} · {pct}%</Tip>
+            <span className="sm:hidden text-xs text-gray-400 tabular-nums">{pct}%</span>
           </>
         ) : (
-          <span className="text-xs text-gray-600">not processed</span>
+          <span className="text-xs text-gray-600 truncate"><span className="hidden sm:inline">not processed</span><span className="sm:hidden">—</span></span>
         )}
       </div>
       {d.errors > 0 && <span className="text-xs text-red-400">{d.errors} err</span>}
-      <Link to={`/photos?folder=${encodeURIComponent(d.path)}`} className="text-xs text-gray-400 hover:text-gray-200">view</Link>
+      <Link to={`/photos?folder=${encodeURIComponent(d.path)}`} className="text-xs text-gray-400 hover:text-gray-200 px-1 py-1 -my-1">view</Link>
     </div>
   );
 }
@@ -89,7 +90,7 @@ export default function Browse() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 text-sm">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
         <Link to="/browse" className="text-blue-300 hover:underline">photos</Link>
         {crumbs.map((c, i) => (
           <span key={i} className="flex items-center gap-2">
@@ -98,7 +99,7 @@ export default function Browse() {
           </span>
         ))}
         <span className="ml-auto flex items-center gap-2">
-          <button onClick={() => start.mutate([path || ''])} className="text-xs px-2 py-1 rounded bg-gray-800 hover:bg-gray-700">
+          <button onClick={() => start.mutate([path || ''])} className="text-xs px-3 py-1.5 sm:px-2 sm:py-1 rounded bg-gray-800 hover:bg-gray-700 active:bg-gray-600">
             process this folder
           </button>
         </span>
@@ -107,9 +108,9 @@ export default function Browse() {
       <div className="rounded-lg border border-gray-800 bg-gray-900/40">
         <div className="flex items-center gap-3 px-3 py-2 border-b border-gray-800 text-xs text-gray-500">
           <input type="checkbox" checked={allSelected} onChange={() => (allSelected ? setSelected(selected.filter((p) => !allHere.includes(p))) : setSelected([...new Set([...selected, ...allHere])]))} className="accent-blue-500" />
-          <span className="flex-1">name <span className="text-gray-600">· shift-click to select a range</span></span>
-          <span className="w-28 text-right">images</span>
-          <span className="w-56">tagged / tracked</span>
+          <span className="flex-1">name <span className="hidden sm:inline text-gray-600">· shift-click to select a range</span></span>
+          <span className="hidden sm:inline w-28 text-right">images</span>
+          <span className="w-20 sm:w-56">tagged<span className="hidden sm:inline"> / tracked</span></span>
         </div>
         {isLoading && <div className="p-3 text-sm text-gray-500">Loading…</div>}
         {error && <div className="p-3 text-sm text-red-400">{(error as Error).message}</div>}
@@ -117,7 +118,7 @@ export default function Browse() {
           <DirRow key={d.path} d={d} checked={selected.includes(d.path)} onToggle={onRowClick(d.path)} />
         ))}
         {data?.files.map((f) => (
-          <div key={f.rel} className="flex items-center gap-3 px-3 py-1.5 border-b border-gray-800/60 text-sm hover:bg-gray-900/60">
+          <div key={f.rel} className="flex items-center gap-2 sm:gap-3 px-3 py-2 sm:py-1.5 border-b border-gray-800/60 text-sm hover:bg-gray-900/60">
             <RowCheck checked={selected.includes(f.rel)} onToggle={onRowClick(f.rel)} />
             <StatusDot status={f.status} />
             <button
@@ -128,14 +129,14 @@ export default function Browse() {
             </button>
             {f.id ? <img src={`/media/thumb/${f.id}`} alt="" className="h-8 w-12 object-cover rounded bg-gray-800" loading="lazy" /> : null}
             <TierBadge tier={f.focus_tier} small />
-            <Stars n={f.quality_score} />
-            <span className="text-xs text-gray-500 w-24 truncate">{f.subject !== 'unknown' ? f.subject : ''}</span>
+            <span className="hidden sm:inline"><Stars n={f.quality_score} /></span>
+            <span className="hidden sm:inline text-xs text-gray-500 w-24 truncate">{f.subject !== 'unknown' ? f.subject : ''}</span>
           </div>
         ))}
         {data && data.dirs.length === 0 && data.files.length === 0 && <div className="p-3 text-sm text-gray-500">Empty folder.</div>}
       </div>
 
-      <div className="sticky bottom-4 rounded-lg border border-gray-700 bg-gray-900 p-3 flex flex-wrap items-center gap-4 shadow-xl">
+      <div className="sticky bottom-[max(0.75rem,env(safe-area-inset-bottom))] sm:bottom-4 rounded-lg border border-gray-700 bg-gray-900/95 backdrop-blur p-3 flex flex-wrap items-center gap-x-4 gap-y-2 shadow-xl">
         <span className="text-sm">
           <span className="font-semibold">{selected.length}</span> selected
           {selected.length > 0 && <button onClick={clear} className="ml-2 text-xs text-gray-400 hover:text-gray-200">clear</button>}
@@ -146,7 +147,7 @@ export default function Browse() {
         <button
           disabled={selected.length === 0 || start.isPending}
           onClick={() => start.mutate(selected)}
-          className="ml-auto px-4 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-sm font-medium"
+          className="w-full sm:w-auto sm:ml-auto px-4 py-2.5 sm:py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.98] transition disabled:opacity-40 text-sm font-medium"
         >
           Process selected
         </button>

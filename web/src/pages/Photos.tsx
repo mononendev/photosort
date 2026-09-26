@@ -51,40 +51,50 @@ export default function Photos() {
   };
   const total = data?.total ?? 0;
   const offset = filters.offset ?? 0;
-  const sel = 'bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm';
+  const sel = 'bg-gray-900 border border-gray-700 rounded px-2 py-1.5 sm:py-1 text-sm';
+  const [showFilters, setShowFilters] = useState(false);
+  const nActive = ['folder', 'tier', 'keeper', 'subject', 'status', 'review', 'truth_mismatch', 'lr_rating', 'recursive'].filter((k) => sp.get(k)).length;
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <input value={filters.folder} onChange={(e) => set('folder', e.target.value)} placeholder="folder (relative to photos root)" className={`${sel} w-72`} />
-        <label className="text-xs text-gray-400 flex items-center gap-1"><input type="checkbox" checked={filters.recursive} onChange={(e) => set('recursive', e.target.checked ? undefined : 'false')} /> <Tip tip="Include photos in subfolders of the folder above. Off shows only that folder's own files.">recursive</Tip></label>
-        <Tip plain tip="Filters on the tier each tile shows: your call if you set one, otherwise the tier from the focus_source setting (vision model by default, local until the model has run)."><select value={filters.tier ?? ''} onChange={(e) => set('tier', e.target.value)} className={sel}>
+      <div className="flex items-center gap-2 sm:hidden">
+        <input value={filters.q ?? ''} onChange={(e) => set('q', e.target.value)} placeholder="search keywords / name" className={`${sel} flex-1 min-w-0`} />
+        <button onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}
+          className={`shrink-0 px-3 py-1.5 rounded border text-sm active:bg-gray-800 ${showFilters || nActive ? 'border-blue-500 text-blue-200' : 'border-gray-700 text-gray-300'}`}>
+          filters{nActive ? ` · ${nActive}` : ''}
+        </button>
+      </div>
+      <div className={`${showFilters ? 'grid' : 'hidden'} grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center animate-[menu-in_120ms_ease-out] sm:animate-none`}>
+        <input value={filters.folder} onChange={(e) => set('folder', e.target.value)} placeholder="folder (relative to photos root)" className={`${sel} col-span-2 sm:w-72`} />
+        <label className="order-last sm:order-none text-sm sm:text-xs text-gray-400 flex items-center gap-1.5 sm:gap-1 py-1 sm:py-0"><input type="checkbox" checked={filters.recursive} onChange={(e) => set('recursive', e.target.checked ? undefined : 'false')} /> <Tip tip="Include photos in subfolders of the folder above. Off shows only that folder's own files.">recursive</Tip></label>
+        <Tip plain tip="Filters on the tier each tile shows: your call if you set one, otherwise the tier from the focus_source setting (vision model by default, local until the model has run)."><select value={filters.tier ?? ''} onChange={(e) => set('tier', e.target.value)} className={`${sel} w-full sm:w-auto`}>
           <option value="">any focus</option><option value="2">2 · sharp</option><option value="1">1 · partial</option><option value="0">0 · nobody</option>
         </select></Tip>
-        <select value={filters.keeper === undefined ? '' : String(filters.keeper)} onChange={(e) => set('keeper', e.target.value)} className={sel}>
+        <select value={filters.keeper === undefined ? '' : String(filters.keeper)} onChange={(e) => set('keeper', e.target.value)} className={`${sel} w-full sm:w-auto`}>
           <option value="">keeper?</option><option value="true">keepers</option><option value="false">culls</option>
         </select>
-        <select value={filters.subject ?? ''} onChange={(e) => set('subject', e.target.value)} className={sel}>
+        <select value={filters.subject ?? ''} onChange={(e) => set('subject', e.target.value)} className={`${sel} w-full sm:w-auto`}>
           <option value="">any subject</option>{SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
-        <Tip plain tip="pending: registered, not analyzed yet · analyzed: local focus scoring done · tagged: the vision model has run too · error: a stage failed (details in the photo)."><select value={filters.status ?? ''} onChange={(e) => set('status', e.target.value)} className={sel}>
+        <Tip plain tip="pending: registered, not analyzed yet · analyzed: local focus scoring done · tagged: the vision model has run too · error: a stage failed (details in the photo)."><select value={filters.status ?? ''} onChange={(e) => set('status', e.target.value)} className={`${sel} w-full sm:w-auto`}>
           <option value="">any status</option><option value="pending">pending</option><option value="analyzed">analyzed</option><option value="tagged">tagged</option><option value="error">error</option>
         </select></Tip>
-        <label className="text-xs text-gray-400 flex items-center gap-1"><input type="checkbox" checked={!!filters.review} onChange={(e) => set('review', e.target.checked ? '1' : undefined)} /> <Tip tip="Photos where the local sharpness tier and the vision model's tier differ. These are the cases where one of them is wrong; open one to see both sides.">needs review</Tip></label>
-        <label className="text-xs text-gray-400 flex items-center gap-1"><input type="checkbox" checked={!!filters.truth_mismatch} onChange={(e) => set('truth_mismatch', e.target.checked ? '1' : undefined)} /> <Tip tip="Photos whose shown tier differs from the ground truth you imported on the Calibrate page. Use it to see what the thresholds or the model get wrong.">≠ ground truth</Tip></label>
-        <select value={filters.lr_rating ?? ''} onChange={(e) => set('lr_rating', e.target.value)} className={sel}>
+        <label className="order-last sm:order-none text-sm sm:text-xs text-gray-400 flex items-center gap-1.5 sm:gap-1 py-1 sm:py-0"><input type="checkbox" checked={!!filters.review} onChange={(e) => set('review', e.target.checked ? '1' : undefined)} /> <Tip tip="Photos where the local sharpness tier and the vision model's tier differ. These are the cases where one of them is wrong; open one to see both sides.">needs review</Tip></label>
+        <label className="order-last sm:order-none text-sm sm:text-xs text-gray-400 flex items-center gap-1.5 sm:gap-1 py-1 sm:py-0"><input type="checkbox" checked={!!filters.truth_mismatch} onChange={(e) => set('truth_mismatch', e.target.checked ? '1' : undefined)} /> <Tip tip="Photos whose shown tier differs from the ground truth you imported on the Calibrate page. Use it to see what the thresholds or the model get wrong.">≠ ground truth</Tip></label>
+        <select value={filters.lr_rating ?? ''} onChange={(e) => set('lr_rating', e.target.value)} className={`${sel} w-full sm:w-auto`}>
           <option value="">any LR rating</option>{[0, 1, 2, 3, 4, 5].map((r) => <option key={r} value={r}>LR {r}★</option>)}
         </select>
-        <input value={filters.q ?? ''} onChange={(e) => set('q', e.target.value)} placeholder="search keywords / name" className={`${sel} w-56`} />
-        <Tip plain tip="Eye sharpness sorts by the eye-band Laplacian (photos without located eyes go last). Head sharpness uses the head box. Score is the model's 1–5 (or yours)."><select value={filters.sort} onChange={(e) => set('sort', e.target.value)} className={sel}>
+        <input value={filters.q ?? ''} onChange={(e) => set('q', e.target.value)} placeholder="search keywords / name" className={`${sel} hidden sm:block w-56`} />
+        <Tip plain tip="Eye sharpness sorts by the eye-band Laplacian (photos without located eyes go last). Head sharpness uses the head box. Score is the model's 1–5 (or yours)."><select value={filters.sort} onChange={(e) => set('sort', e.target.value)} className={`${sel} w-full sm:w-auto`}>
           <option value="path">by path</option><option value="newest">newest</option><option value="score">by score</option><option value="eye_sharpness">by eye sharpness</option><option value="sharpness">by head sharpness</option><option value="lr">by your LR rating</option>
         </select></Tip>
-        <span className="ml-auto text-xs text-gray-500">{isFetching ? 'loading…' : `${total} photos`}</span>
+        <span className="hidden sm:inline ml-auto text-xs text-gray-500">{isFetching ? 'loading…' : `${total} photos`}</span>
       </div>
+      <div className="sm:hidden -mt-2 text-xs text-gray-500">{isFetching ? 'loading…' : `${total} photos`}</div>
 
-      <div className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(180px,1fr))]">
+      <div className="grid gap-2 grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]">
         {items.map((it) => (
-          <button key={it.id ?? it.rel} onClick={() => it.id && setOpen(it.id)} className="group text-left rounded-lg overflow-hidden border border-gray-800 bg-gray-900 hover:border-gray-600">
+          <button key={it.id ?? it.rel} onClick={() => it.id && setOpen(it.id)} className="group text-left rounded-lg overflow-hidden border border-gray-800 bg-gray-900 hover:border-gray-600 transition active:scale-[0.97] active:border-gray-500">
             <div className="aspect-[3/2] bg-gray-950 relative">
               {it.id && it.status !== 'pending' ? <img src={thumbUrl(it.id)} alt="" loading="lazy" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-700 text-xs">pending</div>}
               <div className="absolute top-1 left-1 flex gap-1">
@@ -105,9 +115,9 @@ export default function Photos() {
       </div>
       {total > PAGE && (
         <div className="flex items-center justify-center gap-3 text-sm">
-          <button disabled={offset === 0} onClick={() => set('offset', String(Math.max(0, offset - PAGE)))} className="px-3 py-1 rounded bg-gray-800 disabled:opacity-40">← prev</button>
+          <button disabled={offset === 0} onClick={() => set('offset', String(Math.max(0, offset - PAGE)))} className="px-4 py-2 sm:px-3 sm:py-1 rounded bg-gray-800 active:bg-gray-700 disabled:opacity-40">← prev</button>
           <span className="text-gray-500">{offset + 1}–{Math.min(offset + PAGE, total)} of {total}</span>
-          <button disabled={offset + PAGE >= total} onClick={() => set('offset', String(offset + PAGE))} className="px-3 py-1 rounded bg-gray-800 disabled:opacity-40">next →</button>
+          <button disabled={offset + PAGE >= total} onClick={() => set('offset', String(offset + PAGE))} className="px-4 py-2 sm:px-3 sm:py-1 rounded bg-gray-800 active:bg-gray-700 disabled:opacity-40">next →</button>
         </div>
       )}
       {open !== null && <ImageDetail id={open} onClose={() => setOpen(null)} onNav={nav} />}

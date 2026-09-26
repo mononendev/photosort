@@ -167,7 +167,7 @@ export default function FrameOverlay({ id, l, onOpen, ...rest }: Omit<OverlayPro
         style={{ aspectRatio: `${l.width} / ${l.height}`, width: `min(100%, calc(60vh * ${l.width / l.height}))` }}>
         <img src={frameUrl(id)} alt="" className="absolute inset-0 w-full h-full" />
         <OverlaySvg l={l} setHover={setHover} {...rest} />
-        <span className="absolute right-2 top-2 rounded bg-black/60 px-1.5 text-xs text-gray-300 opacity-0 group-hover:opacity-100 pointer-events-none">⛶ click to enlarge</span>
+        <span className="absolute right-2 top-2 rounded bg-black/60 px-1.5 text-xs text-gray-300 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 pointer-events-none">⛶ <span className="[@media(hover:none)]:hidden">click to </span>enlarge</span>
       </div>
       <HoverBar hover={hover} l={l} />
     </div>

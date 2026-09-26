@@ -31,29 +31,29 @@ export default function JobRow({ job, compact }: { job: Job; compact?: boolean }
   const incomplete = finished && (job.state !== 'done' || job.errors > 0 || job.done < job.total);
   return (
     <div className="rounded-lg border border-gray-800 bg-gray-900 p-3">
-      <div className="flex items-center gap-3 text-sm">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
         <Link to={`/jobs/${job.id}`} className="text-gray-500 hover:text-blue-300">#{job.id}</Link>
         <span className={`font-medium ${STATE_CLASS[job.state]}`}>{job.state}</span>
         <span className="text-gray-400">{job.stage}</span>
-        <Link to={`/jobs/${job.id}`} className="text-gray-300 truncate flex-1 hover:text-blue-300" title={`${job.paths.join('\n')}\n\nOpen job details`}>
+        <Link to={`/jobs/${job.id}`} className="text-gray-300 truncate flex-1 min-w-[8rem] basis-40 sm:basis-auto hover:text-blue-300" title={`${job.paths.join('\n')}\n\nOpen job details`}>
           {job.paths.map((p) => p.split('/').slice(-2).join('/')).join(', ')}
         </Link>
         <Tip tip={<>Progress of the current stage ({job.stage === 'done' ? 'the last stage that had work' : job.stage}). The local stage counts images analyzed; the vlm stage counts images sent to the vision model. The note below keeps the local stage's summary.</>} className="text-gray-400 tabular-nums">{job.done}/{job.total}</Tip>
         {job.errors > 0 && <Tip tip="Images that failed in the local or vision stage, both added up. Filter Photos by status = error for the messages; resume retries them." className="text-red-400">{job.errors} err</Tip>}
         {live && job.rate ? <span className="text-gray-500">{job.rate}/s · eta {fmtEta(job.eta_s)}</span> : null}
         {(job.state === 'queued' || job.state === 'running') && (
-          <button onClick={() => cancel.mutate()} className="text-xs text-gray-400 hover:text-red-300">cancel</button>
+          <button onClick={() => cancel.mutate()} className="text-xs px-2 py-1 -my-1 rounded text-gray-400 hover:text-red-300 active:bg-gray-800">cancel</button>
         )}
         {finished && incomplete && (
           <Tip plain tip="Queue a new job with the same paths and options. It only processes images this job didn't finish and retries errors; finished images are left alone.">
             <button onClick={() => rerun.mutate({ rescan: false })} disabled={rerun.isPending}
-              className="text-xs px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-40">resume</button>
+              className="text-xs px-2.5 py-1 sm:px-2 sm:py-0.5 rounded bg-gray-800 hover:bg-gray-700 active:bg-gray-600 disabled:opacity-40">resume</button>
           </Tip>
         )}
         {finished && (
           <Tip plain tip="Queue a new job with the same paths and options, re-analyzing every image locally: new detections, eye bands, metrics and tiers with the current thresholds. Existing vision-model tags are kept; only untagged images go to the model.">
             <button onClick={() => rerun.mutate({ rescan: true })} disabled={rerun.isPending}
-              className="text-xs px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-40">re-run</button>
+              className="text-xs px-2.5 py-1 sm:px-2 sm:py-0.5 rounded bg-gray-800 hover:bg-gray-700 active:bg-gray-600 disabled:opacity-40">re-run</button>
           </Tip>
         )}
         {rerun.isSuccess && <span className="text-xs text-emerald-300">queued #{rerun.data.id}</span>}

@@ -16,12 +16,12 @@ function Matrix({ rows, title, accuracy, tip }: { rows: TruthMatrixRow[]; title:
   return (
     <div className="rounded-lg border border-gray-800 bg-gray-900 p-3">
       <div className="text-xs uppercase tracking-wide text-gray-500 mb-1"><Tip tip={tip}>{title}</Tip> {accuracy !== null && <Tip tip="Share of photos with a truth tier where this source picked exactly the same tier (the diagonal). Rows are your tier, columns the prediction: above the diagonal is too generous, below is too strict." className="text-gray-300 normal-case">· agreement {Math.round(accuracy * 100)}%</Tip>}</div>
-      <table className="text-xs">
+      <div className="overflow-x-auto"><table className="text-xs">
         <thead><tr><th className="text-gray-600 font-normal pr-2 text-left">truth ↓ / predicted →</th>{[0, 1, 2].map((p) => <th key={p} className="px-3 text-gray-400">{p}</th>)}</tr></thead>
         <tbody>{[0, 1, 2].map((t) => (
           <tr key={t}><td className="pr-2 text-gray-400">{t}</td>{[0, 1, 2].map((p) => <td key={p} className={`px-3 text-center tabular-nums ${t === p ? 'text-emerald-300' : 'text-gray-300'}`}>{cell(t, p)}</td>)}</tr>
         ))}</tbody>
-      </table>
+      </table></div>
     </div>
   );
 }
@@ -43,15 +43,15 @@ function GroundTruth({ onApply, applying }: { onApply: (values: Record<string, n
   const sel = 'bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm';
   const s: TruthSummary | undefined = data;
   return (
-    <section className="space-y-3 rounded-lg border border-gray-800 p-4">
+    <section className="space-y-3 rounded-lg border border-gray-800 p-3 sm:p-4">
       <h2 className="font-semibold">Ground truth (your exported verdicts)</h2>
       <p className="text-sm text-gray-400 max-w-3xl">Export known-good metadata from Lightroom (select photos → Metadata → Save Metadata to File, or export the sidecars), then upload the <code>.xmp</code> files (or a <code>.zip</code>, or a <code>.csv</code> with <code>name,rating,label,focus_tier,keywords</code>). Files are matched to tracked images by filename. A focus tier is taken from a <code>focus:2</code>-style keyword or an explicit CSV column first, otherwise from the color label ({s?.mapping ? Object.entries(s.mapping.label_tiers).map(([k, v]) => `${k}→${v}`).join(', ') : '…'}), otherwise from the star rating ({s?.mapping ? Object.entries(s.mapping.rating_tiers).map(([k, v]) => `${k}★→${v ?? '–'}`).join(', ') : '…'}).</p>
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <input value={folder} onChange={(e) => setFolder(e.target.value)} placeholder="limit matching to photos subfolder (optional)" className={`${sel} w-80`} />
-        <input ref={fileRef} type="file" multiple accept=".xmp,.xml,.csv,.zip" className="text-xs" />
+        <input value={folder} onChange={(e) => setFolder(e.target.value)} placeholder="limit matching to photos subfolder (optional)" className={`${sel} w-full sm:w-80`} />
+        <input ref={fileRef} type="file" multiple accept=".xmp,.xml,.csv,.zip" className="text-xs max-w-full" />
         <button onClick={() => fileRef.current?.files?.length && upload.mutate(fileRef.current.files)} disabled={upload.isPending} className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40">upload</button>
         <span className="text-gray-600">or</span>
-        <input value={dir} onChange={(e) => setDir(e.target.value)} placeholder="folder on the photos or data volume" className={`${sel} w-72`} />
+        <input value={dir} onChange={(e) => setDir(e.target.value)} placeholder="folder on the photos or data volume" className={`${sel} w-full sm:w-72`} />
         <button onClick={() => imp.mutate()} disabled={!dir || imp.isPending} className="px-3 py-1 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-40">import from folder</button>
         {s && s.images_with_truth > 0 && <button onClick={() => clear.mutate()} className="ml-auto text-xs text-gray-500 hover:text-red-300">clear truth</button>}
       </div>
@@ -68,7 +68,7 @@ function GroundTruth({ onApply, applying }: { onApply: (values: Record<string, n
               <div className="text-gray-400">Suggested thresholds from your verdicts (each picked for balanced accuracy on its own; with eyes found, a shot must clear both eye-band metrics):</div>
               {(Object.entries(s.suggested) as [FocusMetric, NonNullable<TruthSummary['suggested'][FocusMetric]>][]).map(([m, sug]) => (
                 <div key={m} className="flex flex-wrap gap-3 pl-2">
-                  <span className="w-64 text-gray-300"><Tip tip={METRIC_TAB_TIP[m]}>{FOCUS_METRIC_LABEL[m]}</Tip> <Tip tip="Photos that have both this metric and a truth tier. Under about 30, treat the suggestion as rough." className="text-gray-500">(n={sug.n})</Tip></span>
+                  <span className="w-full sm:w-64 text-gray-300"><Tip tip={METRIC_TAB_TIP[m]}>{FOCUS_METRIC_LABEL[m]}</Tip> <Tip tip="Photos that have both this metric and a truth tier. Under about 30, treat the suggestion as rough." className="text-gray-500">(n={sug.n})</Tip></span>
                   {Object.entries(sug).filter(([k]) => k !== 'n').map(([k, v]) => typeof v === 'object' && (
                     <Tip key={k} plain tip={<>The cut on this metric that best separates your {k.includes('tier2') ? 'tier-2 photos from the rest' : 'tier-1-or-better photos from tier 0'}. Balanced accuracy is the average of the hit rate on each side, so a lopsided set can't inflate it. To be pickier than your own labels, round tier 2 up.</>}><span className="font-mono text-xs cursor-help">{k} ≥ <b>{v.value}</b> <span className="text-gray-500">({Math.round(v.balanced_accuracy * 100)}% balanced acc.)</span></span></Tip>
                   ))}
@@ -102,16 +102,16 @@ export default function Calibrate() {
       <GroundTruth onApply={(values) => save.mutate(values)} applying={save.isPending} />
       <h2 className="font-semibold">Local focus thresholds</h2>
       <p className="text-sm text-gray-400 max-w-3xl">Focus is judged on a band across both eyes when they can be located (face landmarks, else the pose model's eye keypoints). There the eye band must clear two thresholds: the contrast-normalized Laplacian and the FFT detail ratio, which drops faster for slight softness. When no eyes are found (helmet, visor, turned away), the head-box Laplacian is used. Crops below are the primary subject ordered softest to sharpest by the chosen metric. Find where "soft" becomes "usable" and "usable" becomes "crisp", enter those two numbers, and re-score. This only affects the <em>local</em> tier. Metrics added after an image was analyzed need a fresh local pass on it.</p>
-      <div className="flex gap-1 text-sm">
+      <div className="flex flex-wrap gap-1 text-sm">
         {(Object.keys(FOCUS_METRIC_LABEL) as FocusMetric[]).map((m) => (
           <Tip key={m} plain tip={METRIC_TAB_TIP[m]}><button onClick={() => setMetric(m)} className={`px-3 py-1 rounded ${m === metric ? 'bg-gray-700 text-white' : 'bg-gray-900 text-gray-400 hover:text-white'}`}>{FOCUS_METRIC_LABEL[m]}</button></Tip>
         ))}
       </div>
       {data?.percentiles && (
-        <Tip tip="Distribution of this metric over the primary subject of every analyzed photo. p50 is the median, and p90 means 90% of photos score at or below it. If the current tier-2 cut sits below p25, most photos pass it and the tier isn't picky." className="text-xs text-gray-400 font-mono">{data.count ?? 0} images · {Object.entries(data.percentiles).map(([k, v]) => `${k}=${v}`).join('  ')}</Tip>
+        <Tip tip="Distribution of this metric over the primary subject of every analyzed photo. p50 is the median, and p90 means 90% of photos score at or below it. If the current tier-2 cut sits below p25, most photos pass it and the tier isn't picky." className="text-xs text-gray-400 font-mono break-words">{data.count ?? 0} images · {Object.entries(data.percentiles).map(([k, v]) => `${k}=${v}`).join('  ')}</Tip>
       )}
       {k1 && (
-        <div className="flex items-center gap-3 text-sm">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
           <span className="text-gray-500">tier 1 ≥</span><input value={shown(k1)} onChange={(e) => setEdits({ ...edits, [k1]: e.target.value })} className={sel} />
           <span className="text-gray-500">tier 2 ≥</span><input value={shown(k2)} onChange={(e) => setEdits({ ...edits, [k2]: e.target.value })} className={sel} />
           <button onClick={() => save.mutate({ [k1]: Number(shown(k1)), [k2]: Number(shown(k2)) })} disabled={save.isPending} className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40">save + re-score</button>
@@ -120,7 +120,7 @@ export default function Calibrate() {
           {save.error && <span className="text-red-400">re-score failed: {String((save.error as Error).message ?? save.error)}</span>}
         </div>
       )}
-      <div className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(150px,1fr))]">
+      <div className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(110px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]">
         {data?.samples.map((s) => (
           <div key={s.id} className="rounded-lg overflow-hidden border border-gray-800 bg-gray-900">
             <img src={cropUrl(s.id)} alt="" loading="lazy" className="w-full aspect-square object-cover" />

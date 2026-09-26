@@ -63,10 +63,10 @@ function isLive(j: JobDetailT | undefined) {
 
 function Section({ title, tip, right, children }: { title: string; tip?: ReactNode; right?: ReactNode; children: ReactNode }) {
   return (
-    <section className="rounded-lg border border-gray-800 bg-gray-900 p-4">
-      <div className="flex items-center gap-3 mb-3">
+    <section className="rounded-lg border border-gray-800 bg-gray-900 p-3 sm:p-4">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-3">
         <h2 className="text-sm font-semibold text-gray-200">{tip ? <Tip tip={tip}>{title}</Tip> : title}</h2>
-        <div className="ml-auto flex items-center gap-2">{right}</div>
+        <div className="ml-auto flex flex-wrap items-center gap-2">{right}</div>
       </div>
       {children}
     </section>
@@ -221,7 +221,7 @@ function BarChart({ title, values, errs, label, unit }: { title: string; values:
     setHover(i >= 0 && i < n ? i : null);
   };
   return (
-    <div>
+    <div className="min-w-0">
       <div className="flex text-xs text-gray-400 mb-1">
         <span>{title}</span>
         <span className="ml-auto tabular-nums text-gray-300 h-4">{hover !== null ? label(hover) : ''}</span>
@@ -230,7 +230,7 @@ function BarChart({ title, values, errs, label, unit }: { title: string; values:
         <div className="flex flex-col justify-between text-[10px] text-gray-500 tabular-nums text-right w-8">
           <span>{max < 10 ? max.toFixed(1) : Math.round(max)}{unit}</span><span>0</span>
         </div>
-        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="flex-1 h-28" onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="flex-1 min-w-0 h-28" onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
           <line x1={0} x2={W} y1={H - 0.5} y2={H - 0.5} className="stroke-gray-700" strokeWidth={1} vectorEffect="non-scaling-stroke" />
           {values.map((v, i) => {
             const h = Math.max(1, (v / max) * (H - 4));
@@ -276,11 +276,11 @@ function Items({ jobId, live, backend, model, onOpen }: { jobId: number; live: b
               <tr className="border-b border-gray-800">
                 <th className="py-1 pr-2 font-normal" />
                 <th className="py-1 pr-2 font-normal">image</th>
-                <th className="py-1 pr-2 font-normal">stage</th>
-                <th className="py-1 pr-2 font-normal">finished</th>
+                <th className="py-1 pr-2 font-normal hidden sm:table-cell">stage</th>
+                <th className="py-1 pr-2 font-normal hidden sm:table-cell">finished</th>
                 <th className="py-1 pr-2 font-normal text-right">time</th>
-                <th className="py-1 pr-2 font-normal text-right">tokens in→out</th>
-                <th className="py-1 pr-2 font-normal text-right">tok/s</th>
+                <th className="py-1 pr-2 font-normal text-right hidden md:table-cell">tokens in→out</th>
+                <th className="py-1 pr-2 font-normal text-right hidden md:table-cell">tok/s</th>
                 <th className="py-1 font-normal">result</th>
               </tr>
             </thead>
@@ -309,15 +309,15 @@ function ItemRows({ it, open, backend, model, onToggle, onOpen }: {
 }) {
   return (
     <>
-      <tr onClick={onToggle} className={`border-b border-gray-800/60 cursor-pointer hover:bg-gray-800/40 ${open ? 'bg-gray-800/40' : ''}`}>
+      <tr onClick={onToggle} className={`border-b border-gray-800/60 cursor-pointer hover:bg-gray-800/40 active:bg-gray-800/60 ${open ? 'bg-gray-800/40' : ''}`}>
         <td className="py-1 pr-2 w-14"><img src={thumbUrl(it.image_id)} alt="" loading="lazy" className="w-12 h-8 object-cover rounded bg-gray-800" /></td>
-        <td className="py-1 pr-2 max-w-[16rem] truncate" title={it.rel ?? ''}>{it.name ?? `#${it.image_id}`}</td>
-        <td className="py-1 pr-2 text-gray-400">{it.stage === 'vlm' ? 'vision' : 'local'}</td>
-        <td className="py-1 pr-2 text-gray-400 tabular-nums">{fmtClock(it.finished)}</td>
+        <td className="py-1 pr-2 max-w-[9rem] sm:max-w-[16rem] truncate" title={it.rel ?? ''}>{it.name ?? `#${it.image_id}`}</td>
+        <td className="py-1 pr-2 text-gray-400 hidden sm:table-cell">{it.stage === 'vlm' ? 'vision' : 'local'}</td>
+        <td className="py-1 pr-2 text-gray-400 tabular-nums hidden sm:table-cell">{fmtClock(it.finished)}</td>
         <td className="py-1 pr-2 text-right tabular-nums">{fmtDur(it.seconds)}</td>
-        <td className="py-1 pr-2 text-right tabular-nums text-gray-400">{it.usage ? `${fmtNum(it.usage.in)}→${fmtNum(it.usage.out)}` : ''}</td>
-        <td className="py-1 pr-2 text-right tabular-nums text-gray-400">{it.usage?.tok_s ?? ''}</td>
-        <td className="py-1"><ItemResult it={it} /></td>
+        <td className="py-1 pr-2 text-right tabular-nums text-gray-400 hidden md:table-cell">{it.usage ? `${fmtNum(it.usage.in)}→${fmtNum(it.usage.out)}` : ''}</td>
+        <td className="py-1 pr-2 text-right tabular-nums text-gray-400 hidden md:table-cell">{it.usage?.tok_s ?? ''}</td>
+        <td className="py-1 max-w-[10rem] sm:max-w-none"><ItemResult it={it} /></td>
       </tr>
       {open && (
         <tr className="border-b border-gray-800">
@@ -364,8 +364,8 @@ function ItemIO({ it, backend, model, onOpen }: { it: JobItem; backend?: string;
   const { data: img } = useQuery({ queryKey: ['image', it.image_id], queryFn: () => api.image(it.image_id) });
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-3 text-xs">
-        <span className="text-gray-300 truncate">{it.rel}</span>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+        <span className="text-gray-300 truncate min-w-0">{it.rel}</span>
         <span className="text-gray-500 tabular-nums">started {fmtClock(it.started)} · {fmtDur(it.seconds)}</span>
         <button onClick={() => onOpen(it.image_id)} className="ml-auto px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700">open photo</button>
       </div>

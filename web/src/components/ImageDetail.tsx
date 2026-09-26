@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, cropUrl } from '../api/client';
 import { TierBadge, Stars, LrBadge } from './TierBadge';
@@ -13,7 +13,7 @@ import { METRIC_TIPS, TIER_MEANING, explainDisagree, explainFinal, explainLocal,
 
 function Row({ k, v, tip }: { k: string; v: React.ReactNode; tip?: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[110px_1fr] gap-2 text-sm py-0.5">
+    <div className="grid grid-cols-[88px_1fr] sm:grid-cols-[110px_1fr] gap-2 text-sm py-0.5">
       <span className="text-gray-500">{tip ? <Tip tip={tip}>{k}</Tip> : k}</span>
       <span className="text-gray-200 break-words">{v}</span>
     </div>
@@ -66,13 +66,29 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
   const l = data?.local;
   const p = l?.people?.[0];
   const heat = dbg.data?.heatmap;
+  // Horizontal swipe on a touch screen steps to the next/previous photo (vertical scrolling wins when ambiguous).
+  const swipe = useRef<{ x: number; y: number } | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    const scroller = (e.target as HTMLElement).closest('input, textarea, .overflow-x-auto');
+    swipe.current = e.touches.length === 1 && !scroller && !full ? { x: t.clientX, y: t.clientY } : null;
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const s0 = swipe.current, t = e.changedTouches[0];
+    swipe.current = null;
+    if (!s0 || !onNav) return;
+    const dx = t.clientX - s0.x, dy = t.clientY - s0.y;
+    if (Math.abs(dx) > 70 && Math.abs(dx) > 2 * Math.abs(dy)) onNav(dx < 0 ? 1 : -1);
+  };
   const layerBar = <LayerBar layers={layers} toggle={toggle} heat={heat} heatLoading={dbg.isFetching} />;
   return (
     <div className="fixed inset-0 z-50 flex" onKeyDown={(e) => { if (e.key === 'Escape') onClose(); if (e.key === 'ArrowRight') onNav?.(1); if (e.key === 'ArrowLeft') onNav?.(-1); }} tabIndex={-1}>
-      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
-      <div className="relative m-auto w-[min(1200px,96vw)] max-h-[94vh] overflow-auto overscroll-contain rounded-xl border border-gray-700 bg-gray-950 shadow-2xl">
-        <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-800 sticky top-0 z-10 bg-gray-950/95">
-          <span className="font-mono text-sm text-gray-300 truncate">{data?.rel ?? id}</span>
+      <div className="absolute inset-0 bg-black/70 animate-[fade-in_150ms_ease-out]" onClick={onClose} />
+      <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
+        className="relative sm:m-auto w-full h-[100dvh] sm:h-auto sm:w-[min(1200px,96vw)] sm:max-h-[94vh] overflow-auto overscroll-contain sm:rounded-xl sm:border border-gray-700 bg-gray-950 shadow-2xl animate-[sheet-in_180ms_ease-out]">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1 px-3 sm:px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:pt-2 border-b border-gray-800 sticky top-0 z-10 bg-gray-950/95 backdrop-blur">
+          <span className="font-mono text-sm text-gray-300 truncate min-w-0 flex-1 sm:flex-none">{data?.rel ?? id}</span>
+          <span className="order-last basis-full sm:basis-auto sm:order-none flex flex-wrap items-center gap-x-3 gap-y-1">
           {data && <Tip plain tip={explainFinal(data, cfg)}><TierBadge tier={data.focus_tier} /></Tip>}
           <Tip plain tip={<>Quality score (1–5) and keep/cull verdict: {data?.override?.quality_score != null || data?.override?.keeper != null ? 'your call.' : "the vision model's opinion of the whole photo (exposure, framing, moment), not just focus."}</>}>
             <span className="inline-flex items-center gap-2">
@@ -89,20 +105,21 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
               <span className="text-xs text-gray-300">truth: tier {data.truth_tier}{data.truth_rating ? ` · ${data.truth_rating}★` : ''}{data.truth_label ? ` · ${data.truth_label}` : ''}</span>
             </Tip>
           )}
-          <span className="ml-auto flex gap-2">
-            {onNav && <button onClick={() => onNav(-1)} className="px-2 text-gray-400 hover:text-white">←</button>}
-            {onNav && <button onClick={() => onNav(1)} className="px-2 text-gray-400 hover:text-white">→</button>}
-            <button onClick={onClose} className="px-2 text-gray-400 hover:text-white">✕</button>
+          </span>
+          <span className="sm:ml-auto flex gap-1 sm:gap-2">
+            {onNav && <button onClick={() => onNav(-1)} aria-label="Previous photo" className="px-3 py-1.5 sm:px-2 sm:py-0 rounded text-gray-400 hover:text-white active:bg-gray-800">←</button>}
+            {onNav && <button onClick={() => onNav(1)} aria-label="Next photo" className="px-3 py-1.5 sm:px-2 sm:py-0 rounded text-gray-400 hover:text-white active:bg-gray-800">→</button>}
+            <button onClick={onClose} aria-label="Close" className="px-3 py-1.5 sm:px-2 sm:py-0 rounded text-gray-400 hover:text-white active:bg-gray-800">✕</button>
           </span>
         </div>
-        <div className="grid md:grid-cols-[1fr_380px] gap-4 p-4">
+        <div className="grid md:grid-cols-[1fr_380px] gap-4 p-3 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="space-y-3">
             {l && layerBar}
             <FrameOverlay id={id} l={l} cfg={cfg} layers={layers} selected={person} onSelect={setPerson} heat={heat} onOpen={() => setFull(true)} />
             {full && l && <FrameViewer id={id} name={data?.rel ?? String(id)} l={l} cfg={cfg} layers={layers} selected={person} onSelect={setPerson} heat={heat} bar={layerBar} onClose={closeFull} onNav={onNav} />}
             {data?.has_crop && (
-              <div className="flex gap-3 items-start">
-                <img src={cropUrl(id)} alt="head crop" className="w-64 rounded-lg bg-gray-900" />
+              <div className="flex flex-col sm:flex-row gap-3 items-start">
+                <img src={cropUrl(id)} alt="head crop" className="w-full max-w-64 sm:w-64 shrink-0 rounded-lg bg-gray-900" />
                 <div className="text-xs text-gray-400 space-y-1">
                   <div>Native-resolution crop of the primary subject's head and upper body (what the model judges focus from). Hover any number for what it means.</div>
                   {p && l && (
@@ -173,27 +190,27 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
             )}
             <div className="rounded-lg border border-gray-800 p-3 space-y-2">
               <div className="text-xs uppercase tracking-wide text-gray-500"><Tip tip="Your overrides. They beat the local and model results in the grid, the filters, and every export (tree, CSV, XMP). Reset clears them. They aren't used as calibration truth; import your exported ratings for that.">Your call</Tip></div>
-              <div className="flex gap-1 text-xs items-center">
+              <div className="flex flex-wrap gap-1 text-xs items-center">
                 <span className="text-gray-500 w-14">focus</span>
                 {[0, 1, 2].map((t) => (
-                  <button key={t} onClick={() => ov.mutate({ focus_tier: t })} className={`px-2 py-1 rounded border ${data?.focus_tier === t ? 'border-blue-500 bg-blue-900/40' : 'border-gray-700 hover:border-gray-500'}`}>{t}</button>
+                  <button key={t} onClick={() => ov.mutate({ focus_tier: t })} className={`px-3 py-2 sm:px-2 sm:py-1 rounded border transition active:scale-95 ${data?.focus_tier === t ? 'border-blue-500 bg-blue-900/40' : 'border-gray-700 hover:border-gray-500'}`}>{t}</button>
                 ))}
               </div>
-              <div className="flex gap-1 text-xs items-center">
+              <div className="flex flex-wrap gap-1 text-xs items-center">
                 <span className="text-gray-500 w-14">score</span>
                 {[1, 2, 3, 4, 5].map((s) => (
-                  <button key={s} onClick={() => ov.mutate({ quality_score: s })} className={`px-2 py-1 rounded border ${data?.quality_score === s ? 'border-amber-500 bg-amber-900/30' : 'border-gray-700 hover:border-gray-500'}`}>{s}</button>
+                  <button key={s} onClick={() => ov.mutate({ quality_score: s })} className={`px-3 py-2 sm:px-2 sm:py-1 rounded border transition active:scale-95 ${data?.quality_score === s ? 'border-amber-500 bg-amber-900/30' : 'border-gray-700 hover:border-gray-500'}`}>{s}</button>
                 ))}
               </div>
-              <div className="flex gap-1 text-xs items-center">
+              <div className="flex flex-wrap gap-1 text-xs items-center">
                 <span className="text-gray-500 w-14">keep</span>
-                <button onClick={() => ov.mutate({ keeper: true })} className={`px-2 py-1 rounded border ${data?.keeper === true ? 'border-emerald-500 bg-emerald-900/30' : 'border-gray-700'}`}>keeper</button>
-                <button onClick={() => ov.mutate({ keeper: false })} className={`px-2 py-1 rounded border ${data?.keeper === false ? 'border-red-500 bg-red-900/30' : 'border-gray-700'}`}>cull</button>
+                <button onClick={() => ov.mutate({ keeper: true })} className={`px-3 py-2 sm:px-2 sm:py-1 rounded border transition active:scale-95 ${data?.keeper === true ? 'border-emerald-500 bg-emerald-900/30' : 'border-gray-700'}`}>keeper</button>
+                <button onClick={() => ov.mutate({ keeper: false })} className={`px-3 py-2 sm:px-2 sm:py-1 rounded border transition active:scale-95 ${data?.keeper === false ? 'border-red-500 bg-red-900/30' : 'border-gray-700'}`}>cull</button>
                 {data?.overridden && <button onClick={() => ov.mutate({ clear: true })} className="ml-auto text-gray-400 hover:text-white">reset</button>}
               </div>
               <div className="flex gap-1 text-xs">
-                <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={data?.override?.note ?? 'note'} className="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1" />
-                <button onClick={() => { ov.mutate({ note }); setNote(''); }} className="px-2 rounded border border-gray-700">save</button>
+                <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={data?.override?.note ?? 'note'} className="flex-1 min-w-0 bg-gray-900 border border-gray-700 rounded px-2 py-1.5 sm:py-1" />
+                <button onClick={() => { ov.mutate({ note }); setNote(''); }} className="px-3 sm:px-2 rounded border border-gray-700 active:bg-gray-800">save</button>
               </div>
             </div>
           </div>

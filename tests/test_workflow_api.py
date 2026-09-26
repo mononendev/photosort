@@ -83,6 +83,8 @@ def test_job_detail_and_items(api):
     v = d["stats"]["vlm"]
     assert (v["tokens_in"], v["tokens_out"], v["avg_in"], v["avg_prefill_s"]) == (3000, 600, 1000, 0.1)
     assert v["tok_s"] == 500.0 and d["active"] == [] and len(d["series"]) == 6
+    few = api.get(f"/api/jobs/{j['id']}/detail", params={"points": 2}).json()["series"]
+    assert [p["stage"] for p in few] == ["local", "local", "vlm", "vlm"]   # capped per stage, not overall
     items = api.get(f"/api/jobs/{j['id']}/items", params={"stage": "local"}).json()
     assert items["total"] == 3 and {i["local"]["local_tier"] for i in items["items"]} == {0, 2}
     vi = api.get(f"/api/jobs/{j['id']}/items", params={"stage": "vlm", "limit": 1}).json()

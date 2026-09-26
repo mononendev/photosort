@@ -11,11 +11,17 @@ import SegButton from '../components/SegButton';
 import ImageDetail from '../components/ImageDetail';
 import { TierBadge, Stars } from '../components/TierBadge';
 import Tip from '../components/Tip';
-import { errMsg, fmtClock, fmtDur, fmtK, fmtNum, fmtTime } from '../lib/format';
+import { errMsg, fmtClock, fmtDur, fmtFinishAt, fmtK, fmtNum, fmtTime } from '../lib/format';
 
 type StageName = 'scan' | 'local' | 'vlm';
 const STAGES: StageName[] = ['scan', 'local', 'vlm'];
 const STAGE_LABEL: Record<StageName, string> = { scan: 'Scan', local: 'Local stage', vlm: 'Vision model' };
+
+/** The stage the page shows until one is picked: the running one, else the last one the job reached. */
+function defaultStage(job: JobDetailT): StageName {
+  if (STAGES.includes(job.stage as StageName) && job.stages[job.stage as StageName]) return job.stage as StageName;
+  return [...STAGES].reverse().find((n) => job.stages[n]) ?? 'local';
+}
 
 export default function JobDetail() {
   const id = Number(useParams().id);
@@ -24,10 +30,12 @@ export default function JobDetail() {
     refetchInterval: (q) => (isLive(q.state.data) ? 1000 : q.state.data && isFinished(q.state.data) ? false : 5000),
   });
   const [open, setOpen] = useState<number | null>(null);
+  const [pick, setPick] = useState<StageName | null>(null);
   if (error) return <p className="text-sm text-red-400">{errMsg(error)}</p>;
   if (!job) return <p className="text-sm text-gray-500">Loading…</p>;
   const live = isLive(job);
   const vlmStage = job.stages.vlm;
+  const view = pick && job.stages[pick] ? pick : defaultStage(job);
 
   return (
     <div className="space-y-5">
@@ -37,11 +45,12 @@ export default function JobDetail() {
       </div>
       <JobRow job={job} />
 
-      <StageStrip job={job} />
-      <Kpis job={job} />
+      <StageStrip job={job} view={view} onPick={setPick} />
+      <Kpis job={job} stage={view} />
       {(live || job.active.length > 0) && <InFlight items={job.active} onOpen={setOpen} />}
-      <Charts job={job} />
-      <Items jobId={job.id} live={live} backend={vlmStage?.backend} model={vlmStage?.model} onOpen={setOpen} />
+      <Charts job={job} stage={view} onPick={setPick} />
+      <Items key={view} initialStage={view === 'scan' ? '' : view} jobId={job.id} live={live}
+        backend={vlmStage?.backend} model={vlmStage?.model} onOpen={setOpen} />
       <Inputs job={job} />
 
       {open !== null && <ImageDetail id={open} onClose={() => setOpen(null)} />}
@@ -63,7 +72,7 @@ function Section({ title, tip, right, children }: { title: string; tip?: ReactNo
 
 // ---- stage strip -----------------------------------------------------------------
 
-function StageStrip({ job }: { job: JobDetailT }) {
+function StageStrip({ job, view, onPick }: { job: JobDetailT; view: StageName; onPick: (s: StageName) => void }) {
   const now = job.now;
   if (!Object.keys(job.stages).length) {
     return <p className="text-xs text-gray-500">No stage timings recorded for this job (it ran before they were kept, or hasn't started).</p>;
@@ -74,15 +83,18 @@ function StageStrip({ job }: { job: JobDetailT }) {
         const st = job.stages[name];
         const current = job.stage === name && isLive(job);
         const dur = st ? (st.finished ?? (current ? now : undefined)) : undefined;
+        const on = st && view === name;
         return (
-          <div key={name} className={`rounded-lg border p-3 ${current ? 'border-blue-600 bg-blue-950/30' : 'border-gray-800 bg-gray-900'} ${st ? '' : 'opacity-50'}`}>
+          <button key={name} disabled={!st} onClick={() => onPick(name)} aria-pressed={on}
+            title={st ? `Show the ${STAGE_LABEL[name].toLowerCase()}'s details` : undefined}
+            className={`text-left rounded-lg border p-3 transition ${on ? 'border-blue-600 bg-blue-950/30' : 'border-gray-800 bg-gray-900'} ${st ? (on ? '' : 'hover:border-gray-600 active:scale-[0.99]') : 'opacity-50 cursor-default'}`}>
             <div className="flex items-center gap-2 text-sm">
               {current && <span className="inline-block w-2 h-2 rounded-full bg-blue-400 animate-pulse" />}
               <span className="font-medium">{STAGE_LABEL[name]}</span>
               <span className="ml-auto text-xs text-gray-400 tabular-nums">{st && dur ? fmtDur(dur - st.started) : st ? '' : name === 'vlm' && job.options.vlm === false ? 'off' : name === 'vlm' && job.state === 'done' ? 'nothing to tag' : 'not reached'}</span>
             </div>
             {st && <StageLine name={name} st={current ? { ...st, done: job.done } : st} />}
-          </div>
+          </button>
         );
       })}
     </div>
@@ -103,32 +115,63 @@ function StageLine({ name, st }: { name: StageName; st: JobStage }) {
 
 // ---- KPIs --------------------------------------------------------------------------
 
-function Kpis({ job }: { job: JobDetailT }) {
-  const stageName = (job.stage === 'local' || job.stage === 'vlm' ? job.stage : job.stats.vlm ? 'vlm' : 'local') as 'local' | 'vlm';
-  const s: StageStats | undefined = job.stats[stageName];
-  const v = job.stats.vlm;
+function Kpis({ job, stage }: { job: JobDetailT; stage: StageName }) {
+  const st = job.stages[stage];
   const live = isLive(job);
-  const rate = (live ? s?.recent_rate : null) ?? s?.rate ?? null;
-  const eta = live && rate ? (job.total - job.done) / rate : null;
-  const elapsed = job.started ? (job.finished ?? job.now) - job.started : null;
+  if (stage === 'scan') {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+        <StatTile compact label="Files found" value={fmtNum(st?.files)} sub="images under the job's paths" />
+        <StatTile compact label="Duration" value={st ? fmtDur((st.finished ?? job.now) - st.started) : '–'}
+          sub={st ? `${fmtClock(st.started)} → ${st.finished ? fmtClock(st.finished) : 'now'}` : undefined} />
+      </div>
+    );
+  }
+  const s: StageStats | undefined = job.stats[stage];
+  const current = live && job.stage === stage;
+  const done = current ? job.done : st?.done ?? s?.n ?? 0;
+  const total = current ? job.total : st?.total ?? done;
+  const rate = (current ? s?.recent_rate : null) ?? s?.rate ?? null;
+  const eta = current && rate ? (total - done) / rate : null;
+  const stageEnd = st?.finished ?? (current ? job.now : null);
+  const more = stage === 'local' && job.options.vlm !== false;
+  const progress = <StatTile compact label="Progress" value={total ? `${Math.round((done / total) * 100)}%` : '–'}
+    sub={`${fmtNum(done)}/${fmtNum(total)} · ${stage}`} />;
+  const timing = current ? (
+    <StatTile compact label="ETA" value={fmtDur(eta)}
+      sub={<>{more ? 'stage done' : 'done'} <span className="text-gray-300">{fmtFinishAt(eta)}</span>{st ? ` · elapsed ${fmtDur(job.now - st.started)}` : ''}</>}
+      tip={<>Remaining images in this stage divided by its recent rate (last 20 images), and the clock time that lands on in your timezone.{more ? ' The vision stage follows this one, so the job runs longer.' : ''}</>} />
+  ) : (
+    <StatTile compact label="Duration" value={st && stageEnd ? fmtDur(stageEnd - st.started) : '–'}
+      sub={st ? `${fmtClock(st.started)} → ${st.finished ? fmtClock(st.finished) : '–'}` : undefined} />
+  );
+  const throughput = <StatTile compact label="Images/min" value={rate ? (rate * 60).toFixed(1) : '–'}
+    sub={s ? `avg ${fmtDur(s.avg_s)}/image · p95 ${fmtDur(s.p95_s)}` : undefined}
+    tip={<>Throughput of the {stage} stage, over the last 20 images while it runs and the whole stage otherwise. Per-image time is wall time for one image; with several workers, images overlap.</>} />;
+  const errors = s?.errors ? <span className="text-red-400">{s.errors} errors</span> : null;
+
+  if (stage === 'local') {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+        {progress}{timing}{throughput}
+        <StatTile compact label="Per image" value={s ? fmtDur(s.p50_s) : '–'} sub={s ? `median · max ${fmtDur(s.max_s)}` : undefined}
+          tip="Wall time for one image: decode, person detection and the eye-region focus metrics." />
+        <StatTile compact label="Workers" value={st?.workers ?? '–'} sub={st?.device ? `on ${st.device}` : undefined} />
+        <StatTile compact label="Errors" value={fmtNum(s?.errors ?? 0)} sub={errors ?? 'none'} />
+      </div>
+    );
+  }
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-      <StatTile compact label="Progress" value={job.total ? `${Math.round((job.done / job.total) * 100)}%` : '–'}
-        sub={`${fmtNum(job.done)}/${fmtNum(job.total)} · ${stageName}`} />
-      <StatTile compact label={live ? 'ETA' : 'Elapsed'} value={live ? fmtDur(eta) : fmtDur(elapsed)}
-        sub={live ? `elapsed ${fmtDur(elapsed)}` : job.finished ? `finished ${fmtClock(job.finished)}` : undefined}
-        tip="Remaining images in the current stage divided by its recent rate (last 20 images). The vision stage can still follow the local one." />
-      <StatTile compact label="Images/min" value={rate ? (rate * 60).toFixed(1) : '–'}
-        sub={s ? `avg ${fmtDur(s.avg_s)}/image · p95 ${fmtDur(s.p95_s)}` : undefined}
-        tip={<>Throughput of the {stageName} stage, over the last 20 images while running and the whole stage otherwise. Per-image time is wall time for one image; with several workers, images overlap.</>} />
-      <StatTile compact label="Decode tok/s" value={v?.recent_tok_s ?? v?.tok_s ?? '–'}
-        sub={v?.tok_s ? `stage avg ${v.tok_s}` : 'vision stage only'}
-        tip="Output tokens per second of model decode time, as the model server reports it (Ollama eval_count / eval_duration). The big number is the last 10 images." />
-      <StatTile compact label="Tokens in / out" value={v ? `${fmtK(v.tokens_in)} / ${fmtK(v.tokens_out)}` : '–'}
-        sub={v?.avg_in ? `avg ${fmtNum(v.avg_in)} in · ${fmtNum(v.avg_out)} out` : undefined}
+      {progress}{timing}{throughput}
+      <StatTile compact label="Decode tok/s" value={(current ? s?.recent_tok_s : null) ?? s?.tok_s ?? '–'}
+        sub={s?.tok_s ? `stage avg ${s.tok_s}` : undefined}
+        tip="Output tokens per second of model decode time, as the model server reports it (Ollama eval_count / eval_duration). While running, the big number is the last 10 images." />
+      <StatTile compact label="Tokens in / out" value={s ? `${fmtK(s.tokens_in)} / ${fmtK(s.tokens_out)}` : '–'}
+        sub={s?.avg_in ? `avg ${fmtNum(s.avg_in)} in · ${fmtNum(s.avg_out)} out` : undefined}
         tip="Prompt (images + text) and generated tokens across every image the vision model finished in this job." />
-      <StatTile compact label="Prefill / decode" value={v?.avg_prefill_s != null ? `${v.avg_prefill_s}s / ${v.avg_decode_s}s` : '–'}
-        sub={job.errors ? <span className="text-red-400">{job.errors} errors</span> : 'per image, average'}
+      <StatTile compact label="Prefill / decode" value={s?.avg_prefill_s != null ? `${s.avg_prefill_s}s / ${s.avg_decode_s}s` : '–'}
+        sub={errors ?? 'per image, average'}
         tip="Average time the model spends reading the prompt (prefill: images and text) versus writing the JSON (decode), per image." />
     </div>
   );
@@ -162,16 +205,14 @@ function InFlight({ items, onOpen }: { items: ActiveItem[]; onOpen: (id: number)
 
 // ---- charts --------------------------------------------------------------------------
 
-function Charts({ job }: { job: JobDetailT }) {
+function Charts({ job, stage, onPick }: { job: JobDetailT; stage: StageName; onPick: (s: StageName) => void }) {
   const have = (['local', 'vlm'] as const).filter((st) => job.series.some((p) => p.stage === st));
-  const [pick, setPick] = useState<'local' | 'vlm' | null>(null);
-  if (!have.length) return null;
-  const stage = pick && have.includes(pick) ? pick : (job.stage === 'local' || job.stage === 'vlm') && have.includes(job.stage) ? job.stage : have[have.length - 1];
   const pts = job.series.filter((p) => p.stage === stage);
+  if (!pts.length) return null;
   const tok = pts.filter((p) => p.tok_s != null);
   return (
-    <Section title="Per-image timing" tip={`The last ${job.series.length} images this job finished, oldest on the left. Failed images are red.`}
-      right={have.length > 1 && have.map((st) => <SegButton key={st} on={st === stage} onClick={() => setPick(st)}>{st}</SegButton>)}>
+    <Section title="Per-image timing" tip={`The last ${pts.length} images the ${stage} stage finished, oldest on the left. Failed images are red.`}
+      right={have.length > 1 && have.map((st) => <SegButton key={st} on={st === stage} onClick={() => onPick(st)}>{st}</SegButton>)}>
       <div className={`grid gap-4 ${tok.length ? 'lg:grid-cols-2' : ''}`}>
         <BarChart title="Seconds per image" values={pts.map((p) => p.s)} errs={pts.map((p) => p.err)}
           label={(i) => `${fmtClock(pts[i].t)} · ${fmtDur(pts[i].s)}${pts[i].err ? ' · failed' : ''}`} unit="s" />
@@ -220,8 +261,10 @@ function BarChart({ title, values, errs, label, unit }: { title: string; values:
 
 // ---- items ------------------------------------------------------------------------------
 
-function Items({ jobId, live, backend, model, onOpen }: { jobId: number; live: boolean; backend?: string; model?: string; onOpen: (id: number) => void }) {
-  const [stage, setStage] = useState<string>('');
+function Items({ initialStage, jobId, live, backend, model, onOpen }: {
+  initialStage: string; jobId: number; live: boolean; backend?: string; model?: string; onOpen: (id: number) => void;
+}) {
+  const [stage, setStage] = useState<string>(initialStage);
   const [errors, setErrors] = useState(false);
   const [offset, setOffset] = useState(0);
   const [expanded, setExpanded] = useState<number | null>(null);

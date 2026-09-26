@@ -197,7 +197,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
             <div className="rounded-lg border border-gray-800 p-3 space-y-2">
               <div className="text-xs uppercase tracking-wide text-gray-500"><Tip tip="Your overrides. They beat the local and model results in the grid, the filters, and every export (tree, CSV, XMP). Reset clears them. They aren't used as calibration truth; import your exported ratings for that.">Your call</Tip></div>
               <div className="flex flex-wrap gap-1 text-xs items-center">
-                <span className="text-gray-500 w-14"><Tip tip="Your cull: 0 missed, 1 partial, 2 soft, 3 sharp set the focus tier; ★ marks a banger (sharp, and one of the best). Keys q w e r t. Rating marks the photo reviewed and moves to the next one.">rating</Tip></span>
+                <span className="text-gray-500 w-14"><Tip tip="Your cull: 0 missed, 1 soft, 2 slightly soft, 3 sharp set the focus tier; ★ marks a banger (sharp, and one of the best). Keys q w e r t. Rating marks the photo reviewed and moves to the next one.">rating</Tip></span>
                 {RATINGS.map((r) => (
                   <button key={r.value} onClick={() => rate(r.value)} title={`${r.label} (${r.key})`}
                     className={`px-3 py-2 sm:px-2 sm:py-1 rounded border transition active:scale-95 ${data?.rating === r.value ? r.cls : 'border-gray-700 hover:border-gray-500'}`}>

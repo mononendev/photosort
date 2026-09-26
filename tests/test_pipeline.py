@@ -185,8 +185,11 @@ def test_old_database_is_migrated_and_indexed(tmp_path):
     db = DB(p)
     assert db.row(1)["folder"] == "/p" and db.row(1)["lr_json"] is None
     idx = {r[0] for r in db.conn.execute("SELECT name FROM sqlite_master WHERE type='index'")}
-    assert {"idx_final_tier", "idx_tier_lr"} <= idx
-    from photosort.db import FINAL_TIER_SQL
+    assert {"idx_final_tier", "idx_tier_lr", "idx_final_tier_strict", "idx_tier_lr_local"} <= idx
+    from photosort.db import FINAL_TIER_SQL, final_tier_sql
     plan = db.conn.execute(f"EXPLAIN QUERY PLAN SELECT {FINAL_TIER_SQL} t, COUNT(*) FROM images "
                            "WHERE local_json IS NOT NULL GROUP BY t").fetchall()
-    assert "idx_final_tier" in str([tuple(r) for r in plan])
+    assert "USING INDEX idx_final_tier'" in str([tuple(r) for r in plan])
+    plan = db.conn.execute(f"EXPLAIN QUERY PLAN SELECT {final_tier_sql('strict')} t, COUNT(*) FROM images "
+                           "WHERE local_json IS NOT NULL GROUP BY t").fetchall()
+    assert "idx_final_tier_strict" in str([tuple(r) for r in plan])

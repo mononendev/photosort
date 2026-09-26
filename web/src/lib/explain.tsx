@@ -15,9 +15,9 @@ const focusSource = (cfg: Cfg): string => (cfg?.focus_source as string) ?? 'vlm'
 
 export const TIER_MEANING: Record<number, string> = {
   3: "sharp: the primary person's head (eyes, face, or helmet edges) is crisply in focus",
-  2: "soft: the primary person's head is nearly in focus but not crisp: slightly soft, just off the eyes, or slight motion blur",
-  1: 'partial: focus landed on part of the subject (torso, board, hands) or on someone other than the primary person',
-  0: 'miss: nobody in focus: no people, everyone blurry, or focus landed on the background or foreground',
+  2: "slightly soft: the primary person's head is nearly in focus but not crisp: just off the eyes, or slight motion blur",
+  1: "soft: the primary person's head is clearly soft but recognizable, from missed focus or motion blur",
+  0: "miss: the primary person's head is blurry: no people, or focus landed on the background, foreground, body or someone else",
 };
 
 const REASON_TEXT: Record<string, string> = {
@@ -26,11 +26,11 @@ const REASON_TEXT: Record<string, string> = {
   primary_eyes_sharp: "the primary subject's eye band cleared both tier-3 thresholds",
   primary_head_sharp: "no eyes were located, and the primary subject's head box cleared the tier-3 threshold",
   borderline_sharp_slow_shutter: 'it cleared tier 3, but only barely, at a shutter speed slow enough for motion blur, so it was demoted',
-  primary_eyes_soft: "the primary subject's eye band cleared tier 2 but not tier 3",
-  primary_soft: "the primary subject's head box cleared tier 2 but not tier 3 (no eyes located)",
-  primary_eyes_partial: "the primary subject's eye band cleared tier 1 but not tier 2",
-  primary_partial: "the primary subject's head box cleared tier 1 but not tier 2 (no eyes located)",
-  secondary_person_sharp: 'the primary subject is soft, but someone else in the frame is sharp',
+  primary_eyes_slightly_soft: "the primary subject's eye band cleared tier 2 but not tier 3",
+  primary_slightly_soft: "the primary subject's head box cleared tier 2 but not tier 3 (no eyes located)",
+  primary_eyes_soft: "the primary subject's eye band cleared tier 1 but not tier 2",
+  primary_soft: "the primary subject's head box cleared tier 1 but not tier 2 (no eyes located)",
+  secondary_person_sharp: 'the primary subject missed, though someone else in the frame is sharp',
   nothing_sharp: 'nobody cleared the tier-1 threshold',
 };
 
@@ -74,7 +74,7 @@ export function explainLocal(l: LocalResult, cfg: Cfg): ReactNode {
         <div className="text-gray-400">Tier 3 at a slow shutter must clear {margin}× the tier-3 thresholds; this one didn't, so it's soft (2).</div>
       )}
       {l.local_reason === 'secondary_person_sharp' && (
-        <div className="text-gray-400">Another person's own grade was tier 3, which lifts a missed frame to partial (1), because they aren't the main subject.</div>
+        <div className="text-gray-400">Another person graded tier 3, but the tier grades the primary subject, so the frame is still a miss.</div>
       )}
       <div className="text-gray-500">Thresholds are set on the Calibrate page. The primary subject is the largest, most central, most confident person.</div>
     </div>

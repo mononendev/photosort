@@ -9,7 +9,7 @@ from xml.sax.saxutils import escape
 
 from .db import jcol
 
-TIER_NAMES = {0: "focus_0_miss", 1: "focus_1_partial", 2: "focus_2_soft", 3: "focus_3_sharp"}
+TIER_NAMES = {0: "focus_0_miss", 1: "focus_1_soft", 2: "focus_2_slightly_soft", 3: "focus_3_sharp"}
 # Your cull rating from the UI: 0-3 are the focus tiers, 4 is a banger (sharp and a favorite; only you give it).
 # Exported as the matching color label. Lightroom's stock label set has no Orange; it shows as a custom label.
 BANGER = 4

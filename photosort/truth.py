@@ -17,7 +17,7 @@ from .config import DEFAULTS
 from .db import under_folder
 from .sidecar import rating_label
 
-TIERS = (0, 1, 2, 3)   # 0 miss, 1 partial, 2 soft, 3 sharp
+TIERS = (0, 1, 2, 3)   # 0 miss, 1 soft, 2 slightly soft, 3 sharp
 _SUBJECT = re.compile(r"<dc:subject>(.*?)</dc:subject>", re.S)
 _LI = re.compile(r"<rdf:li[^>]*>(.*?)</rdf:li>", re.S)
 _FOCUS_KW = re.compile(r"^(?:focus|tier)[:_ -]?([0-3])$", re.I)

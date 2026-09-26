@@ -54,7 +54,7 @@ def test_full_cli_flow(work, capsys, fake_backend):
     work("sort", work.wd / "out", "--link", "symlink", "--xmp", "outdir")
     out = capsys.readouterr().out
     assert "sorted 3 images" in out and "XMP: wrote 3" in out
-    link = work.wd / "out" / "focus_1_partial" / "rider_action" / "full_body" / "sharp.jpg"
+    link = work.wd / "out" / "focus_1_soft" / "rider_action" / "full_body" / "sharp.jpg"
     assert link.is_symlink() and link.resolve() == (work.photos / "sharp.jpg").resolve()
 
     work("status")

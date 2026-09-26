@@ -180,6 +180,18 @@ def test_stats_tiers_with_partial_overrides(api):
     assert api.get("/api/stats").json()["tiers"] == {"tier0": 0, "tier1": 2, "tier2": 0, "tier3": 1}
 
 
+def test_focus_source_drives_stats_filter_and_tiles(api):
+    api.run([""])   # local: sharp 3, soft 0, empty 0; the model says 1 for all three
+    tiers = lambda: {k: v for k, v in api.get("/api/stats").json()["tiers"].items() if v}
+    assert tiers() == {"tier1": 3}
+    api.put("/api/config", json={"values": {"focus_source": "strict"}})
+    assert tiers() == {"tier0": 2, "tier1": 1}
+    assert set(by_name(api, tier=1)) == {"sharp.jpg"} and set(by_name(api, tier=0)) == {"soft.jpg", "empty.jpg"}
+    assert {n: i["focus_tier"] for n, i in by_name(api).items()} == {"sharp.jpg": 1, "soft.jpg": 0, "empty.jpg": 0}
+    api.put("/api/config", json={"values": {"focus_source": "local"}})
+    assert tiers() == {"tier0": 2, "tier3": 1} and set(by_name(api, tier=3)) == {"sharp.jpg"}
+
+
 def test_config_and_rescore(api):
     api.run([""], vlm=False)
     assert api.get("/api/config").json()["focus"]["tier3_min"] == 0.03
@@ -224,7 +236,7 @@ def test_export(api):
     r = api.post("/api/export", json={"name": "../evil/cull"}).json()
     out = api.work / "exports" / "cull"
     assert r["out"] == str(out) and r["images"] == 3 and r["xmp_written"] == 3
-    assert r["tree"] == {"focus_3_sharp": 1, "focus_0_miss": 1, "focus_1_partial": 1, "review": 3, "bangers": 1}
+    assert r["tree"] == {"focus_3_sharp": 1, "focus_0_miss": 1, "focus_1_soft": 1, "review": 3, "bangers": 1}
     assert (out / "focus_3_sharp" / "rider_action" / "full_body" / "sharp.jpg").is_file()
     assert (out / "bangers" / "sharp.jpg").is_file() and (out / "review" / "local0_vlm1" / "soft.jpg").is_file()
     rows = {row["path"].rsplit("/", 1)[1]: row for row in csv.DictReader((out / "results.csv").open())}

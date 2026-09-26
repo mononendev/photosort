@@ -75,7 +75,7 @@ export const PersonInspector = memo(function PersonInspector({ l, cfg, grades, l
         <div className="space-y-2">
           <div className="text-xs text-gray-300">
             <span style={{ color: PERSON_COLORS[i % PERSON_COLORS.length] }}>Person #{i + 1}</span>
-            {i === 0 ? ' · primary subject (decides the tier)' : ' · secondary (a sharp one can only lift a missed primary to tier 1)'}
+            {i === 0 ? ' · primary subject (decides the tier)' : ' · secondary (doesn’t affect the tier)'}
           </div>
           <Tip tip={<>Who counts as the subject: the highest priority wins. Big, central and confidently detected people rank first. Numbers are for this person.</>}>
             <div className="font-mono text-[11px] text-gray-400 leading-5">

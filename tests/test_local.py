@@ -73,16 +73,16 @@ THR = {"tier3_min": 0.03, "tier2_min": 0.017, "tier1_min": 0.01,
 def test_local_tier_eye_band_needs_both_metrics():
     sharp = {"sharp_eye": 0.08, "hf_eye": 0.05, "sharp_head": 0.001}
     assert local.local_tier(sharp, [], THR) == (3, "primary_eyes_sharp")          # eyes beat a soft head box
-    assert local.local_tier({**sharp, "hf_eye": 0.02}, [], THR) == (2, "primary_eyes_soft")  # FFT vetoes
-    assert local.local_tier({**sharp, "hf_eye": 0.012}, [], THR) == (1, "primary_eyes_partial")
+    assert local.local_tier({**sharp, "hf_eye": 0.02}, [], THR) == (2, "primary_eyes_slightly_soft")  # FFT vetoes
+    assert local.local_tier({**sharp, "hf_eye": 0.012}, [], THR) == (1, "primary_eyes_soft")
     assert local.local_tier({**sharp, "sharp_eye": 0.01}, [], THR) == (0, "nothing_sharp")
     assert local.local_tier({**sharp, "hf_eye": 0.02}, [], {**THR, "use_hf": False})[0] == 3
     assert local.local_tier({**sharp, "hf_eye": None}, [], THR)[0] == 3           # band too small for FFT
     # no eyes found -> head box against the head thresholds; use_eyes off does the same
     assert local.local_tier({"sharp_eye": None, "sharp_head": 0.05}, [], THR) == (3, "primary_head_sharp")
     assert local.local_tier(sharp, [], {**THR, "use_eyes": False})[0] == 0
-    # a sharp secondary face makes it tier 1
-    assert local.local_tier({"sharp_eye": 0.001, "hf_eye": 0.001}, [sharp], THR) == (1, "secondary_person_sharp")
+    # a sharp secondary face doesn't rescue a missed primary; the reason says so
+    assert local.local_tier({"sharp_eye": 0.001, "hf_eye": 0.001}, [sharp], THR) == (0, "secondary_person_sharp")
 
 
 def test_local_tier_slow_shutter_demotes_borderline_eyes_only():
@@ -95,9 +95,9 @@ def test_local_tier_rules():
     thr = {"tier3_min": 0.03, "tier2_min": 0.017, "tier1_min": 0.01}
     assert local.local_tier(None, [], thr) == (0, "no_people")
     assert local.local_tier({"sharp_head": 0.05}, [], thr)[0] == 3
-    assert local.local_tier({"sharp_head": 0.02}, [], thr) == (2, "primary_soft")
-    assert local.local_tier({"sharp_head": 0.012}, [], thr) == (1, "primary_partial")
-    assert local.local_tier({"sharp_head": 0.002}, [{"sharp_head": 0.06}], thr) == (1, "secondary_person_sharp")
+    assert local.local_tier({"sharp_head": 0.02}, [], thr) == (2, "primary_slightly_soft")
+    assert local.local_tier({"sharp_head": 0.012}, [], thr) == (1, "primary_soft")
+    assert local.local_tier({"sharp_head": 0.002}, [{"sharp_head": 0.06}], thr) == (0, "secondary_person_sharp")
     assert local.local_tier({"sharp_head": 0.002}, [{"sharp_head": 0.02}], thr)[0] == 0   # a soft bystander doesn't count
     assert local.local_tier({"sharp_head": 0.002}, [], thr)[0] == 0
 

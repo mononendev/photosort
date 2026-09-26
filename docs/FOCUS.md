@@ -38,13 +38,13 @@ subject at native resolution, and falls back to the head when the eyes can't be 
      which is why the tier needs both metrics.
 6. **Tier** for the primary subject:
 
-   | Eyes found? | Tier N (3 sharp, 2 soft, 1 partial; else 0 miss) |
+   | Eyes found? | Tier N (3 sharp, 2 slightly soft, 1 soft; else 0 miss) |
    |---|---|
    | yes | Laplacian ≥ `eye_tierN_min` **and** FFT ≥ `hf_tierN_min` |
    | no | head Laplacian ≥ `tierN_min` |
 
-   If the primary subject is tier 0 but someone else in the frame grades tier 3, the frame is tier 1
-   (`secondary_person_sharp`). No people is tier 0 (`no_people`). The reason is stored with the tier and
+   The tier grades the primary subject only: if it misses while someone else in the frame grades tier 3,
+   the frame is still tier 0, with the reason `secondary_person_sharp`. No people is tier 0 (`no_people`). The reason is stored with the tier and
    shown in the UI.
 7. **EXIF prior.** Aperture, shutter, focal length and ISO are read from EXIF. An entrance pupil ≥ 40 mm
    or f/2 and wider flags very shallow depth of field; a shutter at least a stop slower than 1/focal-length
@@ -65,8 +65,8 @@ with "use all + re-score" to apply them. A `focus:3` keyword or explicit CSV col
 labels (Blue/Green 3, Yellow 2, Orange 1, Red 0), then stars (4-5 → 3, 3 → 2, 2 → 1, 1 → 0) are used.
 
 **By eye.** The Calibrate page (or `photosort calibrate --metric eye|hf|head`) shows primary subjects
-ordered softest to sharpest with their values. Pick the values where a miss becomes partial, partial
-becomes soft, and soft becomes sharp, enter them, and re-score.
+ordered softest to sharpest with their values. Pick the values where a miss becomes soft, soft
+becomes slightly soft, and slightly soft becomes sharp, enter them, and re-score.
 
 Re-scoring only re-applies thresholds to stored numbers, so it takes seconds. Leaning tier 3 slightly
 high is usually right: a false "sharp" costs more than a false "check this".

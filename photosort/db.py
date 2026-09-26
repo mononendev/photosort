@@ -60,17 +60,33 @@ def jcol(row, key: str, default=None):
     return json.loads(v) if v else default
 
 
-# The tier a photo ends up with (your override, else the model's, else the local stage's) and whether the two
-# stages disagree, as SQL over the images table. sort.final_record is the Python twin (it also knows focus_source).
-FINAL_TIER_SQL = ("COALESCE(json_extract(override_json,'$.focus_tier'), json_extract(vlm_json,'$.focus_tier'), "
-                  "json_extract(local_json,'$.local_tier'))")
+# The tier a photo ends up with, as SQL over the images table: your override, else the configured focus_source
+# (vlm: the model's, falling back to local until it has run; local: the local stage's; strict: the lower of the
+# two). sort.final_record is the Python twin; keep them in step.
+_OV, _VLM, _LOC = ("json_extract(override_json,'$.focus_tier')", "json_extract(vlm_json,'$.focus_tier')",
+                   "json_extract(local_json,'$.local_tier')")
+FOCUS_SOURCES = {
+    "vlm": f"COALESCE({_OV}, {_VLM}, {_LOC})",
+    "local": f"COALESCE({_OV}, {_LOC})",
+    "strict": f"COALESCE({_OV}, CASE WHEN {_VLM} IS NULL THEN {_LOC} WHEN {_LOC} IS NULL THEN {_VLM} "
+              f"ELSE MIN({_LOC}, {_VLM}) END)",
+}
+FINAL_TIER_SQL = FOCUS_SOURCES["vlm"]
+
+
+def final_tier_sql(source: str) -> str:
+    """FINAL_TIER_SQL for a focus_source; anything unknown reads as vlm, as in sort.final_record."""
+    return FOCUS_SOURCES.get(source, FINAL_TIER_SQL)
+
+
+# Whether the two stages disagree.
 REVIEW_SQL = ("local_json IS NOT NULL AND vlm_json IS NOT NULL AND "
               "json_extract(local_json,'$.local_tier') != json_extract(vlm_json,'$.focus_tier')")
 
 
 def _four_tiers(c: sqlite3.Connection):
-    """Focus went from three tiers (0 none, 1 partial, 2 sharp; rating 3 = banger) to four (0 miss, 1 partial,
-    2 soft, 3 sharp; rating 4 = banger). Old tiers keep their color: 2 -> 3 (green), 1 -> 2 (yellow), banger
+    """Focus went from three tiers (0 none, 1 partial, 2 sharp; rating 3 = banger) to four (0 miss, 1 soft,
+    2 slightly soft, 3 sharp; rating 4 = banger). Old tiers keep their color: 2 -> 3 (green), 1 -> 2 (yellow), banger
     3 -> 4 (blue); orange (1) is the new slot. `photosort rescore` then re-derives the local tiers properly."""
     up = "CASE json_extract({col},'{p}') WHEN 1 THEN 2 WHEN 2 THEN 3 WHEN 3 THEN 4 ELSE json_extract({col},'{p}') END"
     for col, path in (("local_json", "$.local_tier"), ("vlm_json", "$.focus_tier"), ("override_json", "$.focus_tier"),
@@ -108,9 +124,12 @@ class DB:
             c.execute("CREATE INDEX IF NOT EXISTS idx_folder ON images(folder)")
             # The dashboard groups by these expressions on every poll; indexed, SQLite reads the index instead of
             # parsing each row's JSON.
-            c.execute(f"CREATE INDEX IF NOT EXISTS idx_final_tier ON images({FINAL_TIER_SQL}) WHERE local_json IS NOT NULL")
-            c.execute(f"CREATE INDEX IF NOT EXISTS idx_tier_lr ON images({FINAL_TIER_SQL}, json_extract(lr_json,'$.rating')) "
-                      "WHERE local_json IS NOT NULL")
+            # One pair per focus_source, so switching it in the config stays fast.
+            for src, expr in FOCUS_SOURCES.items():
+                sfx = "" if src == "vlm" else f"_{src}"
+                c.execute(f"CREATE INDEX IF NOT EXISTS idx_final_tier{sfx} ON images({expr}) WHERE local_json IS NOT NULL")
+                c.execute(f"CREATE INDEX IF NOT EXISTS idx_tier_lr{sfx} ON images({expr}, json_extract(lr_json,'$.rating')) "
+                          "WHERE local_json IS NOT NULL")
             c.commit()
 
     @property

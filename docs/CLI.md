@@ -55,7 +55,7 @@ thumbnail. See [FOCUS.md](FOCUS.md) for what is measured.
 ### `calibrate`
 Prints percentiles of the chosen metric for every primary subject and writes
 `<workdir>/calibration_sheet.jpg`: head crops ordered softest to sharpest, each labeled with its value and
-tier. Find where a miss turns partial, partial turns soft, and soft turns sharp, put those three numbers in
+tier. Find where a miss turns soft, soft turns slightly soft, and slightly soft turns sharp, put those three numbers in
 `config.json`, and run `rescore`.
 
 | Flag | |

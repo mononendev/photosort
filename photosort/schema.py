@@ -7,7 +7,7 @@ PLACEMENTS = ["center", "left_third", "right_third", "top", "bottom", "edge", "n
 
 FIELDS = {
     "focus_tier": {"type": "integer", "enum": [0, 1, 2, 3],
-                   "description": "0 = missed, nobody in focus; 1 = partial, focus on the wrong part or person; 2 = soft, primary head nearly but not crisply in focus; 3 = sharp, primary person's head/eyes/helmet edges crisp"},
+                   "description": "0 = missed, primary person's head not in focus; 1 = soft, head clearly soft but recognizable; 2 = slightly soft, head nearly but not crisply in focus; 3 = sharp, primary person's head/eyes/helmet edges crisp"},
     "focus_notes": {"type": "string", "description": "What is and isn't sharp; where focus landed; motion blur vs missed focus. 1-2 sentences."},
     "primary_subject": {"type": "string", "enum": SUBJECTS},
     "people_count": {"type": "integer", "description": "Number of clearly visible people, 0 if none."},
@@ -51,10 +51,11 @@ For each photo you get:
 - Detector data: people count, primary subject size and position, and sharpness numbers measured on the original pixels (contrast-normalized; higher is sharper; head/torso/body for the primary person, plus the background). Use them as evidence, not as the answer; the crop is what you can see.
 
 Focus tiers:
-- 3 sharp: the primary person's head (eyes, face, or helmet edges) is crisply in focus.
-- 2 soft: the primary person's head is nearly in focus but not crisp: slightly soft, just in front of or behind the eyes, or slight motion blur with the face still clearly readable.
-- 1 partial: focus landed on part of the subject or on the wrong person: the torso, board or hands are sharp but the head is clearly blurry, or someone other than the primary person is sharp.
-- 0 miss: nobody in focus: no people, everyone blurry, or focus landed on the background or foreground.
+Grade the primary person's head (eyes, face, or helmet edges):
+- 3 sharp: crisply in focus.
+- 2 slightly soft: nearly in focus but not crisp: just in front of or behind the eyes, or slight motion blur; fine detail is a little mushy at 100%.
+- 1 soft: clearly soft: the face is recognizable but detail is gone, from missed focus or motion blur.
+- 0 miss: the head is blurry: no people, focus landed on the background, foreground, torso or board, or on someone else.
 Distinguish missed focus (whole subject soft while something else is crisp) from motion blur (directional smear) in focus_notes.
 
 Composition is the portion of the primary subject in frame. Placement is where the subject sits in the frame.

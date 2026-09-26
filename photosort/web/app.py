@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .. import __version__, config, images as I, schema, sort as sorter, truth
-from ..db import DB, FINAL_TIER_SQL, jcol, REVIEW_SQL, under_folder
+from ..db import DB, final_tier_sql, jcol, REVIEW_SQL, under_folder
 from ..pipeline import JobRunner
 
 
@@ -123,13 +123,14 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             "COUNT(*) FILTER (WHERE vlm_json IS NOT NULL) tagged, COUNT(*) FILTER (WHERE error IS NOT NULL) errors, "
             f"COUNT(*) FILTER (WHERE {REVIEW_SQL}) review, COUNT(*) FILTER (WHERE {KEEPER_SQL} = 1) keepers, "
             "COUNT(*) FILTER (WHERE json_extract(lr_json,'$.rating') > 0) lr_rated FROM images").fetchone()
+        tier_sql = final_tier_sql(cfg.get("focus_source", "vlm"))
         tiers = {f"tier{k}": 0 for k in (0, 1, 2, 3)}
-        for t in c.execute(f"SELECT {FINAL_TIER_SQL} t, COUNT(*) n FROM images WHERE local_json IS NOT NULL GROUP BY t"):
+        for t in c.execute(f"SELECT {tier_sql} t, COUNT(*) n FROM images WHERE local_json IS NOT NULL GROUP BY t"):
             if t["t"] is not None:
                 tiers[f"tier{int(t['t'])}"] += t["n"]
         return {**dict(r), "tiers": tiers,
                 "lr_by_tier": [dict(x) for x in c.execute(
-                    f"SELECT {FINAL_TIER_SQL} tier, json_extract(lr_json,'$.rating') rating, COUNT(*) n FROM images "
+                    f"SELECT {tier_sql} tier, json_extract(lr_json,'$.rating') rating, COUNT(*) n FROM images "
                     "WHERE local_json IS NOT NULL AND json_extract(lr_json,'$.rating') IS NOT NULL "
                     "GROUP BY tier, rating ORDER BY tier, rating")]}
 
@@ -313,7 +314,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         elif status == "error":
             where.append("error IS NOT NULL")
         if tier is not None:
-            where.append(f"{FINAL_TIER_SQL} = ?")
+            where.append(f"{final_tier_sql(cfg.get('focus_source', 'vlm'))} = ?")
             params.append(tier)
         if keeper is not None:
             where.append(f"{KEEPER_SQL} = ?"); params.append(int(keeper))
@@ -329,7 +330,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             where.append("json_extract(truth_json,'$.focus_tier') = ?"); params.append(truth_tier)
         if truth_mismatch:
             where.append("json_extract(truth_json,'$.focus_tier') IS NOT NULL AND local_json IS NOT NULL AND "
-                         f"json_extract(truth_json,'$.focus_tier') != {FINAL_TIER_SQL}")
+                         f"json_extract(truth_json,'$.focus_tier') != {final_tier_sql(cfg.get('focus_source', 'vlm'))}")
         if rating is not None:
             where.append("json_extract(override_json,'$.rating') = ?"); params.append(rating)
         if reviewed is not None:

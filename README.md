@@ -19,7 +19,7 @@ At f/1.4-f/2 focus varies across a body, so the question that matters most is "d
 
 - **Focus tiers from pixels, not vibes.** A pose model finds each person; the eye band of the primary
   subject is scored at native resolution with two sharpness metrics. Every frame lands in tier
-  **0** (missed), **1** (partial), **2** (soft), or **3** (sharp).
+  **0** (missed), **1** (soft), **2** (slightly soft), or **3** (sharp).
 - **Vision-model tagging.** Subject, composition, action, keywords, adjectives, a caption, editor-style
   remarks, a 1-5 score and a keeper flag, as schema-constrained JSON. Runs free on a local GPU with
   Ollama, or through the Gemini and Anthropic batch APIs.
@@ -56,8 +56,8 @@ flowchart LR
 2. **Vision model.** Gets the frame, the crop, the measured sharpness, and an EXIF summary, and returns
    structured JSON. The default is `qwen3-vl:4b-instruct` on Ollama, which fits an 8 GB card.
 3. **Review and export.** Browse results, override anything, then export. To cull, open a photo and rate it
-   with `q` `w` `e` `r` `t` (or the bar at the bottom on a phone): 0-3 are the focus tiers (missed, partial,
-   soft, sharp), and the fifth (blue ★) marks a banger, which only you can give. Rating marks the photo
+   with `q` `w` `e` `r` `t` (or the bar at the bottom on a phone): 0-3 are the focus tiers (missed, soft,
+   slightly soft, sharp), and the fifth (blue ★) marks a banger, which only you can give. Rating marks the photo
    reviewed and steps to the next one. Re-running jobs never changes a rating. Exports carry it as the color
    label (red, orange, yellow, green, blue; Lightroom has no stock orange, so it shows as a custom label), and
    bangers get their own `bangers/` folder in the tree.

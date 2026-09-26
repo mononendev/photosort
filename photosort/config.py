@@ -64,8 +64,8 @@ DEFAULTS: dict = {
     "eye_max_people": 4,         # eye bands for the N most prominent people
     # Local focus thresholds. When the eyes are found (face landmarks, else confident pose keypoints), the
     # eye band must clear both eye_* (contrast-normalized Laplacian) and hf_* (FFT upper-mid band energy
-    # ratio); otherwise the head box Laplacian is judged against tier*_min. Tiers: 3 sharp, 2 soft, 1 partial,
-    # 0 miss. The eye/hf values are placeholders: upload exported verdicts on the Calibrate page (or run
+    # ratio); otherwise the head box Laplacian is judged against tier*_min. Tiers: 3 sharp, 2 slightly soft,
+    # 1 soft, 0 miss. The eye/hf values are placeholders: upload exported verdicts on the Calibrate page (or run
     # `photosort calibrate`) to set them.
     "focus": {"tier3_min": 0.030, "tier2_min": 0.017, "tier1_min": 0.010,
               "eye_tier3_min": 0.060, "eye_tier2_min": 0.035, "eye_tier1_min": 0.020,
@@ -101,8 +101,8 @@ DEFAULTS: dict = {
 
 def _migrate_tiers(user: dict) -> bool:
     """Bring a config.json from the three-tier scale (0 none, 1 partial, 2 sharp) to the four-tier one (0 miss,
-    1 partial, 2 soft, 3 sharp). Old tier 2 becomes 3 and old tier 1 becomes 2, as in the database; each metric's
-    new soft cut starts at the geometric mean of its old sharp and partial cuts. Returns whether anything changed."""
+    1 soft, 2 slightly soft, 3 sharp). Old tier 2 becomes 3 and old tier 1 becomes 2, as in the database; each metric's
+    new tier-2 cut starts at the geometric mean of its old two cuts. Returns whether anything changed."""
     changed = False
     f = user.get("focus")
     if isinstance(f, dict):

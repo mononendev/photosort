@@ -286,8 +286,8 @@ export const fullUrl = (id: number) => `/media/full/${id}`;
  * Exported as these color labels. */
 export const RATINGS = [
   { value: 0, key: 'q', short: '0', label: 'missed', color: 'Red', hex: '#f87171', cls: 'bg-red-900/70 text-red-200 border-red-700', solid: 'bg-red-600 border-red-400' },
-  { value: 1, key: 'w', short: '1', label: 'partial', color: 'Orange', hex: '#fb923c', cls: 'bg-orange-900/70 text-orange-200 border-orange-700', solid: 'bg-orange-500 border-orange-300 text-gray-950' },
-  { value: 2, key: 'e', short: '2', label: 'soft', color: 'Yellow', hex: '#facc15', cls: 'bg-yellow-900/70 text-yellow-200 border-yellow-700', solid: 'bg-yellow-400 border-yellow-200 text-gray-950' },
+  { value: 1, key: 'w', short: '1', label: 'soft', color: 'Orange', hex: '#fb923c', cls: 'bg-orange-900/70 text-orange-200 border-orange-700', solid: 'bg-orange-500 border-orange-300 text-gray-950' },
+  { value: 2, key: 'e', short: '2', label: 'slightly soft', color: 'Yellow', hex: '#facc15', cls: 'bg-yellow-900/70 text-yellow-200 border-yellow-700', solid: 'bg-yellow-400 border-yellow-200 text-gray-950' },
   { value: 3, key: 'r', short: '3', label: 'sharp', color: 'Green', hex: '#34d399', cls: 'bg-emerald-900/70 text-emerald-200 border-emerald-700', solid: 'bg-emerald-600 border-emerald-400' },
   { value: 4, key: 't', short: '★', label: 'banger', color: 'Blue', hex: '#60a5fa', cls: 'bg-blue-900/70 text-blue-200 border-blue-600', solid: 'bg-blue-600 border-blue-400' },
 ] as const;

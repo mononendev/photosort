@@ -290,7 +290,7 @@ def _grade(p: dict, thr: dict, k: float = 1.0) -> Optional[int]:
 
 def local_tier(primary: Optional[dict], others: list[dict], thr: dict, prior: Optional[dict] = None,
                shake_margin: float = 1.5) -> tuple[int, str]:
-    """Tier from measured sharpness (3 sharp, 2 soft, 1 partial, 0 miss); the EXIF prior only demotes a
+    """Tier from measured sharpness (3 sharp, 2 slightly soft, 1 soft, 0 miss); the EXIF prior only demotes a
     *borderline* tier 3 shot at a slow shutter (a clearly sharp subject wins, e.g. a well-panned rider)."""
     if primary is None:
         return 0, "no_people"
@@ -302,12 +302,13 @@ def local_tier(primary: Optional[dict], others: list[dict], thr: dict, prior: Op
         if prior and prior.get("motion_risk") == "high" and _grade(primary, thr, shake_margin) < 3:
             return 2, "borderline_sharp_slow_shutter"
         return 3, "primary_eyes_sharp" if on_eyes else "primary_head_sharp"
-    if g == 2:  # the primary's own grade names the reason; a sharp bystander only rescues a missed primary
-        return 2, "primary_eyes_soft" if on_eyes else "primary_soft"
+    if g == 2:
+        return 2, "primary_eyes_slightly_soft" if on_eyes else "primary_slightly_soft"
     if g == 1:
-        return 1, "primary_eyes_partial" if on_eyes else "primary_partial"
+        return 1, "primary_eyes_soft" if on_eyes else "primary_soft"
+    # The tiers grade the primary subject, so a sharp bystander is still a miss; the reason keeps it findable.
     if any(_grade(o, thr) == 3 for o in others):
-        return 1, "secondary_person_sharp"
+        return 0, "secondary_person_sharp"
     return 0, "nothing_sharp"
 
 

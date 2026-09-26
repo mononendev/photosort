@@ -105,7 +105,7 @@ def cmd_calibrate(args):
     out = workdir / "calibration_sheet.jpg"
     sheet.save(out, quality=85)
     print(f"contact sheet (sharpness ascending, left-to-right, top-to-bottom): {out}")
-    print("Pick the sharpness values where a miss becomes partial, partial becomes soft, and soft becomes sharp,")
+    print("Pick the sharpness values where a miss becomes soft, soft becomes slightly soft, and slightly soft becomes sharp,")
     print(f"then set focus.{' / focus.'.join(reversed(keys))} in {workdir/'config.json'} and run `photosort rescore`.")
 
 

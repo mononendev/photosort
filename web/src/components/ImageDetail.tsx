@@ -56,7 +56,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
   });
   const save = ovm.mutate;   // stable across renders
   const ov = { mutate: (o: Parameters<typeof api.override>[1]) => save({ id, o }) };
-  // Culling: q/w/e/r (or the bottom bar on a phone) rate the photo, mark it reviewed, and move on to the next one.
+  // Culling: q/w/e/r/t (or the bottom bar on a phone) rate the photo, mark it reviewed, and move on to the next one.
   const rate = useCallback((r: number) => { save({ id, o: { rating: r } }); onNav?.(1); }, [save, id, onNav]);
   useHotkeys({
     Escape: onClose,
@@ -94,7 +94,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
           <span className="font-mono text-sm text-gray-300 truncate min-w-0 flex-1 sm:flex-none">{data?.rel ?? id}</span>
           <span className="order-last basis-full sm:basis-auto sm:order-none flex flex-wrap items-center gap-x-3 gap-y-1">
           {data && <Tip plain tip={explainFinal(data, cfg)}><TierBadge tier={data.focus_tier} /></Tip>}
-          {data?.reviewed && <Tip plain tip="You rated this photo (q/w/e/r). Re-running jobs never changes it; only another rating or reset does."><span className="inline-flex items-center gap-1 text-xs text-gray-300"><RatingBadge rating={data.rating} /> reviewed</span></Tip>}
+          {data?.reviewed && <Tip plain tip="You rated this photo (q/w/e/r/t). Re-running jobs never changes it; only another rating or reset does."><span className="inline-flex items-center gap-1 text-xs text-gray-300"><RatingBadge rating={data.rating} /> reviewed</span></Tip>}
           {ovm.isError && <span className="text-xs text-red-400">couldn't save: {String(ovm.error?.message ?? ovm.error)}</span>}
           <Tip plain tip={<>Quality score (1–5) and keep/cull verdict: {data?.override?.quality_score != null || data?.override?.keeper != null ? 'your call.' : "the vision model's opinion of the whole photo (exposure, framing, moment), not just focus."}</>}>
             <span className="inline-flex items-center gap-2">
@@ -107,7 +107,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
             <LrBadge rating={data?.lr_rating} label={data?.lr_label} />
           </Tip>
           {data?.truth_tier !== null && data?.truth_tier !== undefined && (
-            <Tip tip={<>Ground truth you imported on the Calibrate page. The tier comes from a focus:N keyword or CSV column first, then the color label, then the star rating (default: 4–5★ → 2, 2–3★ → 1, 1★ → 0). It's used to score both tiers and suggest thresholds.</>}>
+            <Tip tip={<>Ground truth you imported on the Calibrate page. The tier comes from a focus:N keyword or CSV column first, then the color label, then the star rating (default: 4–5★ → 3, 3★ → 2, 2★ → 1, 1★ → 0). It's used to score both tiers and suggest thresholds.</>}>
               <span className="text-xs text-gray-300">truth: tier {data.truth_tier}{data.truth_rating ? ` · ${data.truth_rating}★` : ''}{data.truth_label ? ` · ${data.truth_label}` : ''}</span>
             </Tip>
           )}
@@ -181,7 +181,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
             )}
             {l?.exif_prior?.summary && (
               <div className="text-xs text-gray-400">
-                <Tip tip="Read from the file's EXIF. The camera summary goes into the model's context. Motion risk can also demote a borderline local tier 2."><span className="text-gray-500">camera:</span></Tip> {l.exif_prior.summary}
+                <Tip tip="Read from the file's EXIF. The camera summary goes into the model's context. Motion risk can also demote a borderline local tier 3 to 2."><span className="text-gray-500">camera:</span></Tip> {l.exif_prior.summary}
                 {l.exif_prior.motion_risk === 'high' && <Tip plain tip={explainPrior(l.exif_prior, cfg).motion}><span className="ml-1 rounded bg-amber-900/60 px-1 text-amber-200 cursor-help">motion risk</span></Tip>}
                 {l.exif_prior.dof_risk === 'high' && <Tip plain tip={explainPrior(l.exif_prior, cfg).dof}><span className="ml-1 rounded bg-sky-900/60 px-1 text-sky-200 cursor-help">shallow DOF</span></Tip>}
               </div>
@@ -197,7 +197,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
             <div className="rounded-lg border border-gray-800 p-3 space-y-2">
               <div className="text-xs uppercase tracking-wide text-gray-500"><Tip tip="Your overrides. They beat the local and model results in the grid, the filters, and every export (tree, CSV, XMP). Reset clears them. They aren't used as calibration truth; import your exported ratings for that.">Your call</Tip></div>
               <div className="flex flex-wrap gap-1 text-xs items-center">
-                <span className="text-gray-500 w-14"><Tip tip="Your cull: 0–2 set the focus tier, ★ marks a banger (sharp, and one of the best). Keys q w e r. Rating marks the photo reviewed and moves to the next one.">rating</Tip></span>
+                <span className="text-gray-500 w-14"><Tip tip="Your cull: 0 missed, 1 partial, 2 soft, 3 sharp set the focus tier; ★ marks a banger (sharp, and one of the best). Keys q w e r t. Rating marks the photo reviewed and moves to the next one.">rating</Tip></span>
                 {RATINGS.map((r) => (
                   <button key={r.value} onClick={() => rate(r.value)} title={`${r.label} (${r.key})`}
                     className={`px-3 py-2 sm:px-2 sm:py-1 rounded border transition active:scale-95 ${data?.rating === r.value ? r.cls : 'border-gray-700 hover:border-gray-500'}`}>
@@ -224,7 +224,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
             </div>
           </div>
         </div>
-        <div className="sm:hidden sticky bottom-0 z-10 grid grid-cols-4 gap-2 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] border-t border-gray-800 bg-gray-950/95 backdrop-blur">
+        <div className="sm:hidden sticky bottom-0 z-10 grid grid-cols-5 gap-2 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] border-t border-gray-800 bg-gray-950/95 backdrop-blur">
           {RATINGS.map((r) => (
             <button key={r.value} onClick={() => rate(r.value)} aria-label={`Rate ${r.label}`}
               className={`h-12 rounded-lg border text-lg font-semibold transition active:scale-95 ${data?.rating === r.value ? `${r.solid} ring-2 ring-white/70` : r.cls}`}>

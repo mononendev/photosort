@@ -1,7 +1,7 @@
 """Shared fixtures for the workflow tests: a tiny synthetic shoot, a stub person detector and a stub vision model.
 
 The shoot is three frames plus a RAW twin and a sidecar:
-  photos/sharp.jpg        landscape, fine texture: the local stage scores it tier 2
+  photos/sharp.jpg        landscape, fine texture: the local stage scores it tier 3
   photos/sharp.xmp        a Lightroom sidecar (3 stars, Green)
   photos/soft.jpg         landscape, heavily blurred: tier 0
   photos/soft.CR2         RAW twin of soft.jpg, skipped by the default skip_raw_dupes

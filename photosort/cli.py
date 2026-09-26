@@ -50,7 +50,7 @@ def cmd_local(args):
 
 
 def _local_summary(db):
-    tiers = {f"tier{k}": 0 for k in (0, 1, 2)}
+    tiers = {f"tier{k}": 0 for k in (0, 1, 2, 3)}
     for r in db.conn.execute("SELECT json_extract(local_json,'$.local_tier') t, COUNT(*) n FROM images "
                              "WHERE local_json IS NOT NULL GROUP BY t"):
         tiers[f"tier{r['t']}"] = r["n"]
@@ -62,7 +62,7 @@ def cmd_calibrate(args):
     from PIL import Image, ImageDraw
     from .truth import METRICS
     workdir, cfg, db = _ctx(args)
-    path, k2, k1 = METRICS[args.metric]
+    path, *keys = METRICS[args.metric]
     rows = db.rows("local_json IS NOT NULL")
     vals = []
     for r in rows:
@@ -78,7 +78,7 @@ def cmd_calibrate(args):
     print(f"{len(vals)} images with a primary-subject {args.metric} value. Percentiles:")
     for q in (5, 10, 25, 50, 75, 90, 95):
         print(f"  p{q:<3d} {np.percentile(arr, q):.4f}")
-    print(f"current thresholds: {k2} = {cfg['focus'][k2]}, {k1} = {cfg['focus'][k1]}")
+    print("current thresholds:", ", ".join(f"{k} = {cfg['focus'][k]}" for k in keys))
     # contact sheet: N tiles evenly spaced across the sorted range
     n = min(args.tiles, len(vals))
     idx = np.linspace(0, len(vals) - 1, n).astype(int)
@@ -105,8 +105,8 @@ def cmd_calibrate(args):
     out = workdir / "calibration_sheet.jpg"
     sheet.save(out, quality=85)
     print(f"contact sheet (sharpness ascending, left-to-right, top-to-bottom): {out}")
-    print("Pick the sharpness values where 'soft' becomes 'acceptable' and 'acceptable' becomes 'crisp',")
-    print(f"then set focus.{k1} / focus.{k2} in {workdir/'config.json'} and run `photosort rescore`.")
+    print("Pick the sharpness values where a miss becomes partial, partial becomes soft, and soft becomes sharp,")
+    print(f"then set focus.{' / focus.'.join(reversed(keys))} in {workdir/'config.json'} and run `photosort rescore`.")
 
 
 def cmd_rescore(args):

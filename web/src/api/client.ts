@@ -21,7 +21,7 @@ export interface ImageSummary {
   quality_score?: number | null;
   keeper?: boolean | null;
   overridden?: boolean;
-  rating?: number | null;      // your cull: 0-2 focus tier, 3 banger (see RATINGS)
+  rating?: number | null;      // your cull: 0-3 focus tier, 4 banger (see RATINGS)
   reviewed?: boolean;
   people_count?: number | null;
   description?: string | null;
@@ -174,7 +174,7 @@ export interface JobOptions {
 
 export interface Stats {
   tracked: number; analyzed: number; tagged: number; errors: number; review: number; keepers: number;
-  tiers: { tier0: number; tier1: number; tier2: number };
+  tiers: { tier0: number; tier1: number; tier2: number; tier3: number };
   lr_rated?: number;
   lr_by_tier?: { tier: number | null; rating: number; n: number }[];
 }
@@ -185,7 +185,7 @@ export interface Health {
 }
 
 export interface Calibration {
-  metric: FocusMetric; keys: [string, string];  // [tier2 key, tier1 key] in config.focus
+  metric: FocusMetric; keys: [string, string, string];  // [tier3, tier2, tier1] keys in config.focus
   count?: number; percentiles: Record<string, number>; thresholds?: Record<string, number | boolean>;
   samples: { id: number; sharp: number; tier: number }[];
 }
@@ -282,19 +282,24 @@ export const cropUrl = (id: number) => `/media/crop/${id}`;
 /** The original at native resolution (rendered on first request, then cached). */
 export const fullUrl = (id: number) => `/media/full/${id}`;
 
-/** Your cull ratings, in key order (q w e r). 0-2 are the focus tiers; 3 is a banger. Exported as these LR color labels. */
+/** Your cull ratings, in key order (q w e r t). 0-3 are the focus tiers; 4 is a banger, which only you give.
+ * Exported as these color labels. */
 export const RATINGS = [
-  { value: 0, key: 'q', short: '0', label: 'nobody in focus', color: 'Red', hex: '#f87171', cls: 'bg-red-900/70 text-red-200 border-red-700', solid: 'bg-red-600 border-red-400' },
-  { value: 1, key: 'w', short: '1', label: 'partly in focus', color: 'Yellow', hex: '#fbbf24', cls: 'bg-amber-900/70 text-amber-200 border-amber-700', solid: 'bg-amber-500 border-amber-300 text-gray-950' },
-  { value: 2, key: 'e', short: '2', label: 'sharp', color: 'Green', hex: '#34d399', cls: 'bg-emerald-900/70 text-emerald-200 border-emerald-700', solid: 'bg-emerald-600 border-emerald-400' },
-  { value: 3, key: 'r', short: '★', label: 'banger', color: 'Blue', hex: '#60a5fa', cls: 'bg-blue-900/70 text-blue-200 border-blue-600', solid: 'bg-blue-600 border-blue-400' },
+  { value: 0, key: 'q', short: '0', label: 'missed', color: 'Red', hex: '#f87171', cls: 'bg-red-900/70 text-red-200 border-red-700', solid: 'bg-red-600 border-red-400' },
+  { value: 1, key: 'w', short: '1', label: 'partial', color: 'Orange', hex: '#fb923c', cls: 'bg-orange-900/70 text-orange-200 border-orange-700', solid: 'bg-orange-500 border-orange-300 text-gray-950' },
+  { value: 2, key: 'e', short: '2', label: 'soft', color: 'Yellow', hex: '#facc15', cls: 'bg-yellow-900/70 text-yellow-200 border-yellow-700', solid: 'bg-yellow-400 border-yellow-200 text-gray-950' },
+  { value: 3, key: 'r', short: '3', label: 'sharp', color: 'Green', hex: '#34d399', cls: 'bg-emerald-900/70 text-emerald-200 border-emerald-700', solid: 'bg-emerald-600 border-emerald-400' },
+  { value: 4, key: 't', short: '★', label: 'banger', color: 'Blue', hex: '#60a5fa', cls: 'bg-blue-900/70 text-blue-200 border-blue-600', solid: 'bg-blue-600 border-blue-400' },
 ] as const;
+export const BANGER = 4;
+/** The focus tiers, worst to best. */
+export const TIERS = [0, 1, 2, 3] as const;
 
-/** Focus tiers 0-2 share their label and colors with the matching cull rating. */
-export const TIER_LABEL: Record<number, string> = Object.fromEntries(RATINGS.slice(0, 3).map((r) => [r.value, r.label]));
-export const TIER_CLASS: Record<number, string> = Object.fromEntries(RATINGS.slice(0, 3).map((r) => [r.value, r.cls]));
+/** Focus tiers 0-3 share their label and colors with the matching cull rating. */
+export const TIER_LABEL: Record<number, string> = Object.fromEntries(RATINGS.slice(0, BANGER).map((r) => [r.value, r.label]));
+export const TIER_CLASS: Record<number, string> = Object.fromEntries(RATINGS.slice(0, BANGER).map((r) => [r.value, r.cls]));
 /** Text/stroke color per tier (or per-person grade), for SVG and inline styles; `none` when nothing was measurable. */
-export const TIER_COLOR: Record<string, string> = { ...Object.fromEntries(RATINGS.slice(0, 3).map((r) => [r.value, r.hex])), none: '#9ca3af' };
+export const TIER_COLOR: Record<string, string> = { ...Object.fromEntries(RATINGS.slice(0, BANGER).map((r) => [r.value, r.hex])), none: '#9ca3af' };
 
 /** A job a worker holds right now. */
 export const isLive = (j: Pick<Job, 'state'> | undefined) => !!j && (j.state === 'running' || j.state === 'cancelling');

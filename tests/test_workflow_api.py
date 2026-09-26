@@ -56,10 +56,10 @@ def test_process_everything(api):
     assert set(imgs) == {"sharp.jpg", "soft.jpg", "empty.jpg"}
     assert all(i["status"] == "tagged" for i in imgs.values())
     s, soft, e = imgs["sharp.jpg"], imgs["soft.jpg"], imgs["empty.jpg"]
-    assert (s["focus_tier_local"], soft["focus_tier_local"], e["focus_tier_local"]) == (2, 0, 0)
+    assert (s["focus_tier_local"], soft["focus_tier_local"], e["focus_tier_local"]) == (3, 0, 0)
     assert s["has_crop"] and not e["has_crop"]
     assert (s["lr_rating"], s["lr_label"]) == (3, "Green") and soft["lr_rating"] is None   # sidecar picked up
-    assert s["review"] and soft["review"]          # local 2/0 vs the model's 1
+    assert s["review"] and soft["review"]          # local 3/0 vs the model's 1
     assert s["folder"] == "" and e["folder"] == "day_2"
 
     for kind in ("thumb", "frame", "crop", "full"):
@@ -69,7 +69,7 @@ def test_process_everything(api):
 
     # the vision model saw the frame, the crop and the detector summary
     item = next(i for i in api.backend.items if i.key == str(s["id"]))
-    assert item.crop and "Local focus guess: tier 2" in item.context
+    assert item.crop and "Local focus guess: tier 3" in item.context
 
     t = api.get("/api/tree").json()
     assert t["dirs"][0]["tracked"] == 1 and t["dirs"][0]["vlm_done"] == 1
@@ -86,7 +86,7 @@ def test_job_detail_and_items(api):
     few = api.get(f"/api/jobs/{j['id']}/detail", params={"points": 2}).json()["series"]
     assert [p["stage"] for p in few] == ["local", "local", "vlm", "vlm"]   # capped per stage, not overall
     items = api.get(f"/api/jobs/{j['id']}/items", params={"stage": "local"}).json()
-    assert items["total"] == 3 and {i["local"]["local_tier"] for i in items["items"]} == {0, 2}
+    assert items["total"] == 3 and {i["local"]["local_tier"] for i in items["items"]} == {0, 3}
     vi = api.get(f"/api/jobs/{j['id']}/items", params={"stage": "vlm", "limit": 1}).json()
     assert vi["total"] == 3 and len(vi["items"]) == 1 and vi["items"][0]["vlm"]["primary_subject"] == "rider_action"
     assert [x["id"] for x in api.get("/api/jobs").json()] == [j["id"]]
@@ -156,7 +156,7 @@ def test_image_detail_and_vlm_request(api):
     api.run([""])
     s = by_name(api)["sharp.jpg"]
     d = api.get(f"/api/images/{s['id']}").json()
-    assert d["local"]["local_tier"] == 2 and d["vlm"]["focus_tier"] == 1 and d["usage"]["in"] == 1000
+    assert d["local"]["local_tier"] == 3 and d["vlm"]["focus_tier"] == 1 and d["usage"]["in"] == 1000
     assert d["final"]["focus_tier"] == 1 and d["override"] is None
     r = api.get(f"/api/images/{s['id']}/vlm-request").json()
     assert r["model"] == "fake-vl" and [i["label"] for i in r["images"]] == ["frame", "crop"]
@@ -168,24 +168,24 @@ def test_stats(api):
     api.run([""])
     st = api.get("/api/stats").json()
     assert (st["tracked"], st["analyzed"], st["tagged"], st["errors"], st["review"], st["keepers"]) == (3, 3, 3, 0, 3, 3)
-    assert st["tiers"] == {"tier0": 0, "tier1": 3, "tier2": 0}
+    assert st["tiers"] == {"tier0": 0, "tier1": 3, "tier2": 0, "tier3": 0}
     assert st["lr_rated"] == 1 and st["lr_by_tier"] == [{"tier": 1, "rating": 3, "n": 1}]
 
 
 def test_stats_tiers_with_partial_overrides(api):
     api.run([""])
     ids = {n: i["id"] for n, i in by_name(api).items()}
-    api.patch(f"/api/images/{ids['sharp.jpg']}", json={"rating": 3})
+    api.patch(f"/api/images/{ids['sharp.jpg']}", json={"rating": 4})
     api.patch(f"/api/images/{ids['soft.jpg']}", json={"note": "only a note"})
-    assert api.get("/api/stats").json()["tiers"] == {"tier0": 0, "tier1": 2, "tier2": 1}
+    assert api.get("/api/stats").json()["tiers"] == {"tier0": 0, "tier1": 2, "tier2": 0, "tier3": 1}
 
 
 def test_config_and_rescore(api):
     api.run([""], vlm=False)
-    assert api.get("/api/config").json()["focus"]["tier2_min"] == 0.03
-    cfg = api.put("/api/config", json={"values": {"focus": {"tier2_min": 1e9, "tier1_min": 1e9}}}).json()
-    assert cfg["focus"]["tier2_min"] == 1e9 and cfg["focus"]["tier1_min"] == 1e9 and cfg["focus"]["use_hf"] is True
-    assert json.loads((api.work / "config.json").read_text())["focus"]["tier2_min"] == 1e9
+    assert api.get("/api/config").json()["focus"]["tier3_min"] == 0.03
+    cfg = api.put("/api/config", json={"values": {"focus": {"tier3_min": 1e9, "tier2_min": 1e9, "tier1_min": 1e9}}}).json()
+    assert cfg["focus"]["tier3_min"] == 1e9 and cfg["focus"]["tier1_min"] == 1e9 and cfg["focus"]["use_hf"] is True
+    assert json.loads((api.work / "config.json").read_text())["focus"]["tier3_min"] == 1e9
     res = api.post("/api/rescore").json()
     assert res["changed"] == 1 and res["errors"] == 0
     assert by_name(api)["sharp.jpg"]["focus_tier"] == 0
@@ -194,7 +194,7 @@ def test_config_and_rescore(api):
 def test_calibration_and_ground_truth(api):
     api.run([""], vlm=False)
     cal = api.get("/api/calibration", params={"metric": "head"}).json()
-    assert cal["count"] == 2 and [s["tier"] for s in cal["samples"]] == [0, 2] and "p50" in cal["percentiles"]
+    assert cal["count"] == 2 and [s["tier"] for s in cal["samples"]] == [0, 3] and "p50" in cal["percentiles"]
     assert api.get("/api/calibration", params={"metric": "eye"}).json()["samples"] == []
     assert api.get("/api/calibration", params={"metric": "nope"}).status_code == 400
 
@@ -206,7 +206,7 @@ def test_calibration_and_ground_truth(api):
     assert (r["verdicts"], r["matched"], r["unmatched"]) == (4, 3, 1)
     s = r["summary"]
     assert s["images_with_truth"] == 3 and s["local"]["accuracy"] == 1.0 and s["vlm"]["accuracy"] is None
-    assert set(by_name(api, truth_tier=2)) == {"sharp.jpg"} and by_name(api, truth_mismatch=True) == {}
+    assert set(by_name(api, truth_tier=3)) == {"sharp.jpg"} and by_name(api, truth_mismatch=True) == {}
 
     (api.photos / "verdicts").mkdir()
     (api.photos / "verdicts" / "v.csv").write_text("name,focus_tier\nsoft.jpg,2\n")
@@ -219,16 +219,16 @@ def test_calibration_and_ground_truth(api):
 def test_export(api):
     api.run([""])
     ids = {n: i["id"] for n, i in by_name(api).items()}
-    api.patch(f"/api/images/{ids['sharp.jpg']}", json={"rating": 3})
+    api.patch(f"/api/images/{ids['sharp.jpg']}", json={"rating": 4})
     api.patch(f"/api/images/{ids['soft.jpg']}", json={"rating": 0})
     r = api.post("/api/export", json={"name": "../evil/cull"}).json()
     out = api.work / "exports" / "cull"
     assert r["out"] == str(out) and r["images"] == 3 and r["xmp_written"] == 3
-    assert r["tree"] == {"focus_2_sharp": 1, "focus_0_none": 1, "focus_1_partial": 1, "review": 3, "bangers": 1}
-    assert (out / "focus_2_sharp" / "rider_action" / "full_body" / "sharp.jpg").is_file()
+    assert r["tree"] == {"focus_3_sharp": 1, "focus_0_miss": 1, "focus_1_partial": 1, "review": 3, "bangers": 1}
+    assert (out / "focus_3_sharp" / "rider_action" / "full_body" / "sharp.jpg").is_file()
     assert (out / "bangers" / "sharp.jpg").is_file() and (out / "review" / "local0_vlm1" / "soft.jpg").is_file()
     rows = {row["path"].rsplit("/", 1)[1]: row for row in csv.DictReader((out / "results.csv").open())}
-    assert (rows["sharp.jpg"]["rating"], rows["sharp.jpg"]["focus_tier"], rows["soft.jpg"]["rating"]) == ("3", "2", "0")
+    assert (rows["sharp.jpg"]["rating"], rows["sharp.jpg"]["focus_tier"], rows["soft.jpg"]["rating"]) == ("4", "3", "0")
     assert len((out / "results.jsonl").read_text().splitlines()) == 3
     x = (out / "xmp" / "sharp.xmp").read_text()
     assert 'xmp:Label="Blue"' in x and "PhotoSort|Banger" in x and 'xmp:Rating="4"' in x

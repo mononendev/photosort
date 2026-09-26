@@ -19,7 +19,7 @@ At f/1.4-f/2 focus varies across a body, so the question that matters most is "d
 
 - **Focus tiers from pixels, not vibes.** A pose model finds each person; the eye band of the primary
   subject is scored at native resolution with two sharpness metrics. Every frame lands in tier
-  **0** (nobody in focus), **1** (partly), or **2** (sharp).
+  **0** (missed), **1** (partial), **2** (soft), or **3** (sharp).
 - **Vision-model tagging.** Subject, composition, action, keywords, adjectives, a caption, editor-style
   remarks, a 1-5 score and a keeper flag, as schema-constrained JSON. Runs free on a local GPU with
   Ollama, or through the Gemini and Anthropic batch APIs.
@@ -56,10 +56,11 @@ flowchart LR
 2. **Vision model.** Gets the frame, the crop, the measured sharpness, and an EXIF summary, and returns
    structured JSON. The default is `qwen3-vl:4b-instruct` on Ollama, which fits an 8 GB card.
 3. **Review and export.** Browse results, override anything, then export. To cull, open a photo and rate it
-   with `q` `w` `e` `r` (or the bar at the bottom on a phone): 0, 1 and 2 are the focus tiers, and the fourth
-   (blue ★) marks a banger. Rating marks the photo reviewed and steps to the next one. Re-running jobs never
-   changes a rating. Exports carry it as the Lightroom color label (red, yellow, green, blue), and bangers get
-   their own `bangers/` folder in the tree.
+   with `q` `w` `e` `r` `t` (or the bar at the bottom on a phone): 0-3 are the focus tiers (missed, partial,
+   soft, sharp), and the fifth (blue ★) marks a banger, which only you can give. Rating marks the photo
+   reviewed and steps to the next one. Re-running jobs never changes a rating. Exports carry it as the color
+   label (red, orange, yellow, green, blue; Lightroom has no stock orange, so it shows as a custom label), and
+   bangers get their own `bangers/` folder in the tree.
 
 The focus scoring, including how the thresholds work and why there are two metrics, is written up in
 [docs/FOCUS.md](docs/FOCUS.md).
@@ -168,9 +169,9 @@ for each are in [`photosort/config.py`](photosort/config.py). The ones you're mo
 
 | Key | Default | What it does |
 |---|---|---|
-| `focus.eye_tier2_min` / `eye_tier1_min` | 0.06 / 0.02 | Eye-band Laplacian thresholds for tier 2 / tier 1 |
-| `focus.hf_tier2_min` / `hf_tier1_min` | 0.03 / 0.01 | Eye-band FFT ratio thresholds (both metrics must pass) |
-| `focus.tier2_min` / `tier1_min` | 0.03 / 0.01 | Head-box thresholds when no eyes are found |
+| `focus.eye_tier3_min` / `eye_tier2_min` / `eye_tier1_min` | 0.06 / 0.035 / 0.02 | Eye-band Laplacian thresholds for tier 3 / 2 / 1 |
+| `focus.hf_tier3_min` / `hf_tier2_min` / `hf_tier1_min` | 0.03 / 0.017 / 0.01 | Eye-band FFT ratio thresholds (both metrics must pass) |
+| `focus.tier3_min` / `tier2_min` / `tier1_min` | 0.03 / 0.017 / 0.01 | Head-box thresholds when no eyes are found |
 | `backend` / `model` | `ollama` / backend default | Vision backend and model |
 | `exif.crop_factor` | 1.0 | Set to 1.5/1.6 for APS-C bodies without a 35 mm-equivalent tag |
 | `focus_source` | `vlm` | Which tier sorting uses: `vlm`, `local`, or `strict` (the lower of both) |

@@ -35,7 +35,7 @@ def test_full_cli_flow(work, capsys, fake_backend):
 
     work("local")
     out = capsys.readouterr().out
-    assert "done: 3 ok, 0 errors" in out and "local focus tiers: {'tier0': 2, 'tier1': 0, 'tier2': 1}" in out
+    assert "done: 3 ok, 0 errors" in out and "local focus tiers: {'tier0': 2, 'tier1': 0, 'tier2': 0, 'tier3': 1}" in out
     assert sorted(p.name for p in (work.wd / "cache").iterdir())[:3] == ["1.jpg", "1_crop.jpg", "1_thumb.jpg"]
     work("local")
     assert "nothing to do" in capsys.readouterr().out
@@ -65,12 +65,12 @@ def test_full_cli_flow(work, capsys, fake_backend):
 def test_rescore_after_threshold_change(work, capsys):
     work("scan", work.photos); work("local")
     cfg = json.loads((work.wd / "config.json").read_text())
-    cfg["focus"]["tier2_min"] = cfg["focus"]["tier1_min"] = 1e9
+    cfg["focus"]["tier3_min"] = cfg["focus"]["tier2_min"] = cfg["focus"]["tier1_min"] = 1e9
     (work.wd / "config.json").write_text(json.dumps(cfg))
     capsys.readouterr()
     work("rescore")
     out = capsys.readouterr().out
-    assert "rescored; 1 images changed tier" in out and "{'tier0': 3, 'tier1': 0, 'tier2': 0}" in out
+    assert "rescored; 1 images changed tier" in out and "{'tier0': 3, 'tier1': 0, 'tier2': 0, 'tier3': 0}" in out
 
 
 def test_submit_sample_and_skip_tier0(work, capsys, fake_backend):

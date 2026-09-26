@@ -38,19 +38,19 @@ subject at native resolution, and falls back to the head when the eyes can't be 
      which is why the tier needs both metrics.
 6. **Tier** for the primary subject:
 
-   | Eyes found? | Tier 2 | Tier 1 |
-   |---|---|---|
-   | yes | Laplacian ≥ `eye_tier2_min` **and** FFT ≥ `hf_tier2_min` | Laplacian ≥ `eye_tier1_min` **and** FFT ≥ `hf_tier1_min` |
-   | no | head Laplacian ≥ `tier2_min` | head Laplacian ≥ `tier1_min` |
+   | Eyes found? | Tier N (3 sharp, 2 soft, 1 partial; else 0 miss) |
+   |---|---|
+   | yes | Laplacian ≥ `eye_tierN_min` **and** FFT ≥ `hf_tierN_min` |
+   | no | head Laplacian ≥ `tierN_min` |
 
-   If the primary subject is tier 0 but someone else in the frame grades tier 2, the frame is tier 1
+   If the primary subject is tier 0 but someone else in the frame grades tier 3, the frame is tier 1
    (`secondary_person_sharp`). No people is tier 0 (`no_people`). The reason is stored with the tier and
    shown in the UI.
 7. **EXIF prior.** Aperture, shutter, focal length and ISO are read from EXIF. An entrance pupil ≥ 40 mm
    or f/2 and wider flags very shallow depth of field; a shutter at least a stop slower than 1/focal-length
-   (35 mm equivalent) or slower than 1/60 s flags motion-blur risk. A tier 2 that clears its thresholds by
-   less than 1.5× at a risky shutter speed is demoted to tier 1 (`borderline_sharp_slow_shutter`). A clearly
-   sharp subject, such as a well-panned rider, keeps tier 2.
+   (35 mm equivalent) or slower than 1/60 s flags motion-blur risk. A tier 3 that clears its thresholds by
+   less than 1.5× at a risky shutter speed is demoted to tier 2 (`borderline_sharp_slow_shutter`). A clearly
+   sharp subject, such as a well-panned rider, keeps tier 3.
 
 ## Calibrating
 
@@ -61,14 +61,14 @@ resolution).
 **From your own picks (best).** Rate or color-label a few hundred frames in Lightroom, save the metadata
 to XMP, and upload the sidecars (or a `.zip`, or a CSV with `name,rating,label,focus_tier`) on the
 Calibrate page. It matches them to tracked images by filename and suggests thresholds for each metric,
-with "use all + re-score" to apply them. A `focus:2` keyword or explicit CSV column wins; otherwise color
-labels (Green 2, Yellow 1, Red 0), then stars (4-5 → 2, 2-3 → 1, 1 → 0) are used.
+with "use all + re-score" to apply them. A `focus:3` keyword or explicit CSV column wins; otherwise color
+labels (Blue/Green 3, Yellow 2, Orange 1, Red 0), then stars (4-5 → 3, 3 → 2, 2 → 1, 1 → 0) are used.
 
 **By eye.** The Calibrate page (or `photosort calibrate --metric eye|hf|head`) shows primary subjects
-ordered softest to sharpest with their values. Pick the value where "soft" becomes "usable" and where
-"usable" becomes "crisp", enter them, and re-score.
+ordered softest to sharpest with their values. Pick the values where a miss becomes partial, partial
+becomes soft, and soft becomes sharp, enter them, and re-score.
 
-Re-scoring only re-applies thresholds to stored numbers, so it takes seconds. Leaning tier 2 slightly
+Re-scoring only re-applies thresholds to stored numbers, so it takes seconds. Leaning tier 3 slightly
 high is usually right: a false "sharp" costs more than a false "check this".
 
 ## Switches
@@ -79,9 +79,9 @@ high is usually right: a false "sharp" costs more than a false "check this".
 |---|---|---|
 | `use_eyes` | `true` | Judge on the eye band when eyes are found |
 | `use_hf` | `true` | Require the FFT ratio as well as the Laplacian on the eye band |
-| `eye_tier2_min`, `eye_tier1_min` | 0.06, 0.02 | Eye band Laplacian |
-| `hf_tier2_min`, `hf_tier1_min` | 0.03, 0.01 | Eye band FFT ratio |
-| `tier2_min`, `tier1_min` | 0.03, 0.01 | Head box Laplacian |
+| `eye_tier3_min`, `eye_tier2_min`, `eye_tier1_min` | 0.06, 0.035, 0.02 | Eye band Laplacian |
+| `hf_tier3_min`, `hf_tier2_min`, `hf_tier1_min` | 0.03, 0.017, 0.01 | Eye band FFT ratio |
+| `tier3_min`, `tier2_min`, `tier1_min` | 0.03, 0.017, 0.01 | Head box Laplacian |
 
 `exif`: `crop_factor` (for bodies that don't write a 35 mm-equivalent focal length), `wide_open_f`,
 `shake_margin`.

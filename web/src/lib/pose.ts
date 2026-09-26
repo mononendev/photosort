@@ -33,12 +33,12 @@ export const DEFAULT_LAYERS: Layer[] = ['af', 'people', 'skeleton', 'regions', '
 
 export type Grade = { grade: number | null; onEyes: boolean; checks: ReturnType<typeof gradeBasis>['checks'] };
 
-/** 2/1/0 for one person, as local.py's _grade decides it (null when nothing is measurable). */
+/** 3/2/1/0 for one person, as local.py's _grade decides it (null when nothing is measurable). */
 export function gradePerson(p: Person, cfg: Cfg): Grade {
   const { onEyes, checks } = gradeBasis(p, focusThr(cfg));
   if (checks.some((c) => c.value == null)) return { grade: null, onEyes, checks };
-  const ok = (lvl: 't1' | 't2') => checks.every((c) => (c.value as number) >= c[lvl]);
-  return { grade: ok('t2') ? 2 : ok('t1') ? 1 : 0, onEyes, checks };
+  const ok = (lvl: number) => checks.every((c) => (c.value as number) >= c.t[lvl - 1]);
+  return { grade: [3, 2, 1].find(ok) ?? 0, onEyes, checks };
 }
 
 export const boxW = (b: number[]) => b[2] - b[0];

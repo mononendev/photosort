@@ -1,8 +1,8 @@
 """Ground truth for calibration: the photographer's own verdicts, exported from Lightroom/Bridge as
 XMP sidecars (Save Metadata to File), a metadata XML, or a CSV. Matched to images by filename stem.
 
-A verdict is {"rating": 0-5|None, "label": str|None, "focus_tier": 0|1|2|None, "keywords": [...]} .
-focus_tier is taken from, in order: an explicit CSV column; a keyword like "focus2" / "focus:1" /
+A verdict is {"rating": 0-5|None, "label": str|None, "focus_tier": 0-3|None, "keywords": [...]} .
+focus_tier is taken from, in order: an explicit CSV column; a keyword like "focus3" / "focus:1" /
 "tier0"; the color label via cfg["truth"]["label_tiers"]; the star rating via cfg["truth"]["rating_tiers"].
 """
 from __future__ import annotations
@@ -17,9 +17,10 @@ from .config import DEFAULTS
 from .db import under_folder
 from .sidecar import rating_label
 
+TIERS = (0, 1, 2, 3)   # 0 miss, 1 partial, 2 soft, 3 sharp
 _SUBJECT = re.compile(r"<dc:subject>(.*?)</dc:subject>", re.S)
 _LI = re.compile(r"<rdf:li[^>]*>(.*?)</rdf:li>", re.S)
-_FOCUS_KW = re.compile(r"^(?:focus|tier)[:_ -]?([012])$", re.I)
+_FOCUS_KW = re.compile(r"^(?:focus|tier)[:_ -]?([0-3])$", re.I)
 
 
 def parse_xmp(text: str) -> dict:
@@ -44,7 +45,7 @@ def parse_csv(text: str) -> dict[str, dict]:
         out[stem] = {
             "rating": int(r["rating"]) if r.get("rating", "").lstrip("-").isdigit() else None,
             "label": r.get("label") or None,
-            "focus_tier": int(tier) if tier in ("0", "1", "2") else None,
+            "focus_tier": int(tier) if tier in ("0", "1", "2", "3") else None,
             "keywords": [k.strip() for k in (r.get("keywords") or "").replace(";", ",").split(",") if k.strip()],
         }
     return out
@@ -71,7 +72,7 @@ def load_dir(d: Path) -> dict[str, dict]:
 
 
 def resolve_tier(v: dict, cfg: dict) -> Optional[int]:
-    if v.get("focus_tier") in (0, 1, 2):
+    if v.get("focus_tier") in TIERS:
         return v["focus_tier"]
     for k in v.get("keywords") or []:
         m = _FOCUS_KW.match(k)
@@ -82,7 +83,7 @@ def resolve_tier(v: dict, cfg: dict) -> Optional[int]:
         return t["label_tiers"][v["label"]]
     if v.get("rating") is not None:
         r = t.get("rating_tiers", {}).get(str(v["rating"]))
-        return r if r in (0, 1, 2) else None
+        return r if r in TIERS else None
     return None
 
 
@@ -101,17 +102,18 @@ def apply(db, verdicts: dict[str, dict], cfg: dict, folder: Optional[str] = None
     return {"verdicts": len(verdicts), "matched": len(found), "unmatched": len(set(verdicts) - seen)}
 
 
-# Which stored per-image value each threshold pair calibrates: metric -> (local_json path, tier2 key, tier1 key)
+# Which stored per-image value each threshold set calibrates: metric -> (local_json path, tier3 key, tier2 key, tier1 key)
 METRICS = {
-    "head": ("$.primary_head_sharp", "tier2_min", "tier1_min"),
-    "eye": ("$.primary_eye_sharp", "eye_tier2_min", "eye_tier1_min"),
-    "hf": ("$.primary_eye_hf", "hf_tier2_min", "hf_tier1_min"),
+    "head": ("$.primary_head_sharp", "tier3_min", "tier2_min", "tier1_min"),
+    "eye": ("$.primary_eye_sharp", "eye_tier3_min", "eye_tier2_min", "eye_tier1_min"),
+    "hf": ("$.primary_eye_hf", "hf_tier3_min", "hf_tier2_min", "hf_tier1_min"),
 }
 
 
 def suggest_thresholds(pairs: list[tuple[float, int]]) -> dict:
-    """pairs of (metric value, truth_tier). Grid-search thresholds maximizing balanced accuracy for
-    tier2-vs-rest and tier0-vs-rest. Returns {} when there isn't enough of each class."""
+    """pairs of (metric value, truth_tier). Grid-search a cut per tier maximizing balanced accuracy for
+    tier-N-or-better vs the rest, keyed tier3_min/tier2_min/tier1_min. A tier without enough photos on
+    each side of it is left out."""
     import numpy as np
     if len(pairs) < 10:
         return {}
@@ -125,11 +127,4 @@ def suggest_thresholds(pairs: list[tuple[float, int]]) -> dict:
         i = int(np.argmax(scores))
         return {"value": round(float(cands[i]), 4), "balanced_accuracy": round(float(scores[i]), 3)}
 
-    t2 = best(y == 2)
-    t1 = best(y >= 1)
-    out = {}
-    if t2:
-        out["tier2_min"] = t2
-    if t1:
-        out["tier1_min"] = t1
-    return out
+    return {f"tier{t}_min": b for t in (3, 2, 1) if (b := best(y >= t))}

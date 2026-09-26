@@ -43,9 +43,9 @@ def test_prior_rules():
     assert exif.prior({"shutter_s": 1 / 80, "focal_mm": 50}, {"crop_factor": 1.6})["shake_stops"] == 0.0
 
 
-def test_slow_shutter_demotes_only_borderline_tier2():
-    thr = {"tier2_min": 0.03, "tier1_min": 0.01}
+def test_slow_shutter_demotes_only_borderline_tier3():
+    thr = {"tier3_min": 0.03, "tier2_min": 0.017, "tier1_min": 0.01}
     risky = {"motion_risk": "high"}
-    assert local.local_tier({"sharp_head": 0.035}, [], thr, risky) == (1, "borderline_sharp_slow_shutter")
-    assert local.local_tier({"sharp_head": 0.06}, [], thr, risky)[0] == 2      # clearly sharp (panned) wins
-    assert local.local_tier({"sharp_head": 0.035}, [], thr, {"motion_risk": "low"})[0] == 2
+    assert local.local_tier({"sharp_head": 0.035}, [], thr, risky) == (2, "borderline_sharp_slow_shutter")
+    assert local.local_tier({"sharp_head": 0.06}, [], thr, risky)[0] == 3      # clearly sharp (panned) wins
+    assert local.local_tier({"sharp_head": 0.035}, [], thr, {"motion_risk": "low"})[0] == 3

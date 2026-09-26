@@ -5,7 +5,7 @@ import Gauge from './Gauge';
 import Tip from './Tip';
 import { fmt } from '../lib/format';
 import { TIER_COLOR } from '../api/client';
-import { METRIC_TIPS, focusThr } from '../lib/explain';
+import { METRIC_TIPS, focusThr, tierCuts } from '../lib/explain';
 import type { Cfg } from '../lib/explain';
 import { PERSON_COLORS } from '../lib/pose';
 import type { Grade } from '../lib/pose';
@@ -75,7 +75,7 @@ export const PersonInspector = memo(function PersonInspector({ l, cfg, grades, l
         <div className="space-y-2">
           <div className="text-xs text-gray-300">
             <span style={{ color: PERSON_COLORS[i % PERSON_COLORS.length] }}>Person #{i + 1}</span>
-            {i === 0 ? ' · primary subject (decides the tier)' : ' · secondary (can only lift a missed primary to tier 1)'}
+            {i === 0 ? ' · primary subject (decides the tier)' : ' · secondary (a sharp one can only lift a missed primary to tier 1)'}
           </div>
           <Tip tip={<>Who counts as the subject: the highest priority wins. Big, central and confidently detected people rank first. Numbers are for this person.</>}>
             <div className="font-mono text-[11px] text-gray-400 leading-5">
@@ -94,10 +94,10 @@ export const PersonInspector = memo(function PersonInspector({ l, cfg, grades, l
         </div>
         <div className="space-y-2">
           {g.checks.map((c) => (
-            <Gauge key={c.label} label={c.label} value={c.value} t1={c.t1} t2={c.t2}
+            <Gauge key={c.label} label={c.label} value={c.value} thr={c.t}
               tip={c.label.includes('FFT') ? METRIC_TIPS.fft : c.label.includes('eye') ? METRIC_TIPS.eyes : METRIC_TIPS.head} />
           ))}
-          {g.onEyes && <Gauge label="head box Laplacian (not deciding)" value={p.sharp_head} t1={thr.tier1_min} t2={thr.tier2_min} tip={METRIC_TIPS.head} />}
+          {g.onEyes && <Gauge label="head box Laplacian (not deciding)" value={p.sharp_head} thr={tierCuts(thr, '')} tip={METRIC_TIPS.head} />}
           <Gauge label="regions compared" value={p.sharp_head} refs={others.slice(1)} note="(head)"
             tip={<>Head against torso, whole body and background on the same log axis. Torso or background well right of the head suggests focus landed behind or below the face.</>} />
         </div>

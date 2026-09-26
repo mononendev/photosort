@@ -65,19 +65,21 @@ def test_face_landmarks_find_eyes_in_head_box():
     assert 2800 < x1 < x2 < 3100 and 1450 < y1 < 1650 and 1450 < y2 < 1650 and score > 0.6
 
 
-THR = {"tier2_min": 0.03, "tier1_min": 0.01, "eye_tier2_min": 0.06, "eye_tier1_min": 0.02,
-       "hf_tier2_min": 0.03, "hf_tier1_min": 0.01}
+THR = {"tier3_min": 0.03, "tier2_min": 0.017, "tier1_min": 0.01,
+       "eye_tier3_min": 0.06, "eye_tier2_min": 0.035, "eye_tier1_min": 0.02,
+       "hf_tier3_min": 0.03, "hf_tier2_min": 0.017, "hf_tier1_min": 0.01}
 
 
 def test_local_tier_eye_band_needs_both_metrics():
     sharp = {"sharp_eye": 0.08, "hf_eye": 0.05, "sharp_head": 0.001}
-    assert local.local_tier(sharp, [], THR) == (2, "primary_eyes_sharp")          # eyes beat a soft head box
-    assert local.local_tier({**sharp, "hf_eye": 0.02}, [], THR) == (1, "primary_eyes_soft")  # FFT vetoes
+    assert local.local_tier(sharp, [], THR) == (3, "primary_eyes_sharp")          # eyes beat a soft head box
+    assert local.local_tier({**sharp, "hf_eye": 0.02}, [], THR) == (2, "primary_eyes_soft")  # FFT vetoes
+    assert local.local_tier({**sharp, "hf_eye": 0.012}, [], THR) == (1, "primary_eyes_partial")
     assert local.local_tier({**sharp, "sharp_eye": 0.01}, [], THR) == (0, "nothing_sharp")
-    assert local.local_tier({**sharp, "hf_eye": 0.02}, [], {**THR, "use_hf": False})[0] == 2
-    assert local.local_tier({**sharp, "hf_eye": None}, [], THR)[0] == 2           # band too small for FFT
+    assert local.local_tier({**sharp, "hf_eye": 0.02}, [], {**THR, "use_hf": False})[0] == 3
+    assert local.local_tier({**sharp, "hf_eye": None}, [], THR)[0] == 3           # band too small for FFT
     # no eyes found -> head box against the head thresholds; use_eyes off does the same
-    assert local.local_tier({"sharp_eye": None, "sharp_head": 0.05}, [], THR) == (2, "primary_head_sharp")
+    assert local.local_tier({"sharp_eye": None, "sharp_head": 0.05}, [], THR) == (3, "primary_head_sharp")
     assert local.local_tier(sharp, [], {**THR, "use_eyes": False})[0] == 0
     # a sharp secondary face makes it tier 1
     assert local.local_tier({"sharp_eye": 0.001, "hf_eye": 0.001}, [sharp], THR) == (1, "secondary_person_sharp")
@@ -85,16 +87,18 @@ def test_local_tier_eye_band_needs_both_metrics():
 
 def test_local_tier_slow_shutter_demotes_borderline_eyes_only():
     slow = {"motion_risk": "high"}
-    assert local.local_tier({"sharp_eye": 0.07, "hf_eye": 0.05}, [], THR, slow) == (1, "borderline_sharp_slow_shutter")
-    assert local.local_tier({"sharp_eye": 0.2, "hf_eye": 0.05}, [], THR, slow)[0] == 2
+    assert local.local_tier({"sharp_eye": 0.07, "hf_eye": 0.05}, [], THR, slow) == (2, "borderline_sharp_slow_shutter")
+    assert local.local_tier({"sharp_eye": 0.2, "hf_eye": 0.05}, [], THR, slow)[0] == 3
 
 
 def test_local_tier_rules():
-    thr = {"tier2_min": 0.03, "tier1_min": 0.01}
+    thr = {"tier3_min": 0.03, "tier2_min": 0.017, "tier1_min": 0.01}
     assert local.local_tier(None, [], thr) == (0, "no_people")
-    assert local.local_tier({"sharp_head": 0.05}, [], thr)[0] == 2
-    assert local.local_tier({"sharp_head": 0.02}, [], thr)[0] == 1
+    assert local.local_tier({"sharp_head": 0.05}, [], thr)[0] == 3
+    assert local.local_tier({"sharp_head": 0.02}, [], thr) == (2, "primary_soft")
+    assert local.local_tier({"sharp_head": 0.012}, [], thr) == (1, "primary_partial")
     assert local.local_tier({"sharp_head": 0.002}, [{"sharp_head": 0.06}], thr) == (1, "secondary_person_sharp")
+    assert local.local_tier({"sharp_head": 0.002}, [{"sharp_head": 0.02}], thr)[0] == 0   # a soft bystander doesn't count
     assert local.local_tier({"sharp_head": 0.002}, [], thr)[0] == 0
 
 
@@ -112,13 +116,13 @@ def test_final_record_and_xmp(tmp_path):
            "local_json": json.dumps({"local_tier": 2, "n_people": 1, "primary_head_sharp": 0.1, "primary_body_sharp": 0.1, "bg_sharp": 0.01, "local_reason": "primary_head_sharp"}),
            "vlm_json": json.dumps({"focus_tier": 1, "primary_subject": "rider_action", "composition": "full_body", "subject_placement": "center", "action": "carving",
                                    "people_count": 1, "keywords": ["onewheel"], "adjectives": ["dynamic"], "description": "d", "focus_notes": "f", "quality_remarks": "q", "quality_score": 4, "keeper": True}),
-           "override_json": json.dumps({"focus_tier": 2})}
+           "override_json": json.dumps({"focus_tier": 3})}
     rec = sort.final_record(row, "vlm")
-    assert rec["focus_tier"] == 2 and rec["review"] and rec["overridden"]
+    assert rec["focus_tier"] == 3 and rec["review"] and rec["overridden"]
     doc = sort.xmp_for(rec)
     import xml.dom.minidom
     assert xml.dom.minidom.parseString(doc)  # well-formed
-    assert "PhotoSort|Focus|focus_2_sharp" in doc and 'xmp:Rating="4"' in doc
+    assert "PhotoSort|Focus|focus_3_sharp" in doc and 'xmp:Rating="4"' in doc
 
 
 def test_debugviz_reproduces_stored_metrics():

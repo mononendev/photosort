@@ -64,15 +64,16 @@ DEFAULTS: dict = {
     "eye_max_people": 4,         # eye bands for the N most prominent people
     # Local focus thresholds. When the eyes are found (face landmarks, else confident pose keypoints), the
     # eye band must clear both eye_* (contrast-normalized Laplacian) and hf_* (FFT upper-mid band energy
-    # ratio); otherwise the head box Laplacian is judged against tier*_min. The eye/hf values are
-    # placeholders: upload exported verdicts on the Calibrate page (or run `photosort calibrate`) to set them.
-    "focus": {"tier2_min": 0.030, "tier1_min": 0.010,
-              "eye_tier2_min": 0.060, "eye_tier1_min": 0.020,
-              "hf_tier2_min": 0.030, "hf_tier1_min": 0.010,
+    # ratio); otherwise the head box Laplacian is judged against tier*_min. Tiers: 3 sharp, 2 soft, 1 partial,
+    # 0 miss. The eye/hf values are placeholders: upload exported verdicts on the Calibrate page (or run
+    # `photosort calibrate`) to set them.
+    "focus": {"tier3_min": 0.030, "tier2_min": 0.017, "tier1_min": 0.010,
+              "eye_tier3_min": 0.060, "eye_tier2_min": 0.035, "eye_tier1_min": 0.020,
+              "hf_tier3_min": 0.030, "hf_tier2_min": 0.017, "hf_tier1_min": 0.010,
               "use_eyes": True, "use_hf": True},
     # Camera-metadata prior: crop_factor converts focal length to 35mm-equivalent when EXIF lacks it;
-    # f-number <= wide_open_f or entrance pupil >= 40mm = "very shallow DOF"; a tier-2 sharpness below tier2_min*shake_margin is
-    # demoted to tier 1 when the shutter was slow enough that motion blur is likely.
+    # f-number <= wide_open_f or entrance pupil >= 40mm = "very shallow DOF"; a tier-3 sharpness below tier3_min*shake_margin is
+    # demoted to tier 2 when the shutter was slow enough that motion blur is likely.
     "exif": {"crop_factor": 1.0, "wide_open_f": 2.0, "action_shutter": 1 / 500, "shake_margin": 1.5},
     # Camera AF points (Canon maker notes): the person the active points land on becomes the primary subject,
     # whatever their size or sharpness, when their score (head hit 2, torso 1.5, body 1 per point) >= min_score.
@@ -91,11 +92,37 @@ DEFAULTS: dict = {
     "ollama_frame_long_edge": 1024,
     "ollama_schema_max_lengths": True,   # hard string caps in the grammar (safer, slower decode); False = rely on sampling  # the local model gets a smaller frame; the crop carries fine focus
     # Ground truth (calibration): how your exported verdicts map to focus tiers when no explicit tier is given
-    "truth": {"label_tiers": {"Blue": 2, "Green": 2, "Yellow": 1, "Red": 0},
-              "rating_tiers": {"5": 2, "4": 2, "3": 1, "2": 1, "1": 0, "0": None}},
+    "truth": {"label_tiers": {"Blue": 3, "Green": 3, "Yellow": 2, "Orange": 1, "Red": 0},
+              "rating_tiers": {"5": 3, "4": 3, "3": 2, "2": 1, "1": 0, "0": None}},
     # Sorting
     "focus_source": "vlm",       # vlm | local | strict (strict = min of both)
 }
+
+
+def _migrate_tiers(user: dict) -> bool:
+    """Bring a config.json from the three-tier scale (0 none, 1 partial, 2 sharp) to the four-tier one (0 miss,
+    1 partial, 2 soft, 3 sharp). Old tier 2 becomes 3 and old tier 1 becomes 2, as in the database; each metric's
+    new soft cut starts at the geometric mean of its old sharp and partial cuts. Returns whether anything changed."""
+    changed = False
+    f = user.get("focus")
+    if isinstance(f, dict):
+        for pre in ("", "eye_", "hf_"):
+            t2, t1 = f.get(f"{pre}tier2_min"), f.get(f"{pre}tier1_min")
+            if t2 is not None and f"{pre}tier3_min" not in f:
+                f[f"{pre}tier3_min"] = t2
+                f[f"{pre}tier2_min"] = round((t2 * t1) ** 0.5, 4) if t1 and t2 > 0 and t1 > 0 else t2
+                changed = True
+    t = user.get("truth")
+    if changed and isinstance(t, dict):
+        up = {1: 2, 2: 3}
+        for k in ("label_tiers", "rating_tiers"):
+            if isinstance(t.get(k), dict):
+                t[k] = {name: up.get(v, v) for name, v in t[k].items()}
+        if isinstance(t.get("label_tiers"), dict):
+            t["label_tiers"].setdefault("Orange", 1)
+        if t.get("rating_tiers") == {"5": 3, "4": 3, "3": 2, "2": 2, "1": 0, "0": None}:   # the old default
+            t["rating_tiers"] = dict(DEFAULTS["truth"]["rating_tiers"])
+    return changed
 
 
 def load(workdir: Path) -> dict:
@@ -103,6 +130,8 @@ def load(workdir: Path) -> dict:
     p = workdir / "config.json"
     if p.exists():
         user = json.loads(p.read_text())
+        if _migrate_tiers(user):
+            p.write_text(json.dumps(user, indent=2))
         for k, v in user.items():
             if isinstance(v, dict) and isinstance(cfg.get(k), dict):
                 cfg[k].update(v)

@@ -11,7 +11,7 @@ export function TierBadge({ tier, small }: { tier: number | null | undefined; sm
   );
 }
 
-/** Your cull rating (0-2 focus, ★ banger), only once you've reviewed the photo. */
+/** Your cull rating (0-3 focus, ★ banger), only once you've reviewed the photo. */
 export function RatingBadge({ rating }: { rating: number | null | undefined }) {
   const r = rating == null ? undefined : RATINGS[rating];
   if (!r) return null;
@@ -32,7 +32,7 @@ export function StatusDot({ status }: { status: string }) {
 
 export function LrBadge({ rating, label }: { rating?: number | null; label?: string | null }) {
   if (!rating && !label) return null;
-  const colors: Record<string, string> = { Red: 'bg-red-700', Yellow: 'bg-yellow-600', Green: 'bg-green-700', Blue: 'bg-blue-700', Purple: 'bg-purple-700' };
+  const colors: Record<string, string> = { Red: 'bg-red-700', Orange: 'bg-orange-600', Yellow: 'bg-yellow-600', Green: 'bg-green-700', Blue: 'bg-blue-700', Purple: 'bg-purple-700' };
   return (
     <span className="inline-flex items-center gap-1 text-[10px] text-gray-300" title="your Lightroom rating / label">
       <span className="rounded bg-gray-800 px-1">LR {rating ? '★'.repeat(rating) : '–'}</span>

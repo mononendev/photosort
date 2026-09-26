@@ -14,36 +14,43 @@ export const focusThr = (cfg: Cfg): Thr => (cfg?.focus as Thr) ?? {};
 const focusSource = (cfg: Cfg): string => (cfg?.focus_source as string) ?? 'vlm';
 
 export const TIER_MEANING: Record<number, string> = {
-  2: "the primary person's head (eyes, face, or helmet edges) is crisply in focus",
-  1: 'someone is somewhat in focus: slightly soft, focus on the torso or board instead of the head, one of several people sharp, or slight motion blur',
-  0: 'nobody in focus: no people, everyone blurry, or focus landed on the background or foreground',
+  3: "sharp: the primary person's head (eyes, face, or helmet edges) is crisply in focus",
+  2: "soft: the primary person's head is nearly in focus but not crisp: slightly soft, just off the eyes, or slight motion blur",
+  1: 'partial: focus landed on part of the subject (torso, board, hands) or on someone other than the primary person',
+  0: 'miss: nobody in focus: no people, everyone blurry, or focus landed on the background or foreground',
 };
 
 const REASON_TEXT: Record<string, string> = {
   no_people: 'the pose model found no person big enough to judge',
   subject_too_small: 'a person was found, but every region was too small to measure',
-  primary_eyes_sharp: "the primary subject's eye band cleared both tier-2 thresholds",
-  primary_head_sharp: "no eyes were located, and the primary subject's head box cleared the tier-2 threshold",
-  borderline_sharp_slow_shutter: 'it cleared tier 2, but only barely, at a shutter speed slow enough for motion blur, so it was demoted',
-  primary_eyes_soft: "the primary subject's eye band cleared tier 1 but not tier 2",
-  primary_soft: "the primary subject's head box cleared tier 1 but not tier 2 (no eyes located)",
+  primary_eyes_sharp: "the primary subject's eye band cleared both tier-3 thresholds",
+  primary_head_sharp: "no eyes were located, and the primary subject's head box cleared the tier-3 threshold",
+  borderline_sharp_slow_shutter: 'it cleared tier 3, but only barely, at a shutter speed slow enough for motion blur, so it was demoted',
+  primary_eyes_soft: "the primary subject's eye band cleared tier 2 but not tier 3",
+  primary_soft: "the primary subject's head box cleared tier 2 but not tier 3 (no eyes located)",
+  primary_eyes_partial: "the primary subject's eye band cleared tier 1 but not tier 2",
+  primary_partial: "the primary subject's head box cleared tier 1 but not tier 2 (no eyes located)",
   secondary_person_sharp: 'the primary subject is soft, but someone else in the frame is sharp',
   nothing_sharp: 'nobody cleared the tier-1 threshold',
 };
 
 
+/** One metric's tier-1, tier-2 and tier-3 cuts from config.focus; prefix is '', 'eye_' or 'hf_'. */
+export const tierCuts = (thr: Thr, prefix: string): [number, number, number] =>
+  [1, 2, 3].map((n) => thr[`${prefix}tier${n}_min`] as number) as [number, number, number];
+
 /** Which region and thresholds decide this person's grade, as local.py's _grade picks them. */
 export function gradeBasis(p: Person, thr: Thr): { onEyes: boolean; checks: Check[] } {
-  const onEyes = thr.use_eyes !== false && p.sharp_eye != null && 'eye_tier2_min' in thr;
+  const onEyes = thr.use_eyes !== false && p.sharp_eye != null && 'eye_tier3_min' in thr;
   if (onEyes) {
-    const checks: Check[] = [{ label: 'eye band Laplacian', value: p.sharp_eye, t2: thr.eye_tier2_min as number, t1: thr.eye_tier1_min as number }];
-    if (thr.use_hf !== false && p.hf_eye != null && 'hf_tier2_min' in thr) {
-      checks.push({ label: 'eye band FFT ratio', value: p.hf_eye, t2: thr.hf_tier2_min as number, t1: thr.hf_tier1_min as number });
+    const checks: Check[] = [{ label: 'eye band Laplacian', value: p.sharp_eye, t: tierCuts(thr, 'eye_') }];
+    if (thr.use_hf !== false && p.hf_eye != null && 'hf_tier3_min' in thr) {
+      checks.push({ label: 'eye band FFT ratio', value: p.hf_eye, t: tierCuts(thr, 'hf_') });
     }
     return { onEyes, checks };
   }
   const s = p.sharp_head ?? p.sharp_body;
-  return { onEyes, checks: [{ label: p.sharp_head != null ? 'head box Laplacian' : 'body box Laplacian', value: s, t2: thr.tier2_min as number, t1: thr.tier1_min as number }] };
+  return { onEyes, checks: [{ label: p.sharp_head != null ? 'head box Laplacian' : 'body box Laplacian', value: s, t: tierCuts(thr, '') }] };
 }
 
 /** Step-by-step reasoning for the local tier of one image. */
@@ -64,10 +71,10 @@ export function explainLocal(l: LocalResult, cfg: Cfg): ReactNode {
       </div>
       <CheckTable checks={checks} />
       {l.local_reason === 'borderline_sharp_slow_shutter' && (
-        <div className="text-gray-400">Tier 2 at a slow shutter must clear {margin}× the tier-2 thresholds; this one didn't.</div>
+        <div className="text-gray-400">Tier 3 at a slow shutter must clear {margin}× the tier-3 thresholds; this one didn't, so it's soft (2).</div>
       )}
       {l.local_reason === 'secondary_person_sharp' && (
-        <div className="text-gray-400">Another person's own grade was tier 2, which lifts the frame to tier 1 (not 2, because they aren't the main subject).</div>
+        <div className="text-gray-400">Another person's own grade was tier 3, which lifts a missed frame to partial (1), because they aren't the main subject.</div>
       )}
       <div className="text-gray-500">Thresholds are set on the Calibrate page. The primary subject is the largest, most central, most confident person.</div>
     </div>
@@ -135,7 +142,7 @@ export function explainPrior(pr: NonNullable<LocalResult['exif_prior']>, cfg: Cf
     ),
     motion: (
       <>Shutter is {pr.shake_stops != null ? `${pr.shake_stops > 0 ? '+' : ''}${pr.shake_stops} stops` : 'too slow'} relative to the 1/focal-length rule
-        (≥ +1 stop, or 1/60 s or slower, is high risk). A tier-2 subject here needs {String(ex.shake_margin ?? 1.5)}× the tier-2 thresholds, or it's demoted to tier 1.</>
+        (≥ +1 stop, or 1/60 s or slower, is high risk). A tier-3 subject here needs {String(ex.shake_margin ?? 1.5)}× the tier-3 thresholds, or it's demoted to tier 2.</>
     ),
   };
 }

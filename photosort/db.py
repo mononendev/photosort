@@ -68,6 +68,17 @@ REVIEW_SQL = ("local_json IS NOT NULL AND vlm_json IS NOT NULL AND "
               "json_extract(local_json,'$.local_tier') != json_extract(vlm_json,'$.focus_tier')")
 
 
+def _four_tiers(c: sqlite3.Connection):
+    """Focus went from three tiers (0 none, 1 partial, 2 sharp; rating 3 = banger) to four (0 miss, 1 partial,
+    2 soft, 3 sharp; rating 4 = banger). Old tiers keep their color: 2 -> 3 (green), 1 -> 2 (yellow), banger
+    3 -> 4 (blue); orange (1) is the new slot. `photosort rescore` then re-derives the local tiers properly."""
+    up = "CASE json_extract({col},'{p}') WHEN 1 THEN 2 WHEN 2 THEN 3 WHEN 3 THEN 4 ELSE json_extract({col},'{p}') END"
+    for col, path in (("local_json", "$.local_tier"), ("vlm_json", "$.focus_tier"), ("override_json", "$.focus_tier"),
+                      ("override_json", "$.rating"), ("truth_json", "$.focus_tier")):
+        c.execute(f"UPDATE images SET {col} = json_set({col}, '{path}', {up.format(col=col, p=path)}) "
+                  f"WHERE json_extract({col}, '{path}') IN (1, 2, 3)")
+
+
 def under_folder(folder: str, col: str = "folder") -> tuple[str, list]:
     """SQL for `col` being `folder` or anything below it. substr() rather than LIKE keeps '_' and '%' literal."""
     folder = folder.rstrip("/")
@@ -90,6 +101,9 @@ class DB:
                     c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
             for r in c.execute("SELECT id, path FROM images WHERE folder IS NULL").fetchall():
                 c.execute("UPDATE images SET folder=? WHERE id=?", (str(Path(r[1]).parent), r[0]))
+            if c.execute("PRAGMA user_version").fetchone()[0] < 1:
+                _four_tiers(c)
+                c.execute("PRAGMA user_version = 1")
             # After the migrations: they add the columns these index.
             c.execute("CREATE INDEX IF NOT EXISTS idx_folder ON images(folder)")
             # The dashboard groups by these expressions on every poll; indexed, SQLite reads the index instead of

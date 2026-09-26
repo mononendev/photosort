@@ -26,8 +26,8 @@ class JobIn(BaseModel):
 
 
 class OverrideIn(BaseModel):
-    rating: Optional[int] = Field(None, ge=0, le=3)   # your cull: 0-2 focus tier, 3 banger; marks the photo reviewed
-    focus_tier: Optional[int] = Field(None, ge=0, le=2)
+    rating: Optional[int] = Field(None, ge=0, le=4)   # your cull: 0-3 focus tier, 4 banger; marks the photo reviewed
+    focus_tier: Optional[int] = Field(None, ge=0, le=3)
     quality_score: Optional[int] = None
     keeper: Optional[bool] = None
     note: Optional[str] = None
@@ -123,7 +123,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             "COUNT(*) FILTER (WHERE vlm_json IS NOT NULL) tagged, COUNT(*) FILTER (WHERE error IS NOT NULL) errors, "
             f"COUNT(*) FILTER (WHERE {REVIEW_SQL}) review, COUNT(*) FILTER (WHERE {KEEPER_SQL} = 1) keepers, "
             "COUNT(*) FILTER (WHERE json_extract(lr_json,'$.rating') > 0) lr_rated FROM images").fetchone()
-        tiers = {f"tier{k}": 0 for k in (0, 1, 2)}
+        tiers = {f"tier{k}": 0 for k in (0, 1, 2, 3)}
         for t in c.execute(f"SELECT {FINAL_TIER_SQL} t, COUNT(*) n FROM images WHERE local_json IS NOT NULL GROUP BY t"):
             if t["t"] is not None:
                 tiers[f"tier{int(t['t'])}"] += t["n"]
@@ -415,7 +415,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             # reviewed. Only another rating or a reset changes it; jobs and rescans never write override_json.
             if o.rating is not None or o.focus_tier is not None:
                 cur["rating"] = o.rating if o.rating is not None else o.focus_tier
-                cur["focus_tier"] = min(cur["rating"], 2)
+                cur["focus_tier"] = min(cur["rating"], 3)
                 cur["reviewed"], cur["reviewed_at"] = True, time.time()
         db.set_override(img_id, cur or None)
         return get_image(img_id)
@@ -515,7 +515,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         """Confusion matrices and suggested thresholds from the images that carry a verdict (usually a few
         hundred), read in one pass instead of one scan of the whole table per matrix and metric."""
         c = db.conn
-        paths = {m: p for m, (p, _, _) in truth.METRICS.items()}
+        paths = {m: v[0] for m, v in truth.METRICS.items()}
         rows = c.execute(
             "SELECT json_extract(truth_json,'$.focus_tier') truth, json_extract(local_json,'$.local_tier') local, "
             "json_extract(vlm_json,'$.focus_tier') vlm, "
@@ -535,11 +535,11 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             return round(ok / tot, 3) if tot else None
         local_m, vlm_m = matrix("local"), matrix("vlm")
         suggested = {}
-        for m, (_, k2, k1) in truth.METRICS.items():
+        for m, (_, *keys) in truth.METRICS.items():
             pairs = [(r[m], int(r["truth"])) for r in with_tier if r[m] is not None]
             sug = truth.suggest_thresholds(pairs)
-            if sug:
-                suggested[m] = {"n": len(pairs), **{(k2 if k == "tier2_min" else k1): v for k, v in sug.items()}}
+            if sug:   # suggest_thresholds names the head keys; keys[i] is this metric's key for tier 3 - i
+                suggested[m] = {"n": len(pairs), **{keys[3 - int(k[4])]: v for k, v in sug.items()}}
         return {"images_with_truth": len(rows), "with_tier": len(with_tier), "local": {"matrix": local_m, "accuracy": acc(local_m)},
                 "vlm": {"matrix": vlm_m, "accuracy": acc(vlm_m)}, "suggested": suggested,
                 "mapping": cfg.get("truth")}

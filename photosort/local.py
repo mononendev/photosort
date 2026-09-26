@@ -267,14 +267,14 @@ def _person_regions(det: dict, scale: float, W: int, H: int) -> dict:
 
 
 def _grade(p: dict, thr: dict, k: float = 1.0) -> Optional[int]:
-    """2/1/0 for one person with every threshold multiplied by k, or None when nothing is measurable.
+    """3/2/1/0 for one person with every threshold multiplied by k, or None when nothing is measurable.
 
     With an eye band, both the Laplacian and the FFT ratio on it must clear their thresholds (the FFT
     check is skipped when use_hf is off or the band had no FFT value). Without one, the head box
     Laplacian is judged against the head thresholds, as before."""
-    if thr.get("use_eyes", True) and p.get("sharp_eye") is not None and "eye_tier2_min" in thr:
+    if thr.get("use_eyes", True) and p.get("sharp_eye") is not None and "eye_tier3_min" in thr:
         lap, hf = p["sharp_eye"], p.get("hf_eye")
-        use_hf = thr.get("use_hf", True) and hf is not None and "hf_tier2_min" in thr
+        use_hf = thr.get("use_hf", True) and hf is not None and "hf_tier3_min" in thr
 
         def ok(lvl):
             return lap >= k * thr[f"eye_tier{lvl}_min"] and (not use_hf or hf >= k * thr[f"hf_tier{lvl}_min"])
@@ -285,26 +285,28 @@ def _grade(p: dict, thr: dict, k: float = 1.0) -> Optional[int]:
 
         def ok(lvl):
             return s >= k * thr[f"tier{lvl}_min"]
-    return 2 if ok(2) else 1 if ok(1) else 0
+    return next((lvl for lvl in (3, 2, 1) if ok(lvl)), 0)
 
 
 def local_tier(primary: Optional[dict], others: list[dict], thr: dict, prior: Optional[dict] = None,
                shake_margin: float = 1.5) -> tuple[int, str]:
-    """Tier from measured sharpness; the EXIF prior only demotes a *borderline* tier 2 shot at a slow shutter
-    (a clearly sharp subject wins, e.g. a well-panned rider)."""
+    """Tier from measured sharpness (3 sharp, 2 soft, 1 partial, 0 miss); the EXIF prior only demotes a
+    *borderline* tier 3 shot at a slow shutter (a clearly sharp subject wins, e.g. a well-panned rider)."""
     if primary is None:
         return 0, "no_people"
     g = _grade(primary, thr)
     if g is None:
         return 0, "subject_too_small"
-    on_eyes = thr.get("use_eyes", True) and primary.get("sharp_eye") is not None and "eye_tier2_min" in thr
-    if g == 2:
-        if prior and prior.get("motion_risk") == "high" and _grade(primary, thr, shake_margin) < 2:
-            return 1, "borderline_sharp_slow_shutter"
-        return 2, "primary_eyes_sharp" if on_eyes else "primary_head_sharp"
-    if g == 1:  # the primary's own grade names the reason; a sharp bystander only rescues a missed primary
-        return 1, "primary_eyes_soft" if on_eyes else "primary_soft"
-    if any(_grade(o, thr) == 2 for o in others):
+    on_eyes = thr.get("use_eyes", True) and primary.get("sharp_eye") is not None and "eye_tier3_min" in thr
+    if g == 3:
+        if prior and prior.get("motion_risk") == "high" and _grade(primary, thr, shake_margin) < 3:
+            return 2, "borderline_sharp_slow_shutter"
+        return 3, "primary_eyes_sharp" if on_eyes else "primary_head_sharp"
+    if g == 2:  # the primary's own grade names the reason; a sharp bystander only rescues a missed primary
+        return 2, "primary_eyes_soft" if on_eyes else "primary_soft"
+    if g == 1:
+        return 1, "primary_eyes_partial" if on_eyes else "primary_partial"
+    if any(_grade(o, thr) == 3 for o in others):
         return 1, "secondary_person_sharp"
     return 0, "nothing_sharp"
 

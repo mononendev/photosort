@@ -4,19 +4,20 @@ import { fmt } from '../lib/format';
 import { TIER_COLOR } from '../api/client';
 
 /**
- * A metric on a log axis with its tier zones: red below the tier-1 threshold, amber between, green above tier 2.
- * Without thresholds it is a plain bar against `ref` values (other regions of the same person, for comparison).
+ * A metric on a log axis with its tier zones (red, orange, yellow, green), cut at the tier-1, tier-2 and tier-3
+ * thresholds in `thr`. Without thresholds it is a plain bar against `ref` values (other regions of the same
+ * person, for comparison).
  */
-export default function Gauge({ label, value, t1, t2, refs = [], tip, note }: {
-  label: string; value: number | null | undefined; t1?: number; t2?: number;
+export default function Gauge({ label, value, thr, refs = [], tip, note }: {
+  label: string; value: number | null | undefined; thr?: [number, number, number];
   refs?: { label: string; value: number | null | undefined }[]; tip?: ReactNode; note?: ReactNode;
 }) {
-  const known = [value, t1, t2, ...refs.map((r) => r.value)].filter((v): v is number => v != null && v > 0);
+  const known = [value, ...(thr ?? []), ...refs.map((r) => r.value)].filter((v): v is number => v != null && v > 0);
   const lo = Math.log10(Math.min(...known, 1e-3) / 2.5);
   const hi = Math.log10(Math.max(...known, 1e-3) * 2.5);
   const x = (v: number) => `${Math.max(0, Math.min(100, ((Math.log10(Math.max(v, 1e-9)) - lo) / (hi - lo)) * 100))}%`;
-  const hasThr = t1 != null && t2 != null;
-  const color = value == null || !hasThr ? '#e5e7eb' : TIER_COLOR[value >= t2 ? 2 : value >= t1 ? 1 : 0];
+  const hasThr = !!thr && thr.every((t) => t != null);
+  const color = value == null || !hasThr ? '#e5e7eb' : TIER_COLOR[[3, 2, 1].find((n) => value >= thr[n - 1]) ?? 0];
   // Axis labels that would overprint go on separate rows. Labels are centred on their mark, 9px mono ≈ 5.5px/char.
   const bar = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(300);
@@ -29,7 +30,7 @@ export default function Gauge({ label, value, t1, t2, refs = [], tip, note }: {
   }, []);
   const halfW = (label: string) => label.length * 2.75 + 4;
   const rowEnds: number[] = [];
-  const marks = hasThr ? [{ label: `t1 ${fmt(t1)}`, value: t1 }, { label: `t2 ${fmt(t2)}`, value: t2 }] : refs;
+  const marks = hasThr ? thr.map((t, k) => ({ label: `t${k + 1} ${fmt(t)}`, value: t })) : refs;
   const axisLabels = marks.filter((r): r is { label: string; value: number } => r.value != null)
     .sort((a, b) => a.value - b.value)
     .map((r) => {
@@ -47,9 +48,10 @@ export default function Gauge({ label, value, t1, t2, refs = [], tip, note }: {
       </div>
       <div ref={bar} className="relative h-3 mt-0.5 rounded bg-gray-800 overflow-hidden">
         {hasThr && <>
-          <div className="absolute inset-y-0 left-0 bg-red-900/60" style={{ width: x(t1) }} />
-          <div className="absolute inset-y-0 bg-amber-900/60" style={{ left: x(t1), width: `calc(${x(t2)} - ${x(t1)})` }} />
-          <div className="absolute inset-y-0 right-0 bg-emerald-900/60" style={{ left: x(t2) }} />
+          <div className="absolute inset-y-0 left-0 bg-red-900/60" style={{ width: x(thr[0]) }} />
+          <div className="absolute inset-y-0 bg-orange-900/60" style={{ left: x(thr[0]), width: `calc(${x(thr[1])} - ${x(thr[0])})` }} />
+          <div className="absolute inset-y-0 bg-yellow-900/60" style={{ left: x(thr[1]), width: `calc(${x(thr[2])} - ${x(thr[1])})` }} />
+          <div className="absolute inset-y-0 right-0 bg-emerald-900/60" style={{ left: x(thr[2]) }} />
         </>}
         {refs.map((r) => r.value != null && (
           <div key={r.label} title={`${r.label} ${fmt(r.value)}`} className="absolute inset-y-0 w-px bg-gray-400/70" style={{ left: x(r.value) }} />

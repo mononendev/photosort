@@ -9,11 +9,11 @@ from xml.sax.saxutils import escape
 
 from .db import jcol
 
-TIER_NAMES = {0: "focus_0_none", 1: "focus_1_partial", 2: "focus_2_sharp"}
-# Your cull rating from the UI: 0-2 are the focus tiers, 3 is a banger (sharp and a favorite). Exported as the
-# matching Lightroom color label.
-BANGER = 3
-RATING_LABELS = {0: "Red", 1: "Yellow", 2: "Green", 3: "Blue"}
+TIER_NAMES = {0: "focus_0_miss", 1: "focus_1_partial", 2: "focus_2_soft", 3: "focus_3_sharp"}
+# Your cull rating from the UI: 0-3 are the focus tiers, 4 is a banger (sharp and a favorite; only you give it).
+# Exported as the matching color label. Lightroom's stock label set has no Orange; it shows as a custom label.
+BANGER = 4
+RATING_LABELS = {0: "Red", 1: "Orange", 2: "Yellow", 3: "Green", 4: "Blue"}
 
 
 def final_record(row, source: str) -> dict:

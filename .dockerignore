@@ -1,13 +1,17 @@
-# Keep the build context small: the images only COPY pyproject.toml, requirements.lock.txt,
-# photosort/, web/, docker/nginx.conf and docker/pydeps.sh.
+# Keep the build context small: the images only COPY the Go module (go.mod, go.sum, cmd/, internal/), the
+# analyzer project, web/ and docker/nginx.conf.
 *
-!pyproject.toml
-!requirements.lock.txt
-!photosort/
+!go.mod
+!go.sum
+!cmd/
+!internal/
+!analyzer/
 !web/
 !docker/nginx.conf
-!docker/pydeps.sh
 **/__pycache__
 **/*.pyc
+**/*_test.go
+analyzer/.venv
+analyzer/tests
 web/node_modules
 web/dist

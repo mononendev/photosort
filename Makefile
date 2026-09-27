@@ -1,8 +1,7 @@
 REGISTRY  := registry.adoah.dev/projects
-API_IMAGE := $(REGISTRY)/photosort-api
-UI_IMAGE  := $(REGISTRY)/photosort-ui
 PLATFORM  := linux/amd64
 BUILDER   ?= homelab-remote-builder
+IMAGES    := api analyzer ui
 
 GIT_SHA    := $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
 VERSION    ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
@@ -11,27 +10,38 @@ VERSION_ARGS = --build-arg VERSION=$(VERSION) --build-arg GIT_SHA=$(GIT_SHA) --b
 # Same registry cache CI reads and writes, so local and CI builds reuse each other's layers
 CACHE_ARGS = --cache-from type=registry,ref=$(1):buildcache --cache-to type=registry,ref=$(1):buildcache,mode=max
 
-.PHONY: dev web test build-api build-ui push deploy
+PHOTOS  ?= dev-data
+WORKDIR ?= photosort_work
+export PHOTOSORT_MODELS ?= $(CURDIR)/models
 
-dev:               ## run API locally against dev-data
-	.venv/bin/python -m photosort --workdir photosort_work web --photos dev-data --port 8080
+.PHONY: dev web test analyzer models bin $(addprefix build-,$(IMAGES)) push deploy
 
-web:               ## run the Vite dev server (proxies /api to :8080)
+dev:               ## API + job runner on :8080 against $(PHOTOS); starts the analyzer from analyzer/ itself
+	go run ./cmd/photosort --workdir $(WORKDIR) web --photos $(PHOTOS) --port 8080
+
+web:               ## the Vite dev server (proxies /api and /media to :8080)
 	cd web && pnpm install && pnpm run dev
 
+analyzer:          ## the analyzer's venv (add the ultralytics extra to convert YOLO models: make models)
+	cd analyzer && uv sync
+
+models:            ## install pose models into $(PHOTOSORT_MODELS)/pose, e.g. make models NAMES="yolo26s-pose rtmo-m"
+	go run ./cmd/photosort models get $(or $(NAMES),yolo26s-pose)
+
+bin:               ## bin/photosort
+	CGO_ENABLED=0 go build -ldflags "-X main.version=$(VERSION)" -o bin/photosort ./cmd/photosort
+
 test:
-	.venv/bin/python -m pytest -q tests
+	go vet ./... && go test -race ./...
+	cd analyzer && uv run pytest -q
 	cd web && pnpm run build && pnpm run lint
 
-build-api:
-	docker buildx build --builder $(BUILDER) --platform $(PLATFORM) --file docker/api.Dockerfile --target production \
-		$(VERSION_ARGS) $(call CACHE_ARGS,$(API_IMAGE)) --tag $(API_IMAGE):$(VERSION) --tag $(API_IMAGE):latest --push .
+build-%:
+	docker buildx build --builder $(BUILDER) --platform $(PLATFORM) --file docker/$*.Dockerfile --target production \
+		$(VERSION_ARGS) $(call CACHE_ARGS,$(REGISTRY)/photosort-$*) \
+		--tag $(REGISTRY)/photosort-$*:$(VERSION) --tag $(REGISTRY)/photosort-$*:latest --push .
 
-build-ui:
-	docker buildx build --builder $(BUILDER) --platform $(PLATFORM) --file docker/ui.Dockerfile --target production \
-		$(VERSION_ARGS) $(call CACHE_ARGS,$(UI_IMAGE)) --tag $(UI_IMAGE):$(VERSION) --tag $(UI_IMAGE):latest --push .
-
-push: build-api build-ui
+push: $(addprefix build-,$(IMAGES))
 
 deploy:            ## helm upgrade into production with the current VERSION tag
 	helm repo add mononen-charts https://mononen.github.io/charts/ >/dev/null 2>&1 || true

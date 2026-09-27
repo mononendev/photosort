@@ -2,8 +2,9 @@
 
 A working journal kept while building photosort: decisions, provider research, measurements, and what
 the first real runs showed, in the order they happened. Older entries mention a `deploy/` directory and a
-k8s Job; those were replaced by the in-cluster web app (see [DEPLOY.md](DEPLOY.md)). For how to use the
-project, start with the [README](../README.md).
+k8s Job; those were replaced by the in-cluster web app (see [DEPLOY.md](DEPLOY.md)). Entries before
+2026-09-27 refer to modules of the Python package `photosort/`, which was then replaced by a Go backend and the
+`analyzer/` service (see the last entry). For how to use the project, start with the [README](../README.md).
 
 Goal: cull and tag ~20,000 event photos (20 MP, fast cameras, lenses near wide open)
 into three focus tiers, plus subject, composition, keywords, adjectives, and
@@ -267,3 +268,61 @@ treat subject/composition as hints until calibrated; keywords/remarks are usable
   `medium_sigma`/`high_sigma` from the Trace page's noise stage on real camera files.
 - The margin only guards tier 3. Noise lifting a blurred frame into tier 1-2 (above) is the metric-correction
   option (subtract the noise's predicted Laplacian variance), not done.
+
+### Go backend, analyzer sidecar, ONNX pose models, Postgres (2026-09-27)
+- The Python package `photosort/` is gone. Everything except pixels is now Go (module
+  `github.com/mononendev/photosort`, Go 1.27): one binary with the HTTP API, job runner, SQLite/Postgres state,
+  the three vision backends, EXIF/AF reading, the tier rules, trace, export, and the same CLI commands, plus
+  `db copy`, `models list|get` and `local --detector`. The HTTP API the UI uses is unchanged apart from additions
+  (`/api/models`, `POST /api/images/{id}/detect`, `stats.detector`/`detector_stale`, `?detector=` and
+  `?stale_detector=` filters).
+- The pixel stage stays Python, as `analyzer/` (uv project, Python 3.13, FastAPI, ONNX Runtime, OpenCV,
+  Pillow): decode (RAW previews, HEIC), exposure lift, pose detection, focus metrics, face landmarks, the
+  frame/thumb/crop JPEGs, focus-debug and the full-size render. Reason: every calibrated threshold depends on
+  OpenCV's filters with their default borders, INTER_AREA, Pillow's resampling and float32 FFTs. Re-implementing
+  those in Go means recalibrating; moving the code verbatim doesn't. It listens on 127.0.0.1:8090 only (it reads
+  any path it's given). Protocol: `/measure` (decode, detect, per-person regions and metrics, frame and thumb),
+  then `/finalize` with the order Go picked (eye bands, focus plane, crop), so the primary-subject decision
+  (prominence, AF points) lives in Go between the two; plus `/detect`, `/render-full`, `/focus-debug`, `/health`.
+  `photosort web`/`local` start it themselves via `uv run` unless `PHOTOSORT_ANALYZER` names one.
+- torch and ultralytics are out of the runtime. Pose detection runs on ONNX Runtime from a model store,
+  `$PHOTOSORT_MODELS/pose/manifest.json`. Three families: YOLO11 pose n-x (raw head, NMS in the analyzer,
+  `detect_iou` 0.7), YOLO26 pose n-x (NMS-free end-to-end head, exported with `nms=False`), and MMPose RTMO s/m/l
+  (Apache-2.0, downloaded as ONNX). YOLO models are converted from the ultralytics `.pt` by
+  `photosort models get NAME` (needs uv and the analyzer's `ultralytics` extra locally); the analyzer image
+  converts `POSE_MODELS` (default `yolo11n-pose yolo26s-pose rtmo-s`) in a build-only stage.
+- The yolo11n ONNX export finds exactly what the torch model did on every golden image
+  (`analyzer/tests/test_detectors.py`), so existing calibrations carry over: configs that say `yolo11n-pose.pt`
+  run its export, and rows without a recorded detector count as `yolo11n-pose`. New installs default to
+  `yolo26s-pose`. Each row now records its detector; the UI got a Pose model panel on Calibrate (model,
+  confidence, NMS overlap, how many photos another model analyzed, re-analyze), "compare detector" on the photo
+  detail (another model's detections in cyan, nothing stored), and a per-job pose model in Browse.
+- Parity, 12 images with 36 people, M-series CPU, against yolo11n.pt as reference, s/img: 11n .113 (identical),
+  26n .105, 26s .258, 26m .652, 11s .248, 11m .657, rtmo-s .098, rtmo-m .211, rtmo-l .413
+  (`analyzer/scripts/parity.py`). Ultralytics reports up to +7.2 pose AP for YOLO26 over YOLO11; YOLO27 is
+  announced, not released. Which one agrees best with the ratings has to be found on real frames via Calibrate;
+  the synthetic set can't say.
+- Verification: golden fixtures (`testdata/golden`, from `analyzer/scripts/golden.py`: one detector run feeds
+  both the old `analyze()` and measure/finalize) pin the Go assembly to the old local_json exactly; the exif,
+  export, backends and trace goldens (trace on 116 cases) likewise. `scripts/apidiff` serves one fixture workdir
+  from the Python and the Go server and diffs every UI route, mutations included: 0 unexpected differences, on
+  SQLite and on Postgres (data moved with `db copy`). End to end, `local` on the old and new code gave equal
+  local_json (`compare_local.py`). numpy 2.2 → 2.5 in the analyzer changes nothing but float32 noise in
+  focus-debug.
+- Accepted API differences, three: the Ollama frame is shrunk with Catmull-Rom instead of Pillow's LANCZOS (same
+  size, other bytes); focus-debug's float32 sums differ in the 7th digit and its debug JPEGs in a few pixels;
+  validation errors are a readable string instead of pydantic's error list.
+- Database: SQLite stays the default (`<workdir>/photosort.db`; the Python version's file opens and migrates in
+  place). `PHOTOSORT_DB=postgres://…` switches to Postgres; `photosort db copy --from sqlite:///data/photosort.db
+  --to postgres://…` moves the data. The DB, job and API tests also run on Postgres when `PHOTOSORT_TEST_PG` is
+  set (CI: repository variable), one schema per test.
+- Deployment: the API pod is two containers, `photosort-api` (Go on Alpine with exiftool, ~146 MB) and the
+  `photosort-analyzer` sidecar (~750 MB unpacked; `--build-arg ORT=onnxruntime-gpu` for CUDA). The GPU env vars
+  moved to the analyzer. Both mount /photos (ro), /data and /models. `docker/pydeps.sh` and the deps-on-PVC
+  scheme from the DiskPressure entry above are gone: without torch the image is small enough, and the models PVC
+  holds weights only. CI: test-go (vet, `go test -race`), test-analyzer (`uv run pytest`), test-web, a build
+  matrix over api/analyzer/ui, deploy.
+- Web deps upgraded alongside: Vite 8, ESLint 10, TypeScript 6.0 (7 is blocked by typescript-eslint), React 19.3,
+  Tailwind 4.3, Node 24, pnpm 12.
+- The golden and apidiff tools need the old code: a checkout of a8ba797 (the last Python commit) via
+  `PHOTOSORT_LEGACY`.

@@ -1,0 +1,39 @@
+[project]
+name = "photosort-analyzer"
+version = "0.2.0"
+description = "photosort's pixel stage: decode, pose detection and focus metrics, served to the Go backend over HTTP"
+requires-python = ">=3.13"
+license = { text = "AGPL-3.0-only" }
+dependencies = [
+    "numpy",
+    "opencv-python-headless",
+    "pillow",
+    "pillow-heif",
+    "rawpy",
+    "fastapi",
+    "uvicorn",
+    "onnxruntime>=1.30.0",
+]
+
+[project.optional-dependencies]
+# The torch-based detector: only for the golden fixtures and the ONNX parity report, never in the image.
+ultralytics = [
+    "ultralytics",
+    "exifread",
+    "onnx>=1.23.0",
+    "onnxslim>=0.1.96",
+]
+
+[dependency-groups]
+dev = ["pytest", "httpx2"]
+
+[tool.uv]
+# ultralytics pulls in the GUI opencv-python next to the headless one; they share cv2/, so keep only headless.
+override-dependencies = ["opencv-python ; sys_platform == 'never'"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,122 @@
+{
+ "frame_long_edge": 1568,
+ "frame_quality": 82,
+ "crop_size": 768,
+ "crop_quality": 88,
+ "crop_pad": 0.15,
+ "exposure": {
+  "recover": true,
+  "target_key": 0.08,
+  "highlight_cap": 0.9,
+  "min_ev": 0.5,
+  "raw_dark_key": 0.03,
+  "raw_max_ev": 4.0,
+  "jpeg_dark_key": 0.015,
+  "jpeg_max_ev": 1.5
+ },
+ "detect_long_edge": 1280,
+ "detect_conf": 0.25,
+ "detect_model": "yolo11n-pose.pt",
+ "min_person_frac": 0.0015,
+ "dedup_iou": 0.6,
+ "dedup_head_iou": 0.25,
+ "dedup_head_tol": 0.1,
+ "workers": 4,
+ "local_ahead": true,
+ "face_model": "face_detection_yunet_2023mar.onnx",
+ "face_conf": 0.6,
+ "eye_max_people": 4,
+ "focus": {
+  "tier3_min": 0.03,
+  "tier2_min": 0.017,
+  "tier1_min": 0.01,
+  "eye_tier3_min": 0.06,
+  "eye_tier2_min": 0.035,
+  "eye_tier1_min": 0.02,
+  "hf_tier3_min": 0.03,
+  "hf_tier2_min": 0.017,
+  "hf_tier1_min": 0.01,
+  "use_eyes": true,
+  "use_hf": true,
+  "eyewear_ratio": 3.0,
+  "use_plane": true,
+  "plane_max_extra": 0.4,
+  "plane_body_max_extra": null,
+  "use_front": true,
+  "front_min_height": 1.0,
+  "front_min_drop": 0.25,
+  "front_max_gap": 0.5,
+  "front_max_grade": 1,
+  "front_edge": 0.01,
+  "floor_tier": 2,
+  "floor_grade": 3,
+  "floor_conf": 0.5,
+  "split_steps": 2
+ },
+ "exif": {
+  "crop_factor": 1.0,
+  "wide_open_f": 2.0,
+  "action_shutter": 0.002,
+  "shake_margin": 1.5
+ },
+ "noise": {
+  "noisy_iso": 1600,
+  "high_iso": 6400,
+  "medium_sigma": null,
+  "high_sigma": null,
+  "margin": 1.5
+ },
+ "af": {
+  "use": true,
+  "min_score": 0.5,
+  "near": 2.0,
+  "y_up": true
+ },
+ "backend": "ollama",
+ "model": null,
+ "vlm_concurrency": 1,
+ "batch_size": 1000,
+ "gemini_thinking_level": "LOW",
+ "anthropic_effort": "low",
+ "max_output_tokens": 1024,
+ "ollama_num_ctx": 8192,
+ "ollama_num_predict": 1536,
+ "ollama_frame_long_edge": 1024,
+ "ollama_schema_max_lengths": true,
+ "truth": {
+  "label_tiers": {
+   "Blue": 3,
+   "Green": 3,
+   "Yellow": 2,
+   "Orange": 1,
+   "Red": 0
+  },
+  "rating_tiers": {
+   "5": 3,
+   "4": 3,
+   "3": 2,
+   "2": 1,
+   "1": 0,
+   "0": null
+  }
+ },
+ "focus_source": "vlm",
+ "groups": {
+  "1": {
+   "folder": "group_1",
+   "keywords": []
+  },
+  "2": {
+   "folder": "group_2",
+   "keywords": []
+  },
+  "3": {
+   "folder": "group_3",
+   "keywords": []
+  },
+  "4": {
+   "folder": "group_4",
+   "keywords": []
+  }
+ }
+}

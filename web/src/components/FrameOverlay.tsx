@@ -1,7 +1,7 @@
 import { memo, useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import { frameUrl } from '../api/client';
-import type { FocusDebug, LocalResult, Person } from '../api/client';
+import type { DetectResult, FocusDebug, LocalResult, Person } from '../api/client';
 import { fmt } from '../lib/format';
 import { TIER_COLOR } from '../api/client';
 import { FACE_LM, KP_MIN_CONF, KP_NAMES, PERSON_COLORS, SKELETON, boxH, boxW } from '../lib/pose';
@@ -14,14 +14,18 @@ type OverlayProps = {
   heat?: FocusDebug['heatmap']; setHover: (h: Hover) => void;
   /** Labels, dots and hit areas shrink by this so they stay the same size on screen when zoomed. */
   zoom?: number;
+  /** Another pose model's detections, drawn in cyan over the stored ones to compare what each finds. */
+  compare?: DetectResult | null;
 };
+
+const COMPARE = '#22d3ee';
 
 /**
  * Everything the local stage found, as an SVG in the original's pixel coordinates (any downscale of the frame
  * with the same aspect ratio fits the one viewBox). Fills its positioned parent.
  */
 // Memoized: panning and hovering re-render the viewer around it, not the dozens of boxes and keypoints inside.
-export const OverlaySvg = memo(function OverlaySvg({ l, grades, layers, selected, onSelect, heat, setHover, zoom = 1 }: OverlayProps) {
+export const OverlaySvg = memo(function OverlaySvg({ l, grades, layers, selected, onSelect, heat, setHover, zoom = 1, compare }: OverlayProps) {
   const W = l.width, H = l.height;
   const hatch = `hatch${useId().replace(/[^a-zA-Z0-9]/g, '')}`;   // unique per SVG: inline and fullscreen coexist
   const u = Math.max(W, H) / 1000 / zoom;    // one "unit" ≈ 0.1% of the long edge at zoom 1
@@ -125,6 +129,21 @@ export const OverlaySvg = memo(function OverlaySvg({ l, grades, layers, selected
           {...hv('Person (not ranked in the top 6)', <>Found and masked out of the background, but not stored with metrics.</>)} />
       ))}
       {people.map((p, i) => personLayer(p, i)).reverse() /* primary drawn last, on top */}
+      {compare?.people.map((p, i) => {
+        const [x0, y0, x1, y1] = p.box;
+        return (
+          <g key={`cmp${i}`}>
+            <rect x={x0} y={y0} width={x1 - x0} height={y1 - y0} stroke={COMPARE} {...stroke(2)} strokeDasharray="10 5"
+              {...hv(`${compare.model} · person ${i + 1}`, <>detection conf {fmt(p.conf)} · {Math.round(x1 - x0)}×{Math.round(y1 - y0)} px · not stored: this is what {compare.model} finds in the frame</>)} />
+            {p.kp && SKELETON.map(([a, b]) => {
+              const ka = p.kp![a], kb = p.kp![b];
+              return ka[2] >= KP_MIN_CONF && kb[2] >= KP_MIN_CONF &&
+                <line key={`${a}-${b}`} x1={ka[0]} y1={ka[1]} x2={kb[0]} y2={kb[1]} stroke={COMPARE} {...stroke(1.25)} opacity={0.8} pointerEvents="none" />;
+            })}
+            {label(x0, y1 + fs * 1.4, `${compare.model} ${fmt(p.conf)}`, COMPARE)}
+          </g>
+        );
+      })}
       {on('af') && l.af && l.af.points.map((pt) => {
         const act = l.af!.active.includes(pt.i);
         const [x0, y0, x1, y1] = pt.box;

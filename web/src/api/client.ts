@@ -122,6 +122,8 @@ export interface LocalResult {
   af_note?: string | null;
   /** What picked people[0]: the camera's AF points, or prominence (size, centering, confidence) */
   primary_by?: 'af' | 'priority';
+  /** The pose model that found the people (absent on rows from before it was recorded: yolo11n-pose) */
+  detector?: string;
   /** Set when an underexposed frame was brightened before analysis: stops added, what was lifted, and the scene key */
   exposure?: { ev: number; source: 'raw' | 'jpeg'; key: number; p99: number } | null;
   exif_prior?: { dof_risk: string | null; motion_risk: string | null; shake_stops: number | null; pupil_mm?: number | null; summary: string | null };
@@ -241,6 +243,8 @@ export interface VlmRequest {
 }
 export interface JobOptions {
   vlm?: boolean; skip_tier0?: boolean; rescan?: boolean; revlm?: boolean; retry_errors?: boolean; concurrency?: number; model?: string | null;
+  /** Pose model for this job's local stage, instead of the configured one */
+  detector?: { model: string } | null;
 }
 
 export interface Stats {
@@ -248,11 +252,28 @@ export interface Stats {
   tiers: { tier0: number; tier1: number; tier2: number; tier3: number };
   lr_rated?: number;
   lr_by_tier?: { tier: number | null; rating: number; n: number }[];
+  /** The configured pose model, and how many analyzed photos another model found the people in */
+  detector?: string; detector_stale?: number;
 }
 
 export interface Health {
   ok: boolean; version: string; photos_root: string; workdir: string; device: string | null;
   backend: string; ollama: string | null; current_job: number | null;
+  database?: 'sqlite' | 'postgres'; analyzer?: boolean;
+}
+
+/** A pose model the analyzer can run (GET /api/models). */
+export interface PoseModel { name: string; family: 'yolo_nms' | 'yolo_e2e' | 'rtmo'; imgsz: number; license?: string; bytes?: number }
+export interface ModelsInfo {
+  installed: PoseModel[];
+  current: { model: string; imgsz?: number; conf?: number; iou?: number };
+  device: string | null;
+}
+
+/** Another pose model's detections on one photo, stored nowhere (POST /api/images/{id}/detect). */
+export interface DetectResult {
+  width: number; height: number; model: string; seconds: number; raw: number;
+  people: { box: number[]; conf: number; kp: [number, number, number][] | null }[];
 }
 
 export interface Calibration {
@@ -274,6 +295,7 @@ export interface ImageFilters {
   people_min?: number; people_max?: number; score_min?: number; score_max?: number; eye_min?: number; eye_max?: number;
   iso_min?: number; iso_max?: number; f_min?: number; f_max?: number; shutter_min?: number; shutter_max?: number;
   focal_min?: number; focal_max?: number; taken_from?: string; taken_to?: string;
+  detector?: string; stale_detector?: boolean;
   q?: string; sort?: string; offset?: number; limit?: number;
 }
 
@@ -367,6 +389,8 @@ export const api = {
   },
   exportRun: (e: ExportRequest) => request<ExportResult>('/api/export', { method: 'POST', body: JSON.stringify(e) }),
   exports: () => request<{ name: string; path: string; mtime: number }[]>('/api/exports'),
+  models: () => request<ModelsInfo>('/api/models'),
+  detect: (id: number, model: string) => request<DetectResult>(`/api/images/${id}/detect${qs({ model })}`, { method: 'POST' }),
 };
 
 export const thumbUrl = (id: number) => `/media/thumb/${id}`;

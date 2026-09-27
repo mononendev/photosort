@@ -1,0 +1,396 @@
+{
+ "entries": [
+  {
+   "af": null,
+   "af_note": "no Canon AF info (exiftool not installed)",
+   "exif": {},
+   "height": 5163,
+   "path": "dev-data/bus_allblur.jpg",
+   "width": 3872
+  },
+  {
+   "af": null,
+   "af_note": "no Canon AF info (exiftool not installed)",
+   "exif": {},
+   "height": 5163,
+   "path": "dev-data/bus_bgblur.jpg",
+   "width": 3872
+  },
+  {
+   "af": null,
+   "af_note": "no Canon AF info (exiftool not installed)",
+   "exif": {},
+   "height": 5163,
+   "path": "dev-data/bus_sharp.jpg",
+   "width": 3872
+  },
+  {
+   "af": null,
+   "af_note": "no Canon AF info (exiftool not installed)",
+   "exif": {},
+   "height": 5163,
+   "path": "dev-data/bus_subjectblur.jpg",
+   "width": 3872
+  },
+  {
+   "af": null,
+   "af_note": "no Canon AF info (exiftool not installed)",
+   "exif": {},
+   "height": 3354,
+   "path": "dev-data/zidane_allblur.jpg",
+   "width": 5962
+  },
+  {
+   "af": null,
+   "af_note": "no Canon AF info (exiftool not installed)",
+   "exif": {},
+   "height": 3354,
+   "path": "dev-data/zidane_bgblur.jpg",
+   "width": 5962
+  },
+  {
+   "af": null,
+   "af_note": "no Canon AF info (exiftool not installed)",
+   "exif": {},
+   "height": 3354,
+   "path": "dev-data/zidane_sharp.jpg",
+   "width": 5962
+  },
+  {
+   "af": null,
+   "af_note": "no Canon AF info (exiftool not installed)",
+   "exif": {},
+   "height": 3354,
+   "path": "dev-data/zidane_subjectblur.jpg",
+   "width": 5962
+  },
+  {
+   "af": null,
+   "af_note": "no Canon AF info (exiftool not installed)",
+   "exif": {},
+   "height": 3872,
+   "path": "testdata/images/bus_portrait.jpg",
+   "width": 5163
+  },
+  {
+   "af": null,
+   "af_note": "no Canon AF info (exiftool not installed)",
+   "exif": {},
+   "height": 3354,
+   "path": "testdata/images/zidane_dark.jpg",
+   "width": 5962
+  },
+  {
+   "af": {
+    "active": [
+     30
+    ],
+    "active_from": "in_focus",
+    "mode": 9,
+    "mode_name": "spot",
+    "n_points": 61,
+    "points": [
+     {
+      "box": [
+       1644,
+       2506,
+       1812,
+       2678
+      ],
+      "i": 30,
+      "in_focus": true,
+      "selected": true
+     }
+    ],
+    "primary_point": null,
+    "source": "canon_afinfo2",
+    "user_placed": true
+   },
+   "af_note": "spot, 1 active",
+   "exif": {
+    "camera": "Canon EOS-1D X",
+    "f_number": 2.2,
+    "focal_mm": 135.0,
+    "iso": 1000.0,
+    "lens": "EF135mm f/2L USM",
+    "shutter_s": 0.0005,
+    "taken": "2024:09:12 15:24:19"
+   },
+   "height": 5184,
+   "path": "/Users/mononen/Programming/photosort/dev-data/cr2/IMG_1010.CR2",
+   "width": 3456
+  },
+  {
+   "af": {
+    "active": [
+     30
+    ],
+    "active_from": "in_focus",
+    "mode": 9,
+    "mode_name": "spot",
+    "n_points": 61,
+    "points": [
+     {
+      "box": [
+       1644,
+       2506,
+       1812,
+       2678
+      ],
+      "i": 30,
+      "in_focus": true,
+      "selected": true
+     }
+    ],
+    "primary_point": null,
+    "source": "canon_afinfo2",
+    "user_placed": true
+   },
+   "af_note": "spot, 1 active",
+   "exif": {
+    "camera": "Canon EOS-1D X",
+    "f_number": 2.2,
+    "focal_mm": 135.0,
+    "iso": 400.0,
+    "lens": "EF135mm f/2L USM",
+    "shutter_s": 0.0005,
+    "taken": "2024:09:12 15:25:28"
+   },
+   "height": 5184,
+   "path": "/Users/mononen/Programming/photosort/dev-data/cr2/IMG_1018.CR2",
+   "width": 3456
+  },
+  {
+   "af": null,
+   "af_note": "no Canon AF info (exiftool not installed)",
+   "exif": {},
+   "height": 6016,
+   "path": "/Users/mononen/Programming/photosort/dev-data/landscape.heic",
+   "width": 6016
+  },
+  {
+   "af": null,
+   "af_note": "no Canon AF info (exiftool not installed)",
+   "exif": {
+    "camera": "Canon EOS R6",
+    "f_number": 1.4,
+    "focal_35mm": 136.0,
+    "focal_mm": 85.0,
+    "iso": 800.0,
+    "lens": "RF85mm F1.2 L USM",
+    "shutter_s": 0.033333,
+    "taken": "2024:09:12 15:24:19"
+   },
+   "height": 16,
+   "path": "testdata/exif/pillow.jpg",
+   "width": 24
+  },
+  {
+   "af": null,
+   "af_note": "no Canon AF info (exiftool not installed)",
+   "exif": {
+    "camera": "Canon EOS R6",
+    "f_number": 1.4,
+    "focal_35mm": 136.0,
+    "focal_mm": 85.0,
+    "iso": 800.0,
+    "lens": "RF85mm F1.2 L USM",
+    "shutter_s": 0.033333,
+    "taken": "2024:09:12 15:24:19"
+   },
+   "height": 16,
+   "path": "testdata/exif/pillow.png",
+   "width": 24
+  },
+  {
+   "af": null,
+   "af_note": "no Canon AF info (exiftool not installed)",
+   "exif": {
+    "camera": "Canon EOS R6",
+    "f_number": 1.4,
+    "focal_35mm": 136.0,
+    "focal_mm": 85.0,
+    "iso": 800.0,
+    "lens": "RF85mm F1.2 L USM",
+    "shutter_s": 0.033333,
+    "taken": "2024:09:12 15:24:19"
+   },
+   "height": 16,
+   "path": "testdata/exif/pillow.webp",
+   "width": 24
+  },
+  {
+   "af": null,
+   "af_note": "no Canon AF info (exiftool not installed)",
+   "exif": {
+    "camera": "Canon EOS R6",
+    "f_number": 1.4,
+    "focal_35mm": 136.0,
+    "focal_mm": 85.0,
+    "iso": 800.0,
+    "lens": "RF85mm F1.2 L USM",
+    "shutter_s": 0.033333,
+    "taken": "2024:09:12 15:24:19"
+   },
+   "height": 16,
+   "path": "testdata/exif/pillow.heic",
+   "width": 24
+  },
+  {
+   "af": null,
+   "af_note": "no Canon AF info (exiftool not installed)",
+   "exif": {
+    "camera": "Canon\u0000\u0000",
+    "f_number": 2.8,
+    "iso": 3200.0,
+    "lens": "EF 50mm \u00e9",
+    "taken": "2023:05:06 07:08:09"
+   },
+   "height": 16,
+   "path": "testdata/exif/app2_first.jpg",
+   "width": 24
+  },
+  {
+   "af": null,
+   "af_note": "no Canon AF info (exiftool not installed)",
+   "exif": {
+    "camera": "[65, 66, 67]",
+    "f_number": 5.6,
+    "iso": 12800.0,
+    "lens": "b'Lens \\xff\\xfe  '",
+    "shutter_s": 0.004,
+    "taken": "2020:02:02 02:02:02"
+   },
+   "height": 100,
+   "path": "testdata/exif/odd_types.tif",
+   "width": 100
+  },
+  {
+   "af": {
+    "active": [
+     1
+    ],
+    "active_from": "in_focus",
+    "mode": 9,
+    "mode_name": "spot",
+    "n_points": 2,
+    "points": [
+     {
+      "box": [
+       1642,
+       1332,
+       1814,
+       1504
+      ],
+      "i": 1,
+      "in_focus": true,
+      "selected": true
+     }
+    ],
+    "primary_point": null,
+    "source": "canon_afinfo2",
+    "user_placed": true
+   },
+   "af_note": "spot, 1 active",
+   "exif": {
+    "camera": "Canon EOS-1D X",
+    "f_number": 2.2,
+    "shutter_s": 0.0005
+   },
+   "height": 5184,
+   "path": "testdata/exif/canon_af_le.cr2",
+   "width": 3456
+  },
+  {
+   "af": {
+    "active": [
+     0,
+     1
+    ],
+    "active_from": "in_focus",
+    "mode": 4,
+    "mode_name": "auto (multi-point)",
+    "n_points": 2,
+    "points": [
+     {
+      "box": [
+       2503,
+       1542,
+       2553,
+       1642
+      ],
+      "i": 0,
+      "in_focus": true,
+      "selected": true
+     },
+     {
+      "box": [
+       1488,
+       2852,
+       1568,
+       2932
+      ],
+      "i": 1,
+      "in_focus": true,
+      "selected": true
+     }
+    ],
+    "primary_point": 1,
+    "source": "canon_afinfo2",
+    "user_placed": false
+   },
+   "af_note": "auto (multi-point), 2 active",
+   "exif": {
+    "camera": "Canon EOS-1D X",
+    "f_number": 2.2,
+    "shutter_s": 0.0005
+   },
+   "height": 5184,
+   "path": "testdata/exif/canon_af_be.cr2",
+   "width": 3456
+  },
+  {
+   "af": {
+    "active": [],
+    "active_from": null,
+    "mode": 0,
+    "mode_name": "manual focus",
+    "n_points": 2,
+    "points": [],
+    "primary_point": null,
+    "source": "canon_afinfo2",
+    "user_placed": false
+   },
+   "af_note": "manual focus, 0 active",
+   "exif": {
+    "camera": "Canon EOS-1D X",
+    "f_number": 2.2,
+    "shutter_s": 0.0005
+   },
+   "height": 3456,
+   "path": "testdata/exif/canon_af_mf.cr2",
+   "width": 5184
+  },
+  {
+   "af": null,
+   "af_note": "AF info present but not decodable (5 words)",
+   "exif": {
+    "camera": "Canon EOS-1D X",
+    "f_number": 2.2,
+    "shutter_s": 0.0005
+   },
+   "height": 3456,
+   "path": "testdata/exif/canon_af_bad.cr2",
+   "width": 5184
+  },
+  {
+   "af": null,
+   "af_note": "AF read failed: error: unpack requires a buffer of 2 bytes",
+   "exif": {},
+   "height": 3456,
+   "path": "testdata/exif/truncated.cr2",
+   "width": 5184
+  }
+ ],
+ "generated_by": "python photosort.exif.read / photosort.af.read_with_note (y_up=True)"
+}

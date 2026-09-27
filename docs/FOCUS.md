@@ -2,7 +2,13 @@
 
 The local stage decides whether a frame is sharp where it matters, before any vision model sees it. It
 runs on the original pixels, costs nothing per image, and its numbers are handed to the vision model as
-context. Code: [`photosort/local.py`](../photosort/local.py).
+context. Code: the pixel work (exposure, detection, the metrics) is in the analyzer,
+[`analyzer/photosort_analyzer/metrics.py`](../analyzer/photosort_analyzer/metrics.py) for the metrics and
+regions, [`measure.py`](../analyzer/photosort_analyzer/measure.py) for the order they run in and
+[`images.py`](../analyzer/photosort_analyzer/images.py) for decoding and the exposure lift. The decisions
+(primary subject, tier, the checks below) are in [`internal/rules/rules.go`](../internal/rules/rules.go), the
+EXIF and AF-point readers in [`internal/exif`](../internal/exif) and [`internal/af`](../internal/af), and the
+defaults in [`internal/config/config.go`](../internal/config/config.go).
 
 ## Why the eyes
 
@@ -22,9 +28,10 @@ subject at native resolution, and falls back to the head when the eyes can't be 
    in-camera sharpening the thresholds are calibrated on. The lift is a pure gain below a highlight
    shoulder, so the contrast-normalized metrics keep their scale; what changes is that dim regions
    clear the `EPS` contrast floor, which otherwise scores a sharp but dark eye band near zero.
-1. **People.** YOLO11n-pose runs on a 1280 px copy of the frame and returns a box and 17 keypoints per
-   person. Boxes smaller than 0.15% of the frame are ignored. Head, torso and body regions come from the
-   keypoints, so a helmeted head still gets a head box.
+1. **People.** The pose model (`detect_model`: YOLO11 or YOLO26 pose, or RTMO; default `yolo26s-pose`)
+   runs on a 1280 px copy of the frame (RTMO scales that to its fixed 640 px input) and returns a box and 17
+   keypoints per person. Boxes smaller than 0.15% of the frame are ignored. Head, torso and body regions come
+   from the keypoints, so a helmeted head still gets a head box.
 2. **Primary subject.** People are ranked by
    `priority = area × (1 − ½·distance from center) × (½ + ½·detector confidence)`. The top one is the
    primary subject and decides the tier. On Canon files, the AF points in the maker notes override this:

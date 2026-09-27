@@ -1,0 +1,1275 @@
+{
+ "config": {
+  "af": {
+   "min_score": 0.5,
+   "near": 2.0,
+   "use": true,
+   "y_up": true
+  },
+  "anthropic_effort": "low",
+  "backend": "ollama",
+  "batch_size": 1000,
+  "crop_pad": 0.15,
+  "crop_quality": 88,
+  "crop_size": 768,
+  "dedup_head_iou": 0.25,
+  "dedup_head_tol": 0.1,
+  "dedup_iou": 0.6,
+  "detect_conf": 0.25,
+  "detect_long_edge": 1280,
+  "detect_model": "yolo11n-pose.pt",
+  "exif": {
+   "action_shutter": 0.002,
+   "crop_factor": 1.0,
+   "shake_margin": 1.5,
+   "wide_open_f": 2.0
+  },
+  "exposure": {
+   "highlight_cap": 0.9,
+   "jpeg_dark_key": 0.015,
+   "jpeg_max_ev": 1.5,
+   "min_ev": 0.5,
+   "raw_dark_key": 0.03,
+   "raw_max_ev": 4.0,
+   "recover": true,
+   "target_key": 0.08
+  },
+  "eye_max_people": 4,
+  "face_conf": 0.6,
+  "face_model": "face_detection_yunet_2023mar.onnx",
+  "focus": {
+   "eye_tier1_min": 0.02,
+   "eye_tier2_min": 0.035,
+   "eye_tier3_min": 0.06,
+   "eyewear_ratio": 3.0,
+   "floor_conf": 0.5,
+   "floor_grade": 3,
+   "floor_tier": 2,
+   "front_edge": 0.01,
+   "front_max_gap": 0.5,
+   "front_max_grade": 1,
+   "front_min_drop": 0.25,
+   "front_min_height": 1.0,
+   "hf_tier1_min": 0.01,
+   "hf_tier2_min": 0.017,
+   "hf_tier3_min": 0.03,
+   "plane_body_max_extra": null,
+   "plane_max_extra": 0.4,
+   "split_steps": 2,
+   "tier1_min": 0.01,
+   "tier2_min": 0.017,
+   "tier3_min": 0.03,
+   "use_eyes": true,
+   "use_front": true,
+   "use_hf": true,
+   "use_plane": true
+  },
+  "focus_source": "vlm",
+  "frame_long_edge": 1568,
+  "frame_quality": 82,
+  "gemini_thinking_level": "LOW",
+  "groups": {
+   "1": {
+    "folder": "group_1",
+    "keywords": []
+   },
+   "2": {
+    "folder": "group_2",
+    "keywords": []
+   },
+   "3": {
+    "folder": "group_3",
+    "keywords": []
+   },
+   "4": {
+    "folder": "group_4",
+    "keywords": []
+   }
+  },
+  "local_ahead": true,
+  "max_output_tokens": 1024,
+  "min_person_frac": 0.0015,
+  "model": null,
+  "noise": {
+   "high_iso": 6400,
+   "high_sigma": null,
+   "margin": 1.5,
+   "medium_sigma": null,
+   "noisy_iso": 1600
+  },
+  "ollama_frame_long_edge": 1024,
+  "ollama_num_ctx": 8192,
+  "ollama_num_predict": 1536,
+  "ollama_schema_max_lengths": true,
+  "truth": {
+   "label_tiers": {
+    "Blue": 3,
+    "Green": 3,
+    "Orange": 1,
+    "Red": 0,
+    "Yellow": 2
+   },
+   "rating_tiers": {
+    "0": null,
+    "1": 0,
+    "2": 1,
+    "3": 2,
+    "4": 3,
+    "5": 3
+   }
+  },
+  "vlm_concurrency": 1,
+  "workers": 4
+ },
+ "finalize": {
+  "crop_box": [
+   1069,
+   1840,
+   5057,
+   3413
+  ],
+  "eyes": {
+   "0": {
+    "eye": [
+     1991,
+     2368,
+     2218,
+     2591
+    ],
+    "eye_src": "pose",
+    "eyes": [
+     [
+      2061,
+      2535
+     ],
+     [
+      2148,
+      2425
+     ]
+    ],
+    "face": null,
+    "hf_eye": 0.0030465068725935426,
+    "sharp_eye": 0.03733468973406599,
+    "terms_eye": {
+     "band_e": 11150.0,
+     "gray_var": 0.06507,
+     "lap_var": 0.002504,
+     "px": [
+      227,
+      223
+     ],
+     "total_e": 3661000.0
+    }
+   },
+   "1": {
+    "eye": null,
+    "eye_src": null,
+    "eyes": null,
+    "face": null,
+    "hf_eye": null,
+    "sharp_eye": null,
+    "terms_eye": null
+   },
+   "2": {
+    "eye": null,
+    "eye_src": null,
+    "eyes": null,
+    "face": null,
+    "hf_eye": null,
+    "sharp_eye": null,
+    "terms_eye": null
+   }
+  },
+  "plane": {
+   "head": 1.562,
+   "head_vs_near": 0.0,
+   "head_vs_torso": 0.0,
+   "n_near": 667750,
+   "n_torso": 12079,
+   "near": 1.687,
+   "torso": 1.796,
+   "torso_vs_near": 0.616
+  }
+ },
+ "local": {
+  "af": null,
+  "af_note": "no Canon AF info (exiftool not installed)",
+  "bg_sharp": 0.4709,
+  "bg_terms": {
+   "gray_var": 0.0529,
+   "lap_var": 0.02585,
+   "px_count": 605978
+  },
+  "crop_box": [
+   1069,
+   1840,
+   5057,
+   3413
+  ],
+  "eps": 0.002,
+  "exif": {},
+  "exif_prior": {
+   "dof_risk": null,
+   "motion_risk": null,
+   "pupil_mm": null,
+   "shake_stops": null,
+   "summary": null
+  },
+  "exposure": null,
+  "global_sharp": 0.408,
+  "global_terms": {
+   "gray_var": 0.06233,
+   "lap_var": 0.02625,
+   "px": [
+    1024,
+    768
+   ]
+  },
+  "height": 3872,
+  "local_reason": "secondary_person_sharp",
+  "local_tier": 0,
+  "mask_boxes": [
+   [
+    1884,
+    2144,
+    4243,
+    3468
+   ],
+   [
+    1960,
+    2115,
+    4162,
+    2793
+   ],
+   [
+    2102,
+    0,
+    4149,
+    681
+   ]
+  ],
+  "n_people": 3,
+  "noise": {
+   "by": null,
+   "eff_iso": null,
+   "ev": null,
+   "iso": null,
+   "risk": null,
+   "sigma": 0.2222,
+   "summary": null
+  },
+  "orientation": "landscape",
+  "people": [
+   {
+    "af_score": null,
+    "area_frac": 0.15623504337122213,
+    "box": [
+     1884,
+     2144,
+     4243,
+     3468
+    ],
+    "center": [
+     0.593,
+     0.725
+    ],
+    "center_dist": 0.344,
+    "conf": 0.5438579320907593,
+    "eye": [
+     1991,
+     2368,
+     2218,
+     2591
+    ],
+    "eye_src": "pose",
+    "eyes": [
+     [
+      2061,
+      2535
+     ],
+     [
+      2148,
+      2425
+     ]
+    ],
+    "face": null,
+    "head": [
+     1780,
+     2128,
+     2488,
+     2835
+    ],
+    "head_src": "keypoints",
+    "hf_eye": 0.003,
+    "kp": [
+     [
+      2130,
+      2501,
+      0.956
+     ],
+     [
+      2148,
+      2425,
+      0.955
+     ],
+     [
+      2061,
+      2535,
+      0.779
+     ],
+     [
+      2282,
+      2349,
+      0.947
+     ],
+     [
+      2051,
+      2600,
+      0.455
+     ],
+     [
+      2431,
+      2343,
+      0.987
+     ],
+     [
+      2268,
+      2643,
+      0.996
+     ],
+     [
+      2490,
+      2303,
+      0.944
+     ],
+     [
+      2334,
+      2621,
+      0.953
+     ],
+     [
+      2484,
+      2396,
+      0.866
+     ],
+     [
+      2326,
+      2503,
+      0.904
+     ],
+     [
+      2976,
+      2570,
+      0.999
+     ],
+     [
+      2855,
+      2736,
+      0.999
+     ],
+     [
+      3085,
+      2790,
+      0.998
+     ],
+     [
+      3126,
+      3022,
+      0.999
+     ],
+     [
+      3921,
+      2729,
+      0.994
+     ],
+     [
+      3924,
+      3056,
+      0.996
+     ]
+    ],
+    "plane": {
+     "head": 1.562,
+     "head_vs_near": 0.0,
+     "head_vs_torso": 0.0,
+     "n_near": 667750,
+     "n_torso": 12079,
+     "near": 1.687,
+     "torso": 1.796,
+     "torso_vs_near": 0.616
+    },
+    "priority": 0.09985,
+    "sharp_body": 0.3108,
+    "sharp_eye": 0.0373,
+    "sharp_head": 0.1307,
+    "sharp_torso": 0.4061,
+    "terms": {
+     "body": {
+      "gray_var": 0.07969,
+      "lap_var": 0.02539,
+      "px": [
+       512,
+       287
+      ]
+     },
+     "eye": {
+      "band_e": 11150.0,
+      "gray_var": 0.06507,
+      "lap_var": 0.002504,
+      "px": [
+       227,
+       223
+      ],
+      "total_e": 3661000.0
+     },
+     "head": {
+      "gray_var": 0.0347,
+      "lap_var": 0.004795,
+      "px": [
+       512,
+       511
+      ]
+     },
+     "torso": {
+      "gray_var": 0.0672,
+      "lap_var": 0.0281,
+      "px": [
+       512,
+       43
+      ]
+     }
+    },
+    "torso": [
+     1884,
+     2493,
+     4243,
+     2691
+    ],
+    "upper": [
+     1530,
+     2022,
+     4597,
+     3232
+    ]
+   },
+   {
+    "af_score": null,
+    "area_frac": 0.0746808985742481,
+    "box": [
+     1960,
+     2115,
+     4162,
+     2793
+    ],
+    "center": [
+     0.593,
+     0.634
+    ],
+    "center_dist": 0.23,
+    "conf": 0.37059125304222107,
+    "eye": null,
+    "eye_src": null,
+    "eyes": null,
+    "face": null,
+    "head": [
+     1990,
+     2078,
+     2651,
+     2738
+    ],
+    "head_src": "keypoints",
+    "hf_eye": null,
+    "kp": [
+     [
+      2332,
+      2404,
+      0.793
+     ],
+     [
+      2323,
+      2385,
+      0.674
+     ],
+     [
+      2319,
+      2408,
+      0.495
+     ],
+     [
+      2323,
+      2388,
+      0.685
+     ],
+     [
+      2308,
+      2457,
+      0.629
+     ],
+     [
+      2417,
+      2435,
+      0.987
+     ],
+     [
+      2433,
+      2517,
+      0.966
+     ],
+     [
+      2513,
+      2441,
+      0.935
+     ],
+     [
+      2457,
+      2538,
+      0.693
+     ],
+     [
+      2490,
+      2430,
+      0.834
+     ],
+     [
+      2435,
+      2490,
+      0.673
+     ],
+     [
+      2951,
+      2443,
+      0.985
+     ],
+     [
+      2939,
+      2528,
+      0.971
+     ],
+     [
+      3321,
+      2342,
+      0.982
+     ],
+     [
+      3364,
+      2419,
+      0.971
+     ],
+     [
+      3786,
+      2528,
+      0.953
+     ],
+     [
+      3794,
+      2596,
+      0.942
+     ]
+    ],
+    "priority": 0.04528,
+    "sharp_body": 0.3179,
+    "sharp_eye": null,
+    "sharp_head": 0.0976,
+    "sharp_torso": 0.4028,
+    "terms": {
+     "body": {
+      "gray_var": 0.08026,
+      "lap_var": 0.02615,
+      "px": [
+       512,
+       158
+      ]
+     },
+     "eye": null,
+     "head": {
+      "gray_var": 0.04147,
+      "lap_var": 0.004243,
+      "px": [
+       512,
+       511
+      ]
+     },
+     "torso": {
+      "gray_var": 0.07472,
+      "lap_var": 0.0309,
+      "px": [
+       512,
+       24
+      ]
+     }
+    },
+    "torso": [
+     1960,
+     2475,
+     4162,
+     2577
+    ],
+    "upper": [
+     1629,
+     2023,
+     4493,
+     2793
+    ]
+   },
+   {
+    "af_score": null,
+    "area_frac": 0.0697312548921682,
+    "box": [
+     2102,
+     0,
+     4149,
+     681
+    ],
+    "center": [
+     0.605,
+     0.088
+    ],
+    "center_dist": 0.601,
+    "conf": 0.3547654449939728,
+    "eye": null,
+    "eye_src": null,
+    "eyes": null,
+    "face": null,
+    "head": [
+     2614,
+     0,
+     3637,
+     1023
+    ],
+    "head_src": "box_top",
+    "hf_eye": null,
+    "kp": [
+     [
+      2870,
+      10,
+      0.011
+     ],
+     [
+      2941,
+      0,
+      0.009
+     ],
+     [
+      2842,
+      0,
+      0.006
+     ],
+     [
+      3033,
+      0,
+      0.029
+     ],
+     [
+      2783,
+      0,
+      0.007
+     ],
+     [
+      3068,
+      21,
+      0.126
+     ],
+     [
+      2632,
+      2,
+      0.084
+     ],
+     [
+      3492,
+      166,
+      0.277
+     ],
+     [
+      2544,
+      80,
+      0.103
+     ],
+     [
+      3914,
+      360,
+      0.213
+     ],
+     [
+      2556,
+      166,
+      0.111
+     ],
+     [
+      3030,
+      251,
+      0.745
+     ],
+     [
+      2757,
+      286,
+      0.642
+     ],
+     [
+      3484,
+      264,
+      0.745
+     ],
+     [
+      3308,
+      299,
+      0.69
+     ],
+     [
+      4065,
+      371,
+      0.773
+     ],
+     [
+      3933,
+      425,
+      0.749
+     ]
+    ],
+    "priority": 0.03303,
+    "sharp_body": 0.3187,
+    "sharp_eye": null,
+    "sharp_head": 0.1573,
+    "sharp_torso": 0.2793,
+    "terms": {
+     "body": {
+      "gray_var": 0.0952,
+      "lap_var": 0.03098,
+      "px": [
+       512,
+       170
+      ]
+     },
+     "eye": null,
+     "head": {
+      "gray_var": 0.09257,
+      "lap_var": 0.01488,
+      "px": [
+       512,
+       512
+      ]
+     },
+     "torso": {
+      "gray_var": 0.07158,
+      "lap_var": 0.02055,
+      "px": [
+       512,
+       30
+      ]
+     }
+    },
+    "torso": [
+     2102,
+     149,
+     4149,
+     268
+    ],
+    "upper": [
+     1795,
+     0,
+     4456,
+     681
+    ]
+   }
+  ],
+  "primary_body_sharp": 0.3108,
+  "primary_by": "priority",
+  "primary_eye_hf": 0.003,
+  "primary_eye_sharp": 0.0373,
+  "primary_eye_src": "pose",
+  "primary_head_sharp": 0.1307,
+  "split": {
+   "gap": 2,
+   "grades": {
+    "eye": 2,
+    "fft": 0,
+    "head": 3
+   },
+   "odd": "fft"
+  },
+  "width": 5163
+ },
+ "measure": {
+  "bg_sharp": 0.4709,
+  "bg_terms": {
+   "gray_var": 0.0529,
+   "lap_var": 0.02585,
+   "px_count": 605978
+  },
+  "detector": "yolo11n-pose",
+  "eps": 0.002,
+  "exposure": null,
+  "global_sharp": 0.408,
+  "global_terms": {
+   "gray_var": 0.06233,
+   "lap_var": 0.02625,
+   "px": [
+    1024,
+    768
+   ]
+  },
+  "height": 3872,
+  "noise_sigma": 0.2222,
+  "people": [
+   {
+    "area_frac": 0.15623504337122213,
+    "box": [
+     1884,
+     2144,
+     4243,
+     3468
+    ],
+    "center": [
+     0.593,
+     0.725
+    ],
+    "center_dist": 0.344,
+    "conf": 0.5438579320907593,
+    "head": [
+     1780,
+     2128,
+     2488,
+     2835
+    ],
+    "head_src": "keypoints",
+    "kp": [
+     [
+      2130,
+      2501,
+      0.956
+     ],
+     [
+      2148,
+      2425,
+      0.955
+     ],
+     [
+      2061,
+      2535,
+      0.779
+     ],
+     [
+      2282,
+      2349,
+      0.947
+     ],
+     [
+      2051,
+      2600,
+      0.455
+     ],
+     [
+      2431,
+      2343,
+      0.987
+     ],
+     [
+      2268,
+      2643,
+      0.996
+     ],
+     [
+      2490,
+      2303,
+      0.944
+     ],
+     [
+      2334,
+      2621,
+      0.953
+     ],
+     [
+      2484,
+      2396,
+      0.866
+     ],
+     [
+      2326,
+      2503,
+      0.904
+     ],
+     [
+      2976,
+      2570,
+      0.999
+     ],
+     [
+      2855,
+      2736,
+      0.999
+     ],
+     [
+      3085,
+      2790,
+      0.998
+     ],
+     [
+      3126,
+      3022,
+      0.999
+     ],
+     [
+      3921,
+      2729,
+      0.994
+     ],
+     [
+      3924,
+      3056,
+      0.996
+     ]
+    ],
+    "priority": 0.09985,
+    "sharp_body": 0.3108174221489855,
+    "sharp_head": 0.1306540994884354,
+    "sharp_torso": 0.40613110247812506,
+    "terms": {
+     "body": {
+      "gray_var": 0.07969,
+      "lap_var": 0.02539,
+      "px": [
+       512,
+       287
+      ]
+     },
+     "head": {
+      "gray_var": 0.0347,
+      "lap_var": 0.004795,
+      "px": [
+       512,
+       511
+      ]
+     },
+     "torso": {
+      "gray_var": 0.0672,
+      "lap_var": 0.0281,
+      "px": [
+       512,
+       43
+      ]
+     }
+    },
+    "torso": [
+     1884,
+     2493,
+     4243,
+     2691
+    ],
+    "upper": [
+     1530,
+     2022,
+     4597,
+     3232
+    ]
+   },
+   {
+    "area_frac": 0.0746808985742481,
+    "box": [
+     1960,
+     2115,
+     4162,
+     2793
+    ],
+    "center": [
+     0.593,
+     0.634
+    ],
+    "center_dist": 0.23,
+    "conf": 0.37059125304222107,
+    "head": [
+     1990,
+     2078,
+     2651,
+     2738
+    ],
+    "head_src": "keypoints",
+    "kp": [
+     [
+      2332,
+      2404,
+      0.793
+     ],
+     [
+      2323,
+      2385,
+      0.674
+     ],
+     [
+      2319,
+      2408,
+      0.495
+     ],
+     [
+      2323,
+      2388,
+      0.685
+     ],
+     [
+      2308,
+      2457,
+      0.629
+     ],
+     [
+      2417,
+      2435,
+      0.987
+     ],
+     [
+      2433,
+      2517,
+      0.966
+     ],
+     [
+      2513,
+      2441,
+      0.935
+     ],
+     [
+      2457,
+      2538,
+      0.693
+     ],
+     [
+      2490,
+      2430,
+      0.834
+     ],
+     [
+      2435,
+      2490,
+      0.673
+     ],
+     [
+      2951,
+      2443,
+      0.985
+     ],
+     [
+      2939,
+      2528,
+      0.971
+     ],
+     [
+      3321,
+      2342,
+      0.982
+     ],
+     [
+      3364,
+      2419,
+      0.971
+     ],
+     [
+      3786,
+      2528,
+      0.953
+     ],
+     [
+      3794,
+      2596,
+      0.942
+     ]
+    ],
+    "priority": 0.04528,
+    "sharp_body": 0.3179085549846505,
+    "sharp_head": 0.09759010727529649,
+    "sharp_torso": 0.40281202649441344,
+    "terms": {
+     "body": {
+      "gray_var": 0.08026,
+      "lap_var": 0.02615,
+      "px": [
+       512,
+       158
+      ]
+     },
+     "head": {
+      "gray_var": 0.04147,
+      "lap_var": 0.004243,
+      "px": [
+       512,
+       511
+      ]
+     },
+     "torso": {
+      "gray_var": 0.07472,
+      "lap_var": 0.0309,
+      "px": [
+       512,
+       24
+      ]
+     }
+    },
+    "torso": [
+     1960,
+     2475,
+     4162,
+     2577
+    ],
+    "upper": [
+     1629,
+     2023,
+     4493,
+     2793
+    ]
+   },
+   {
+    "area_frac": 0.0697312548921682,
+    "box": [
+     2102,
+     0,
+     4149,
+     681
+    ],
+    "center": [
+     0.605,
+     0.088
+    ],
+    "center_dist": 0.601,
+    "conf": 0.3547654449939728,
+    "head": [
+     2614,
+     0,
+     3637,
+     1023
+    ],
+    "head_src": "box_top",
+    "kp": [
+     [
+      2870,
+      10,
+      0.011
+     ],
+     [
+      2941,
+      0,
+      0.009
+     ],
+     [
+      2842,
+      0,
+      0.006
+     ],
+     [
+      3033,
+      0,
+      0.029
+     ],
+     [
+      2783,
+      0,
+      0.007
+     ],
+     [
+      3068,
+      21,
+      0.126
+     ],
+     [
+      2632,
+      2,
+      0.084
+     ],
+     [
+      3492,
+      166,
+      0.277
+     ],
+     [
+      2544,
+      80,
+      0.103
+     ],
+     [
+      3914,
+      360,
+      0.213
+     ],
+     [
+      2556,
+      166,
+      0.111
+     ],
+     [
+      3030,
+      251,
+      0.745
+     ],
+     [
+      2757,
+      286,
+      0.642
+     ],
+     [
+      3484,
+      264,
+      0.745
+     ],
+     [
+      3308,
+      299,
+      0.69
+     ],
+     [
+      4065,
+      371,
+      0.773
+     ],
+     [
+      3933,
+      425,
+      0.749
+     ]
+    ],
+    "priority": 0.03303,
+    "sharp_body": 0.3187184112706646,
+    "sharp_head": 0.15734584732861262,
+    "sharp_torso": 0.2793002710618786,
+    "terms": {
+     "body": {
+      "gray_var": 0.0952,
+      "lap_var": 0.03098,
+      "px": [
+       512,
+       170
+      ]
+     },
+     "head": {
+      "gray_var": 0.09257,
+      "lap_var": 0.01488,
+      "px": [
+       512,
+       512
+      ]
+     },
+     "torso": {
+      "gray_var": 0.07158,
+      "lap_var": 0.02055,
+      "px": [
+       512,
+       30
+      ]
+     }
+    },
+    "torso": [
+     2102,
+     149,
+     4149,
+     268
+    ],
+    "upper": [
+     1795,
+     0,
+     4456,
+     681
+    ]
+   }
+  ],
+  "width": 5163
+ },
+ "order": [
+  0,
+  1,
+  2
+ ],
+ "path": "testdata/images/bus_portrait.jpg"
+}

@@ -16,3 +16,7 @@ photosort_data/
 .claude/
 dev-data/cr2/
 CLAUDE.md
+.models/
+testdata/golden-local/
+bin/
+.scratch/

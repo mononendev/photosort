@@ -90,7 +90,12 @@ DEFAULTS: dict = {
               # A tier 3 whose head carries >= plane_max_extra px more edge blur than its surroundings drops to 2:
               # focus landed just in front or behind. plane_body_max_extra does the same against the torso; off
               # by default, since clothing print reads sharper than a face even when both are in focus.
-              "use_plane": True, "plane_max_extra": 0.4, "plane_body_max_extra": None},
+              "use_plane": True, "plane_max_extra": 0.4, "plane_body_max_extra": None,
+              # A tier 3 drops to 2 when someone nearer (>= front_min_height x its box height, feet lower by
+              # front_min_drop x that height) and beside it (<= front_max_gap heights apart) has a head at
+              # front_max_grade or worse: focus went past them. People within front_edge of the frame edge don't count.
+              "use_front": True, "front_min_height": 1.0, "front_min_drop": 0.25, "front_max_gap": 0.5,
+              "front_max_grade": 1, "front_edge": 0.01},
     # Camera-metadata prior: crop_factor converts focal length to 35mm-equivalent when EXIF lacks it;
     # f-number <= wide_open_f or entrance pupil >= 40mm = "very shallow DOF"; a tier-3 sharpness below tier3_min*shake_margin is
     # demoted to tier 2 when the shutter was slow enough that motion blur is likely.

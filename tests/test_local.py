@@ -114,6 +114,23 @@ def test_local_tier_focus_plane_caps_sharp_at_two():
     assert local.local_tier({**behind, "sharp_eye": 0.04}, [], thr) == (2, "primary_eyes_slightly_soft")  # only caps a 3
 
 
+def test_local_tier_soft_person_in_front_caps_sharp_at_two():
+    # AA4I6532: the AF point slipped past the rider onto a spectator behind, who is sharp; the rider is not.
+    thr = {**THR, "use_front": True, "front_min_height": 1.0, "front_min_drop": 0.25, "front_max_gap": 0.5,
+           "front_max_grade": 1, "front_edge": 0.01}
+    size = (3648, 5472)
+    spectator = {"sharp_head": 0.28, "box": [1564, 2397, 2074, 3187]}
+    rider = {"sharp_head": 0.0078, "box": [1189, 2566, 1666, 3684]}
+    assert local.local_tier(spectator, [rider], thr, size=size) == (2, "soft_person_in_front")
+    assert local.local_tier(spectator, [rider], thr)[0] == 3                                  # no frame size: off
+    assert local.local_tier(spectator, [rider], {**thr, "use_front": False}, size=size)[0] == 3
+    assert local.local_tier(spectator, [{**rider, "sharp_head": 0.05}], thr, size=size)[0] == 3   # sharp in front
+    assert local.local_tier(spectator, [{**rider, "box": [1189, 2566, 1666, 3200]}], thr, size=size)[0] == 3  # level
+    assert local.local_tier(spectator, [{**rider, "box": [1350, 2900, 1666, 3684]}], thr, size=size)[0] == 3  # shorter
+    assert local.local_tier(spectator, [{**rider, "box": [100, 2566, 600, 3684]}], thr, size=size)[0] == 3    # far off
+    assert local.local_tier(spectator, [{**rider, "box": [0, 2566, 1500, 3684]}], thr, size=size)[0] == 3     # edge-cut
+
+
 def _scene(head_blur, bg_blur, size=1200):
     """Textured surroundings with a person-shaped patch of texture in the middle, each blurred separately."""
     rng = np.random.default_rng(1)

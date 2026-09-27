@@ -32,6 +32,7 @@ const REASON_TEXT: Record<string, string> = {
   primary_soft: "the primary subject's head box cleared tier 1 but not tier 2 (no eyes located)",
   sharper_around_subject: 'it cleared tier 3, but things right around the subject are clearly sharper than their head, so focus landed just in front or behind',
   sharper_body_than_head: "it cleared tier 3, but the subject's torso is clearly sharper than their head, so focus landed on the body",
+  soft_person_in_front: 'it cleared tier 3, but a soft person stands right beside them and nearer the camera, so focus likely went past the real subject onto someone behind',
   secondary_person_sharp: 'the primary subject missed, though someone else in the frame is sharp',
   nothing_sharp: 'nobody cleared the tier-1 threshold',
 };
@@ -84,6 +85,9 @@ export function explainLocal(l: LocalResult, cfg: Cfg): ReactNode {
         <div className="text-gray-400">Tier 3 at a slow shutter must clear {margin}× the tier-3 thresholds; this one didn't, so it's soft (2).</div>
       )}
       {p.plane && thr.use_plane !== false && planeNote(p.plane, (thr.plane_max_extra as number | null) ?? undefined, (thr.plane_body_max_extra as number | null) ?? undefined)}
+      {l.local_reason === 'soft_person_in_front' && (
+        <div className="text-gray-400">Someone at least as tall, with their feet clearly lower in the frame (nearer), stands beside the primary and their head box is soft. That's what an AF point slipping off a rider onto the background looks like, so a tier 3 is capped at 2. People cut by the frame edge (passers-by) don't count.</div>
+      )}
       {l.local_reason === 'secondary_person_sharp' && (
         <div className="text-gray-400">Another person graded tier 3, but the tier grades the primary subject, so the frame is still a miss.</div>
       )}

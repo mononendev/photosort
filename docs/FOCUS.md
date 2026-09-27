@@ -69,6 +69,15 @@ subject at native resolution, and falls back to the head when the eyes can't be 
    (added in quadrature) drops to tier 2 (`sharper_around_subject`). Bokeh with no edges can't trigger it. The
    same comparison against the torso is stored and shown, but only decides when `plane_body_max_extra` is set:
    clothing print is steeper than any face, so it reads high on sharp frames too. Primary subject only.
+
+   **Soft person in front.** The plane check trusts that the primary is the subject. When the AF point slips
+   off a rider onto a spectator behind them, the spectator is sharp (and so are their surroundings), while the
+   rider is not. So a tier 3 also drops to 2 (`soft_person_in_front`) when another person stands beside the
+   primary (at most `front_max_gap` primary-heights apart sideways) and clearly nearer (at least
+   `front_min_height` times as tall, feet lower by `front_min_drop` primary-heights), and their head box grades
+   `front_max_grade` or worse. Their head box decides, not their eye band, which can grade low on a sharp face.
+   People within `front_edge` of the frame edge are passers-by in the foreground and don't count. It uses only
+   stored boxes and metrics, so a rescore applies it.
 8. **EXIF prior.** Aperture, shutter, focal length and ISO are read from EXIF. An entrance pupil ≥ 40 mm
    or f/2 and wider flags very shallow depth of field; a shutter at least a stop slower than 1/focal-length
    (35 mm equivalent) or slower than 1/60 s flags motion-blur risk. A tier 3 that clears its thresholds by
@@ -109,6 +118,10 @@ high is usually right: a false "sharp" costs more than a false "check this".
 | `use_plane` | `true` | Run the focus-plane check (needs a local re-analyze; re-scoring alone can't add it) |
 | `plane_max_extra` | 0.4 | Extra head blur over the surroundings, in px, that takes a tier 3 to 2 |
 | `plane_body_max_extra` | `null` | The same against the torso (off: clothing print reads sharp) |
+| `use_front` | `true` | Run the soft-person-in-front check |
+| `front_min_height`, `front_min_drop`, `front_max_gap` | 1.0, 0.25, 0.5 | Nearer and beside: height ratio, feet drop and sideways gap, in primary heights |
+| `front_max_grade` | 1 | Head box grade at or below which the person in front counts as soft |
+| `front_edge` | 0.01 | Ignore people within this fraction of the frame edge |
 
 `exif`: `crop_factor` (for bodies that don't write a 35 mm-equivalent focal length), `wide_open_f`,
 `shake_margin`.

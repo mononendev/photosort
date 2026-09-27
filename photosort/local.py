@@ -406,12 +406,41 @@ def _grade(p: dict, thr: dict, k: float = 1.0) -> Optional[int]:
     return next((lvl for lvl in (3, 2, 1) if ok(lvl)), 0)
 
 
+def soft_in_front(primary: dict, others: list[dict], thr: dict, W: int, H: int) -> Optional[int]:
+    """Index into others of a person standing clearly nearer than, and beside, the primary whose head is soft.
+
+    Nearer means at least front_min_height x the primary's box height with feet (box bottom) lower in the frame by
+    front_min_drop x that height: on a ground plane both grow toward the camera. Beside means at most front_max_gap
+    x that height apart sideways, where a slipped AF point lands. When the point slips off a rider onto a
+    spectator behind them, the spectator is sharp and the rider in front is not: focus landed behind the subject.
+
+    The head box Laplacian decides, not _grade: an eye band can grade low on a plainly sharp face. People cut by
+    the frame edge (within front_edge of it) are passers-by in the foreground, not the subject, so they don't
+    count. Needs only stored boxes and metrics, so a rescore applies it."""
+    hmin, drop, gap = thr.get("front_min_height"), thr.get("front_min_drop"), thr.get("front_max_gap")
+    box, e = primary.get("box"), thr.get("front_edge", 0.01)
+    if not thr.get("use_front", True) or None in (hmin, drop, gap) or not box:
+        return None
+    h = box[3] - box[1]
+    for i, o in enumerate(others):
+        b, s = o.get("box"), o.get("sharp_head")
+        if not b or s is None or b[3] - b[1] < hmin * h or b[3] - box[3] < drop * h \
+                or max(b[0] - box[2], box[0] - b[2]) > gap * h:
+            continue
+        if b[0] <= e * W or b[2] >= (1 - e) * W or b[3] >= (1 - e) * H:
+            continue
+        if s < thr[f"tier{thr.get('front_max_grade', 1) + 1}_min"]:
+            return i
+    return None
+
+
 def local_tier(primary: Optional[dict], others: list[dict], thr: dict, prior: Optional[dict] = None,
-               shake_margin: float = 1.5) -> tuple[int, str]:
+               shake_margin: float = 1.5, size: Optional[tuple[int, int]] = None) -> tuple[int, str]:
     """Tier from measured sharpness (3 sharp, 2 slightly soft, 1 soft, 0 miss); the EXIF prior only demotes a
     *borderline* tier 3 shot at a slow shutter (a clearly sharp subject wins, e.g. a well-panned rider). A tier 3
     whose surroundings (or, when plane_body_max_extra is set, torso) are clearly sharper than the head
-    (focus_plane) is only slightly soft: focus landed just off the face."""
+    (focus_plane) is only slightly soft: focus landed just off the face. So is one with a soft person standing
+    clearly in front of it (soft_in_front): focus went past the subject onto someone behind."""
     if primary is None:
         return 0, "no_people"
     g = _grade(primary, thr)
@@ -428,6 +457,8 @@ def local_tier(primary: Optional[dict], others: list[dict], thr: dict, prior: Op
                 return 2, "sharper_around_subject"
             if body_cut and (pl.get("head_vs_torso") or 0) >= body_cut:
                 return 2, "sharper_body_than_head"
+        if size and soft_in_front(primary, others, thr, *size) is not None:
+            return 2, "soft_person_in_front"
         return 3, "primary_eyes_sharp" if on_eyes else "primary_head_sharp"
     if g == 2:
         return 2, "primary_eyes_slightly_soft" if on_eyes else "primary_slightly_soft"
@@ -558,7 +589,7 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
         primary["plane"] = focus_plane(gray, primary, W, H)
     exif = X.read(path)
     prior = X.prior(exif, cfg.get("exif"))
-    tier, reason = local_tier(primary, people[1:], cfg["focus"], prior, cfg.get("exif", {}).get("shake_margin", 1.5))
+    tier, reason = local_tier(primary, people[1:], cfg["focus"], prior, cfg.get("exif", {}).get("shake_margin", 1.5), (W, H))
 
     frame_im = I.resize_long_edge(im, cfg["frame_long_edge"])
     frame = I.to_jpeg(frame_im, cfg["frame_quality"])
@@ -621,7 +652,8 @@ def rescore(db, cfg: dict, backfill_exif: bool = True) -> dict:
                 reordered += 1
                 dirty = True
             tier, reason = local_tier(people[0] if people else None, people[1:], cfg["focus"], d.get("exif_prior"),
-                                      cfg.get("exif", {}).get("shake_margin", 1.5))
+                                      cfg.get("exif", {}).get("shake_margin", 1.5),
+                                      (d["width"], d["height"]) if d.get("width") else None)
             if tier != d.get("local_tier") or dirty:
                 if tier != d.get("local_tier"):
                     changed += 1

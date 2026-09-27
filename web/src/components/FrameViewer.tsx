@@ -29,7 +29,7 @@ const subjectCenter = (l: LocalResult): [number, number] => {
 
 /**
  * Fullscreen frame with the same overlay. Scroll zooms around the cursor, drag pans, 0 resets, + / − zoom around
- * the center. Double-click while zoomed in goes to 1:1 around the cursor; at 1:1 (or fit) it goes back to fit. Escape closes the viewer only; arrow keys still step through images.
+ * the center. Double-click goes to 1:1 around the cursor, or back to fit when already at 1:1. Escape closes the viewer only; arrow keys still step through images.
  * On touch screens: pinch zooms around the fingers, one finger pans, double-tap zooms in (or back to fit).
  * `zoomRef` holds the magnification (screen px per native px) while zoomed in, 0 at fit. Every photo opens at it,
  * centered on the subject's head, so stepping on (or rating) keeps the zoom; it lives with the caller because the
@@ -153,7 +153,7 @@ export default function FrameViewer({ id, name, l, grades, layers, selected, onS
         onDoubleClick={(e) => {
           if (lastType.current !== 'mouse') return;
           const r = stageRect();
-          if (view.zoom > 1 && Math.abs(scale - 1) > 0.01) zoomAt(1 / scale, e.clientX - r.left, e.clientY - r.top); else reset();
+          if (Math.abs(scale - 1) > 0.01) zoomAt(1 / scale, e.clientX - r.left, e.clientY - r.top); else reset();
         }}
         onPointerDown={(e) => {
           lastType.current = e.pointerType;

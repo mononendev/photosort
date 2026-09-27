@@ -128,6 +128,10 @@ DEFAULTS: dict = {
               "rating_tiers": {"5": 3, "4": 3, "3": 2, "2": 1, "1": 0, "0": None}},
     # Sorting
     "focus_source": "vlm",       # vlm | local | strict (strict = min of both)
+    # Your sort groups (keys a s d f in the photo view). In the sorted tree a grouped photo goes under its group's
+    # folder (<folder>/focus_N/...) instead of the top level, and its XMP sidecar gets the group's keywords
+    # ("Parent|Child" for a hierarchical one).
+    "groups": {str(n): {"folder": f"group_{n}", "keywords": []} for n in range(1, 5)},
 }
 
 

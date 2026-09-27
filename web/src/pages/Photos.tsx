@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { api, thumbUrl, BANGER, SUBJECTS, TIER_LABEL, TIERS } from '../api/client';
+import { api, thumbUrl, BANGER, GROUPS, SUBJECTS, TIER_LABEL, TIERS } from '../api/client';
 import type { ImageFilters } from '../api/client';
 import { TierBadge, Stars, StatusDot, LrBadge, RatingBadge } from '../components/TierBadge';
 import ImageDetail from '../components/ImageDetail';
@@ -27,6 +27,7 @@ export default function Photos() {
     truth_mismatch: sp.get('truth_mismatch') ? true : undefined,
     reviewed: sp.get('reviewed') ? sp.get('reviewed') === 'true' : undefined,
     rating: sp.get('rating') ? Number(sp.get('rating')) : undefined,
+    group: sp.get('group') ? Number(sp.get('group')) : undefined,
     q: sp.get('q') ?? undefined,
     sort: sp.get('sort') ?? 'path',
     offset: Number(sp.get('offset') ?? 0),
@@ -70,7 +71,7 @@ export default function Photos() {
   const offset = filters.offset ?? 0;
   const sel = 'bg-gray-900 border border-gray-700 rounded px-2 py-1.5 sm:py-1 text-sm';
   const [showFilters, setShowFilters] = useState(false);
-  const nActive = ['folder', 'tier', 'keeper', 'subject', 'status', 'review', 'truth_mismatch', 'lr_rating', 'recursive', 'reviewed', 'rating'].filter((k) => sp.get(k)).length;
+  const nActive = ['folder', 'tier', 'keeper', 'subject', 'status', 'review', 'truth_mismatch', 'lr_rating', 'recursive', 'reviewed', 'rating', 'group'].filter((k) => sp.get(k)).length;
 
   return (
     <div className="space-y-4">
@@ -93,6 +94,9 @@ export default function Photos() {
         <Tip plain tip="Photos you have or haven't rated yet (q/w/e/r/t in the photo view), or just your bangers. Pick “not reviewed yet” to cull: rating a photo steps to the next one."><select value={filters.rating === BANGER ? 'banger' : filters.reviewed === undefined ? '' : String(filters.reviewed)}
           onChange={(e) => setMany(e.target.value === 'banger' ? { rating: String(BANGER), reviewed: undefined } : { rating: undefined, reviewed: e.target.value })} className={`${sel} w-full sm:w-auto`}>
           <option value="">reviewed?</option><option value="false">not reviewed yet</option><option value="true">reviewed</option><option value="banger">★ bangers</option>
+        </select></Tip>
+        <Tip plain tip="Your sort groups (a/s/d/f in the photo view)."><select value={filters.group ?? ''} onChange={(e) => set('group', e.target.value)} className={`${sel} w-full sm:w-auto`}>
+          <option value="">any group</option>{GROUPS.map((g) => <option key={g.value} value={g.value}>group {g.value}</option>)}<option value="0">in no group</option>
         </select></Tip>
         <select value={filters.subject ?? ''} onChange={(e) => set('subject', e.target.value)} className={`${sel} w-full sm:w-auto`}>
           <option value="">any subject</option>{SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -127,6 +131,7 @@ export default function Photos() {
                 {it.reviewed
                   ? <RatingBadge rating={it.rating} />
                   : it.overridden && <Tip plain tip="You set a score, keep/cull or note on this photo. Your values beat the automatic ones."><span className="rounded bg-purple-900/80 text-purple-200 px-1 text-[10px]">edited</span></Tip>}
+                {it.group ? <Tip plain tip={`In your group ${it.group}.`}><span className="rounded bg-fuchsia-900/80 text-fuchsia-200 px-1 text-[10px]">G{it.group}</span></Tip> : null}
               </div>
               {it.keeper === false && <div className="absolute inset-0 bg-black/40" />}
             </div>

@@ -16,6 +16,18 @@ BANGER = 4
 RATING_LABELS = {0: "Red", 1: "Orange", 2: "Yellow", 3: "Green", 4: "Blue"}
 
 
+def _group(r: dict, groups: dict | None) -> dict:
+    """The config entry for the record's sort group (config "groups"), or {} when it has none."""
+    return (groups or {}).get(str(r.get("group")), {}) if r.get("group") else {}
+
+
+def group_folder(r: dict, groups: dict | None) -> str | None:
+    """The tree folder a grouped record goes under: its group's folder name, else group_N."""
+    if not r.get("group"):
+        return None
+    return Path(str(_group(r, groups).get("folder") or "")).name or f"group_{r['group']}"
+
+
 def final_record(row, source: str) -> dict:
     local, vlm = jcol(row, "local_json"), jcol(row, "vlm_json")
     ov = jcol(row, "override_json", {}) if "override_json" in row.keys() else {}
@@ -52,6 +64,7 @@ def final_record(row, source: str) -> dict:
         "rating": ov.get("rating"),
         "banger": ov.get("rating") == BANGER,
         "reviewed": bool(ov.get("reviewed")),
+        "group": ov.get("group"),   # your sort group 1-4: its own folder in the tree, its keywords in the XMP
         "overridden": bool(ov),
         "local": {k: local.get(k) for k in ("n_people", "primary_head_sharp", "primary_body_sharp", "bg_sharp", "local_reason")} if local else None,
         "error": row["error"],
@@ -74,19 +87,22 @@ def place(src: Path, dst: Path, mode: str):
         shutil.move(str(src), dst)
 
 
-def build_tree(records: list[dict], out: Path, mode: str) -> dict:
+def build_tree(records: list[dict], out: Path, mode: str, groups: dict | None = None) -> dict:
     counts: dict[str, int] = {}
     for r in records:
         src = Path(r["path"])
         if not src.exists() or r["focus_tier"] is None:
             continue
         tier_dir = TIER_NAMES[r["focus_tier"]]
+        gdir = group_folder(r, groups)
+        base = out / gdir if gdir else out                       # a grouped photo sorts inside its group's folder
         if r["subject"] == "unknown" and r["composition"] == "unknown":
-            dst = out / tier_dir / src.name                      # local-only run: no subject info yet
+            dst = base / tier_dir / src.name                     # local-only run: no subject info yet
         else:
-            dst = out / tier_dir / r["subject"] / r["composition"] / src.name
+            dst = base / tier_dir / r["subject"] / r["composition"] / src.name
         place(src, dst, mode)
-        counts[tier_dir] = counts.get(tier_dir, 0) + 1
+        key = f"{gdir}/{tier_dir}" if gdir else tier_dir
+        counts[key] = counts.get(key, 0) + 1
         if r["review"]:
             why = f"local{r['focus_tier_local']}_vlm{r['focus_tier_vlm']}" if r["disagree"] else "metrics_split"
             place(src, out / "review" / why / src.name, "symlink" if mode == "move" else mode)
@@ -103,7 +119,7 @@ def export(records: list[dict], out: Path):
         for r in records:
             f.write(json.dumps(r) + "\n")
     cols = ["path", "focus_tier", "focus_tier_local", "focus_tier_vlm", "review", "subject", "composition", "placement",
-            "action", "people_count", "rating", "reviewed", "quality_score", "keeper", "keywords", "adjectives", "description", "focus_notes",
+            "action", "people_count", "rating", "reviewed", "group", "quality_score", "keeper", "keywords", "adjectives", "description", "focus_notes",
             "quality_remarks", "error"]
     with (out / "results.csv").open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
@@ -141,7 +157,7 @@ XMP_TMPL = """<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
 """
 
 
-def xmp_for(r: dict) -> str:
+def xmp_for(r: dict, groups: dict | None = None) -> str:
     tier = r["focus_tier"]
     kws = list(r["keywords"] or []) + list(r["adjectives"] or [])
     tags = [f"focus-{TIER_NAMES.get(tier, 'unknown')}", f"subject-{r['subject']}", f"comp-{r['composition']}"]
@@ -155,6 +171,10 @@ def xmp_for(r: dict) -> str:
     if r.get("banger"):
         tags.append("photosort-banger")
         hier.append("PhotoSort|Banger")
+    for kw in _group(r, groups).get("keywords") or []:   # your group's keywords, as plain Lightroom keywords
+        if str(kw).strip("| "):
+            tags.append(str(kw).strip("| ").split("|")[-1])
+            hier.append(str(kw).strip("| "))
     li = lambda xs: "\n".join(f"    <rdf:li>{escape(str(x))}</rdf:li>" for x in xs)
     instr = " ".join(x for x in (r["focus_notes"], r["quality_remarks"]) if x)
     attrs = {
@@ -172,7 +192,7 @@ def xmp_for(r: dict) -> str:
         description=escape(r["description"] or ""))
 
 
-def write_xmp(records: list[dict], xmp_dir: Path | None, overwrite: bool) -> tuple[int, int]:
+def write_xmp(records: list[dict], xmp_dir: Path | None, overwrite: bool, groups: dict | None = None) -> tuple[int, int]:
     written = skipped = 0
     for r in records:
         src = Path(r["path"])
@@ -183,6 +203,6 @@ def write_xmp(records: list[dict], xmp_dir: Path | None, overwrite: bool) -> tup
             skipped += 1
             continue
         dst.parent.mkdir(parents=True, exist_ok=True)
-        dst.write_text(xmp_for(r), encoding="utf-8")
+        dst.write_text(xmp_for(r, groups), encoding="utf-8")
         written += 1
     return written, skipped

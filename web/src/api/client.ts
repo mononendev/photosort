@@ -24,6 +24,7 @@ export interface ImageSummary {
   overridden?: boolean;
   rating?: number | null;      // your cull: 0-3 focus tier, 4 banger (see RATINGS)
   reviewed?: boolean;
+  group?: number | null;       // your sort group 1-4 (see GROUPS)
   people_count?: number | null;
   description?: string | null;
   error?: string | null;
@@ -127,7 +128,7 @@ export interface VlmResult {
   quality_remarks: string; quality_score: number; keeper: boolean;
 }
 
-export interface Override { rating?: number; focus_tier?: number; quality_score?: number; keeper?: boolean; note?: string }
+export interface Override { rating?: number; focus_tier?: number; quality_score?: number; group?: number; keeper?: boolean; note?: string }
 
 export interface ImageDetail extends ImageSummary {
   local: LocalResult | null;
@@ -254,7 +255,7 @@ export interface ImagesPage { total: number; offset: number; items: ImageSummary
 export interface ImageFilters {
   folder?: string; recursive?: boolean; tier?: number; keeper?: boolean; subject?: string; status?: string;
   review?: boolean; split?: boolean; lr_rating?: number; lr_label?: string; truth_tier?: number; truth_mismatch?: boolean;
-  rating?: number; reviewed?: boolean;
+  rating?: number; reviewed?: boolean; group?: number;   // group 0: in none
   local_tier?: number; vlm_tier?: number; stages?: 'agree' | 'disagree'; stale?: boolean; composition?: string;
   eye_src?: 'face' | 'pose' | 'none'; primary_by?: 'af' | 'priority'; lifted?: boolean; overridden?: boolean; noted?: boolean;
   camera?: string; lens?: string;
@@ -320,7 +321,7 @@ export const api = {
   image: (id: number) => request<ImageDetail>(`/api/images/${id}`),
   trace: (id: number) => request<Trace>(`/api/images/${id}/trace`),
   focusDebug: (id: number) => request<FocusDebug>(`/api/images/${id}/focus-debug`),
-  override: (id: number, o: Override & { clear?: boolean; clear_rating?: boolean; clear_score?: boolean }) =>
+  override: (id: number, o: Override & { clear?: boolean; clear_rating?: boolean; clear_score?: boolean; clear_group?: boolean }) =>
     request<ImageDetail>(`/api/images/${id}`, { method: 'PATCH', body: JSON.stringify(o) }),
   jobs: () => request<Job[]>('/api/jobs'),
   createJob: (paths: string[], options: JobOptions) =>
@@ -369,6 +370,12 @@ export const RATINGS = [
   { value: 4, key: 't', short: '★', label: 'banger', color: 'Blue', hex: '#60a5fa', cls: 'bg-blue-900/70 text-blue-200 border-blue-600', solid: 'bg-blue-600 border-blue-400' },
 ] as const;
 export const BANGER = 4;
+/** Your sort groups, in key order (a s d f). Each exports to its own folder with its keywords (config "groups"). */
+export const GROUPS = [
+  { value: 1, key: 'a' }, { value: 2, key: 's' }, { value: 3, key: 'd' }, { value: 4, key: 'f' },
+] as const;
+/** Config "groups": per group, the export folder and the XMP keywords. */
+export type GroupsConfig = Record<string, { folder: string; keywords: string[] }>;
 /** The focus tiers, worst to best. */
 export const SUBJECTS = ['rider_action', 'rider_posed', 'group', 'crowd_spectators', 'gear_board', 'venue_scenery', 'other', 'no_people'];
 export const TIERS = [0, 1, 2, 3] as const;

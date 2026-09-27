@@ -30,11 +30,13 @@ class OverrideIn(BaseModel):
     rating: Optional[int] = Field(None, ge=0, le=4)   # your cull: 0-3 focus tier, 4 banger; marks the photo reviewed
     focus_tier: Optional[int] = Field(None, ge=0, le=3)
     quality_score: Optional[int] = Field(None, ge=1, le=5)   # your stars; beat the model's score and export as xmp:Rating
+    group: Optional[int] = Field(None, ge=1, le=4)   # your sort group (keys a s d f); see config "groups"
     keeper: Optional[bool] = None
     note: Optional[str] = None
     clear: bool = False
     clear_rating: bool = False    # drop just your rating (and the reviewed mark); keeps score, keeper and note
     clear_score: bool = False     # drop just your stars; the model's score shows through again
+    clear_group: bool = False     # take the photo back out of its group
 
 
 class ConfigIn(BaseModel):
@@ -104,7 +106,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             "focus_tier": rec["focus_tier"], "focus_tier_local": rec["focus_tier_local"], "focus_tier_vlm": rec["focus_tier_vlm"],
             "review": rec["review"], "split": rec["split"], "subject": rec["subject"], "composition": rec["composition"],
             "quality_score": rec["quality_score"], "keeper": rec["keeper"], "overridden": rec["overridden"],
-            "rating": rec["rating"], "reviewed": rec["reviewed"],
+            "rating": rec["rating"], "reviewed": rec["reviewed"], "group": rec["group"],
             "people_count": rec["people_count"], "description": rec["description"], "error": row["error"],
             "lr_rating": lr.get("rating"), "lr_label": lr.get("label"),
             "truth_tier": tr.get("focus_tier"), "truth_rating": tr.get("rating"), "truth_label": tr.get("label"),
@@ -314,7 +316,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
                     subject: Optional[str] = None, status: Optional[str] = None, review: Optional[bool] = None, split: Optional[bool] = None,
                     lr_rating: Optional[int] = None, lr_label: Optional[str] = None,
                     truth_tier: Optional[int] = None, truth_mismatch: Optional[bool] = None,
-                    rating: Optional[int] = None, reviewed: Optional[bool] = None,
+                    rating: Optional[int] = None, reviewed: Optional[bool] = None, group: Optional[int] = None,
                     local_tier: Optional[int] = None, vlm_tier: Optional[int] = None, stages: Optional[str] = None,
                     stale: Optional[bool] = None, composition: Optional[str] = None, eye_src: Optional[str] = None,
                     primary_by: Optional[str] = None, lifted: Optional[bool] = None, overridden: Optional[bool] = None,
@@ -377,6 +379,8 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             where.append("json_extract(override_json,'$.rating') = ?"); params.append(rating)
         if reviewed is not None:
             where.append("COALESCE(json_extract(override_json,'$.reviewed'), 0) = ?"); params.append(int(reviewed))
+        if group is not None:   # 0: in no group
+            where.append("COALESCE(json_extract(override_json,'$.group'), 0) = ?"); params.append(group)
         if local_tier is not None:
             where.append(f"{_LOC} = ?"); params.append(local_tier)
         if vlm_tier is not None:
@@ -535,8 +539,10 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
                 cur.pop(k, None)
         elif o.clear_score:
             cur.pop("quality_score", None)
+        elif o.clear_group:
+            cur.pop("group", None)
         else:
-            for k, v in o.model_dump(exclude={"clear", "clear_rating", "clear_score"}, exclude_none=True).items():
+            for k, v in o.model_dump(exclude={"clear", "clear_rating", "clear_score", "clear_group"}, exclude_none=True).items():
                 cur[k] = v
             # A rating or a focus tier is your verdict on the photo: the two stay in step, and the photo counts as
             # reviewed. Only another rating or a reset changes it; jobs and rescans never write override_json.
@@ -723,10 +729,10 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         rows = db.rows(" AND ".join(where), params)
         recs = [sorter.final_record(r, e.focus_source or cfg.get("focus_source", "vlm")) for r in rows]
         sorter.export(recs, out)
-        counts = sorter.build_tree(recs, out, e.link) if e.tree else {}
+        counts = sorter.build_tree(recs, out, e.link, cfg.get("groups")) if e.tree else {}
         w = s = 0
         if e.xmp:
-            w, s = sorter.write_xmp(recs, out / "xmp", True)
+            w, s = sorter.write_xmp(recs, out / "xmp", True, cfg.get("groups"))
         return {"out": str(out), "images": len(recs), "tree": counts, "xmp_written": w}
 
     @app.get("/api/exports")

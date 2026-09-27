@@ -125,6 +125,34 @@ def test_export_carries_label_and_banger(tmp_path):
     assert counts["bangers"] == 1 and (tmp_path / "out" / "bangers" / "x.jpg").exists()
 
 
+def test_groups_set_filter_and_clear_without_touching_the_rating(client):
+    a, b = ids(client)
+    d = client.patch(f"/api/images/{a}", json={"group": 2}).json()
+    assert (d["group"], d["reviewed"]) == (2, False)
+    assert ids(client, group=2) == [a] and ids(client, group=0) == [b] and ids(client, group=1) == []
+    client.patch(f"/api/images/{a}", json={"rating": 3})
+    d = client.patch(f"/api/images/{a}", json={"clear_group": True}).json()
+    assert d["group"] is None and (d["rating"], d["reviewed"]) == (3, True)
+    assert client.patch(f"/api/images/{a}", json={"group": 5}).status_code == 422
+
+
+def test_group_exports_in_its_own_folder_with_its_keywords(tmp_path):
+    rec = {"path": str(tmp_path / "x.jpg"), "focus_tier": 3, "focus_tier_local": 3, "focus_tier_vlm": None, "review": False,
+           "subject": "rider_action", "composition": "full_body", "action": None, "keywords": [], "adjectives": [],
+           "description": None, "focus_notes": None, "quality_remarks": None, "quality_score": None, "keeper": None,
+           "rating": None, "banger": False, "group": 1}
+    groups = {"1": {"folder": "../clients", "keywords": ["Clients|Smith", "private"]}}
+    x = sorter.xmp_for(rec, groups)
+    assert "<rdf:li>Smith</rdf:li>" in x and "<rdf:li>Clients|Smith</rdf:li>" in x and "<rdf:li>private</rdf:li>" in x
+    assert "Smith" not in sorter.xmp_for({**rec, "group": None}, groups)
+    (tmp_path / "x.jpg").write_bytes(b"")
+    counts = sorter.build_tree([rec], tmp_path / "out", "copy", groups)
+    assert counts == {"clients/focus_3_sharp": 1}
+    assert (tmp_path / "out" / "clients" / "focus_3_sharp" / "rider_action" / "full_body" / "x.jpg").exists()
+    sorter.build_tree([{**rec, "group": 3}], tmp_path / "out2", "copy", groups)   # no config entry: group_N
+    assert (tmp_path / "out2" / "group_3" / "focus_3_sharp" / "rider_action" / "full_body" / "x.jpg").exists()
+
+
 def test_old_three_tier_data_and_config_migrate(tmp_path):
     """Old scale 0/1/2 (+ banger 3) keeps its colors: 1 -> 2 (yellow), 2 -> 3 (green), 3 -> 4 (blue); 0 stays."""
     import json

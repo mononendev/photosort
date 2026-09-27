@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { api, cropUrl, RATINGS } from '../api/client';
+import { api, cropUrl, GROUPS, RATINGS } from '../api/client';
 import { TierBadge, Stars } from './TierBadge';
 import Tip from './Tip';
 import FrameOverlay from './FrameOverlay';
@@ -87,6 +87,9 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
   // Stars: 1-5 set your quality score, 6 takes it back off (the model's shows through again). Neither moves on.
   const star = useCallback((n: number | null) => save({ id, o: n ? { quality_score: n } : { clear_score: true } }), [save, id]);
   const myStars = data?.override?.quality_score ?? null;
+  // Groups: a/s/d/f put the photo in group 1-4; the same key again takes it back out. Neither moves on.
+  const myGroup = data?.group ?? null;
+  const group = useCallback((g: number | null) => save({ id, o: g ? { group: g } : { clear_group: true } }), [save, id]);
   useHotkeys({
     ...(onClose && { Escape: onClose }),
     ...(onNav && { ArrowRight: () => onNav(1), ArrowLeft: () => onNav(-1) }),
@@ -94,6 +97,7 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
     Backspace: (e) => { if (!e.repeat && data?.reviewed) unrate(); },
     ...Object.fromEntries(STARS.map((n) => [String(n), (e: KeyboardEvent) => { if (!e.repeat) star(n); }])),
     '6': (e) => { if (!e.repeat && myStars != null) star(null); },
+    ...Object.fromEntries(GROUPS.map((g) => [g.key, (e: KeyboardEvent) => { if (!e.repeat) group(myGroup === g.value ? null : g.value); }])),
   });
   const v = data?.vlm;
   const l = data?.local;
@@ -252,6 +256,15 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
                   </button>
                 ))}
                 {myStars != null && <button onClick={() => star(null)} title="Clear your stars (6)" className="ml-auto px-2 py-2 sm:py-1 text-gray-400 hover:text-white">clear <kbd className="hidden sm:inline text-[10px] text-gray-500">6</kbd></button>}
+              </div>
+              <div className="flex flex-wrap gap-1 text-xs items-center">
+                <span className="text-gray-500 w-14"><Tip tip="Your sort groups (1–4), for sets you want kept apart. Keys a s d f; the same key again takes the photo back out. On export a grouped photo sorts into its group's own folder and gets the group's keywords (set both on the Export page). Groups don't move on to the next photo.">group</Tip></span>
+                {GROUPS.map((g) => (
+                  <button key={g.value} onClick={() => group(myGroup === g.value ? null : g.value)} title={`Group ${g.value} (${g.key})`}
+                    className={`px-3 py-2 sm:px-2 sm:py-1 rounded border transition active:scale-95 ${myGroup === g.value ? 'border-fuchsia-500 bg-fuchsia-900/30' : 'border-gray-700 hover:border-gray-500'}`}>
+                    {g.value} <kbd className="hidden sm:inline text-[10px] text-gray-500">{g.key}</kbd>
+                  </button>
+                ))}
               </div>
               <div className="flex flex-wrap gap-1 text-xs items-center">
                 <span className="text-gray-500 w-14">keep</span>

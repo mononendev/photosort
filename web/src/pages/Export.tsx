@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { api } from '../api/client';
-import type { ExportResult } from '../api/client';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api, GROUPS } from '../api/client';
+import type { ExportResult, GroupsConfig } from '../api/client';
 import { errMsg, fmtTime } from '../lib/format';
 
 export default function Export() {
@@ -13,8 +13,26 @@ export default function Export() {
   const [source, setSource] = useState('vlm');
   const [result, setResult] = useState<ExportResult | null>(null);
   const { data: exports, refetch } = useQuery({ queryKey: ['exports'], queryFn: api.exports });
+  // Your sort groups' export folder and keywords live in the config; edits are drafts until saved (or exported).
+  const qc = useQueryClient();
+  const { data: cfg } = useQuery({ queryKey: ['config'], queryFn: api.config });
+  const saved = (cfg?.groups ?? {}) as GroupsConfig;
+  const [draft, setDraft] = useState<Record<string, { folder?: string; keywords?: string }>>({});
+  const folderOf = (g: number) => draft[g]?.folder ?? saved[g]?.folder ?? `group_${g}`;
+  const keywordsOf = (g: number) => draft[g]?.keywords ?? (saved[g]?.keywords ?? []).join(', ');
+  const edit = (g: number, k: 'folder' | 'keywords', v: string) => setDraft((d) => ({ ...d, [g]: { ...d[g], [k]: v } }));
+  const dirty = Object.keys(draft).length > 0;
+  const saveGroups = useMutation({
+    mutationFn: () => api.putConfig({ groups: Object.fromEntries(GROUPS.map(({ value: g }) => [g, {
+      folder: folderOf(g).trim() || `group_${g}`, keywords: keywordsOf(g).split(',').map((k) => k.trim()).filter(Boolean),
+    }])) }),
+    onSuccess: (c) => { qc.setQueryData(['config'], c); setDraft({}); },
+  });
   const run = useMutation({
-    mutationFn: () => api.exportRun({ name, folder, link, xmp, tree, focus_source: source }),
+    mutationFn: async () => {
+      if (dirty) await saveGroups.mutateAsync();
+      return api.exportRun({ name, folder, link, xmp, tree, focus_source: source });
+    },
     onSuccess: (r) => { setResult(r); refetch(); },
   });
   const sel = 'bg-gray-900 border border-gray-700 rounded px-2 py-1.5 sm:py-1 text-sm mb-2 sm:mb-0';
@@ -31,6 +49,19 @@ export default function Export() {
         <select value={source} onChange={(e) => setSource(e.target.value)} className={sel}><option value="vlm">vision model (your overrides win)</option><option value="local">local sharpness only</option><option value="strict">strict: lower of both</option></select>
         <span className="text-gray-500">options</span>
         <span className="flex flex-wrap gap-4"><label className="flex items-center gap-1"><input type="checkbox" checked={xmp} onChange={(e) => setXmp(e.target.checked)} /> XMP sidecars</label><label className="flex items-center gap-1"><input type="checkbox" checked={tree} onChange={(e) => setTree(e.target.checked)} /> sorted tree</label></span>
+      </div>
+      <div className="rounded-lg border border-gray-800 p-3 space-y-2">
+        <div className="text-xs uppercase tracking-wide text-gray-500">Your groups</div>
+        <p className="text-xs text-gray-500">Photos you put in a group (keys a s d f in the photo view) sort into that group's folder in the tree, as <code>&lt;folder&gt;/focus_N/subject/composition/</code>, instead of the top level. Their XMP sidecars get the group's keywords; separate them with commas, and use <code>Parent|Child</code> for a hierarchical keyword.</p>
+        {GROUPS.map(({ value: g, key }) => (
+          <div key={g} className="grid grid-cols-[3.5rem_1fr] sm:grid-cols-[3.5rem_10rem_1fr] gap-x-2 gap-y-1 items-center text-sm">
+            <span className="text-gray-500">{g} <kbd className="text-[10px]">{key}</kbd></span>
+            <input value={folderOf(g)} onChange={(e) => edit(g, 'folder', e.target.value)} placeholder={`group_${g}`} aria-label={`Group ${g} folder`} className={sel} />
+            <input value={keywordsOf(g)} onChange={(e) => edit(g, 'keywords', e.target.value)} placeholder="keywords, comma separated" aria-label={`Group ${g} keywords`} className={`${sel} col-start-2 sm:col-start-auto`} />
+          </div>
+        ))}
+        {dirty && <button onClick={() => saveGroups.mutate()} disabled={saveGroups.isPending} className="px-3 py-1 rounded border border-gray-700 hover:border-gray-500 text-sm disabled:opacity-40">{saveGroups.isPending ? 'saving…' : 'save groups'}</button>}
+        {saveGroups.error && <p className="text-sm text-red-400">{errMsg(saveGroups.error)}</p>}
       </div>
       <button onClick={() => run.mutate()} disabled={run.isPending} className="w-full sm:w-auto px-4 py-2.5 sm:py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.98] transition disabled:opacity-40 text-sm font-medium">{run.isPending ? 'Exporting…' : 'Run export'}</button>
       {run.error && <p className="text-sm text-red-400">{errMsg(run.error)}</p>}

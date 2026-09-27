@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { api, thumbUrl, COMPOSITIONS, RATINGS, SUBJECTS, TIER_LABEL, TIERS } from '../api/client';
+import { api, thumbUrl, COMPOSITIONS, GROUPS, RATINGS, SUBJECTS, TIER_LABEL, TIERS } from '../api/client';
 import type { ImageFilters } from '../api/client';
 import ImageDetail from '../components/ImageDetail';
 import Loading from '../components/Loading';
@@ -16,7 +16,7 @@ const QUEUES = [['', 'needs review'], ['split', 'metrics split'], ['all', 'all']
 const PAGE = 500;   // the API's per-request cap; stepping past either end loads the neighbouring page
 
 // URL params that go to the API as they are, by type. The queue/rated/folder/... ones above them are mapped by hand.
-const NUM_KEYS = ['local_tier', 'vlm_tier', 'rating', 'lr_rating', 'truth_tier', 'people_min', 'people_max', 'score_min', 'score_max',
+const NUM_KEYS = ['local_tier', 'vlm_tier', 'rating', 'group', 'lr_rating', 'truth_tier', 'people_min', 'people_max', 'score_min', 'score_max',
   'eye_min', 'eye_max', 'iso_min', 'iso_max', 'f_min', 'f_max', 'focal_min', 'focal_max'] as const;
 const BOOL_KEYS = ['keeper', 'stale', 'lifted', 'overridden', 'noted', 'truth_mismatch'] as const;
 const STR_KEYS = ['stages', 'composition', 'eye_src', 'primary_by', 'camera', 'lens', 'lr_label', 'taken_from', 'taken_to'] as const;
@@ -169,7 +169,7 @@ export default function Review() {
   useEffect(() => {   // opening the menu scrolls the thumbnail strip to the photo you're on
     if (menu) menuRef.current?.querySelector('[data-current]')?.scrollIntoView({ block: 'nearest' });
   }, [menu]);
-  useHotkeys({ f: () => setMenu((m) => !m) });
+  useHotkeys({ '/': () => setMenu((m) => !m) });   // f is group 4
   const { data: facets } = useQuery({ queryKey: ['image-facets'], queryFn: api.imageFacets, enabled: menu, staleTime: 60_000 });
   const nActive = new Set(sp.keys()).size;
 
@@ -276,8 +276,9 @@ export default function Review() {
       </>,
     },
     {
-      key: 'yours', title: 'Your calls', keys: ['rating', 'overridden', 'noted', 'lr_rating', 'lr_label', 'truth_tier', 'truth_mismatch'], body: () => <>
+      key: 'yours', title: 'Your calls', keys: ['rating', 'group', 'overridden', 'noted', 'lr_rating', 'lr_label', 'truth_tier', 'truth_mismatch'], body: () => <>
         {pick('rating', 'any rating of yours', RATINGS.map((r) => [String(r.value), `${r.short} · ${r.label}`]))}
+        {pick('group', 'any group', [...GROUPS.map((g) => [String(g.value), `group ${g.value} (${g.key})`] as [string, string]), ['0', 'in no group']])}
         {tri('overridden', 'changed anything', 'yes', 'no')}
         {tri('noted', 'has a note', 'yes', 'no')}
         <div className="grid grid-cols-2 gap-1">
@@ -299,7 +300,7 @@ export default function Review() {
         {id === null ? 0 : away !== null ? '–' : offset + i + 1} / {total}
       </span>
       <div ref={menuRef} className="relative" onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setMenu(false); } }}>
-        <button onClick={() => setMenu(!menu)} aria-label="Filters" aria-expanded={menu} title="Filters (f)"
+        <button onClick={() => setMenu(!menu)} aria-label="Filters" aria-expanded={menu} title="Filters (/)"
           className={`relative px-3 py-1.5 sm:px-2 sm:py-0.5 rounded hover:text-white active:bg-gray-800 ${menu || nActive ? 'text-blue-300' : 'text-gray-400'}`}>
           <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
           {nActive > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-3.5 h-3.5 rounded-full bg-blue-600 text-white text-[9px] leading-3.5 text-center">{nActive}</span>}
@@ -354,7 +355,7 @@ export default function Review() {
       <div className="flex items-center justify-end gap-2 px-3 sm:px-4 py-2 border-b border-gray-800">{toolbar}</div>
       <div className="flex-1 flex flex-col items-center justify-center gap-2 text-sm text-gray-500 animate-[fade-in_300ms_ease-out]">
         {nActive ? 'Nothing matches these filters.' : 'Nothing left to review.'}
-        {nActive > 0 && <button onClick={() => setMenu(true)} className="text-xs text-blue-300 hover:text-white">adjust filters (f)</button>}
+        {nActive > 0 && <button onClick={() => setMenu(true)} className="text-xs text-blue-300 hover:text-white">adjust filters (/)</button>}
       </div>
     </div>
   );

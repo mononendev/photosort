@@ -275,11 +275,11 @@ def cmd_sort(args):
     recs = [sort.final_record(r, source) for r in rows]
     out = Path(args.out)
     sort.export(recs, out)
-    counts = sort.build_tree(recs, out, args.link)
+    counts = sort.build_tree(recs, out, args.link, cfg.get("groups"))
     print(f"sorted {sum(v for k, v in counts.items() if k != 'review')} images into {out} using {args.link}: {counts}")
     if args.xmp != "none":
         xd = None if args.xmp == "sidecar" else out / "xmp"
-        w, s = sort.write_xmp(recs, xd, args.xmp_overwrite)
+        w, s = sort.write_xmp(recs, xd, args.xmp_overwrite, cfg.get("groups"))
         print(f"XMP: wrote {w}, skipped {s} existing" + ("" if w or not s else " (use --xmp-overwrite)"))
     print(f"exports: {out/'results.csv'}, {out/'results.jsonl'}")
 

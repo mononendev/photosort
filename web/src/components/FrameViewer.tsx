@@ -28,8 +28,8 @@ const subjectCenter = (l: LocalResult): [number, number] => {
 };
 
 /**
- * Fullscreen frame with the same overlay. Scroll zooms around the cursor, drag pans, double-click (or 0) resets,
- * + / − zoom around the center. Escape closes the viewer only; arrow keys still step through images.
+ * Fullscreen frame with the same overlay. Scroll zooms around the cursor, drag pans, 0 resets, + / − zoom around
+ * the center. Double-click while zoomed in goes to 1:1 around the cursor; at 1:1 (or fit) it goes back to fit. Escape closes the viewer only; arrow keys still step through images.
  * On touch screens: pinch zooms around the fingers, one finger pans, double-tap zooms in (or back to fit).
  * `zoomRef` holds the magnification (screen px per native px) while zoomed in, 0 at fit. Every photo opens at it,
  * centered on the subject's head, so stepping on (or rating) keeps the zoom; it lives with the caller because the
@@ -150,7 +150,11 @@ export default function FrameViewer({ id, name, l, grades, layers, selected, onS
   return createPortal(
     <div ref={root} tabIndex={-1} className="fixed inset-0 z-[60] bg-black/95 outline-none">
       <div ref={stage} className="absolute inset-0 overflow-hidden select-none touch-none cursor-grab active:cursor-grabbing"
-        onDoubleClick={() => { if (lastType.current === 'mouse') reset(); }}
+        onDoubleClick={(e) => {
+          if (lastType.current !== 'mouse') return;
+          const r = stageRect();
+          if (view.zoom > 1 && Math.abs(scale - 1) > 0.01) zoomAt(1 / scale, e.clientX - r.left, e.clientY - r.top); else reset();
+        }}
         onPointerDown={(e) => {
           lastType.current = e.pointerType;
           if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -232,7 +236,7 @@ export default function FrameViewer({ id, name, l, grades, layers, selected, onS
       <div className="absolute inset-x-0 bottom-0 z-10 flex items-start gap-4 px-4 py-1 border-t border-gray-800 bg-black/80 backdrop-blur-sm overflow-hidden"
         style={{ height: `calc(${INSET_B}px + env(safe-area-inset-bottom))`, paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="flex-1 min-w-0"><HoverBar hover={hover} l={l} /></div>
-        <div className="hidden sm:block [@media(hover:none)]:hidden text-[11px] text-gray-600 pt-0.5">scroll to zoom · drag to pan · double-click or 0 to fit · Esc to close · ←/→ next image</div>
+        <div className="hidden sm:block [@media(hover:none)]:hidden text-[11px] text-gray-600 pt-0.5">scroll to zoom · drag to pan · double-click for 1:1 / fit · 0 to fit · Esc to close · ←/→ next image</div>
         <div className="hidden [@media(hover:none)]:block text-[11px] text-gray-600 pt-0.5 shrink-0">pinch to zoom · double-tap to fit</div>
       </div>
     </div>,

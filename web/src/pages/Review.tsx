@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { api, SUBJECTS, TIER_LABEL, TIERS } from '../api/client';
+import { api, thumbUrl, SUBJECTS, TIER_LABEL, TIERS } from '../api/client';
 import type { ImageFilters } from '../api/client';
 import ImageDetail from '../components/ImageDetail';
+import SegButton from '../components/SegButton';
+import { RatingBadge, TierBadge } from '../components/TierBadge';
 import useHotkeys from '../hooks/useHotkeys';
 
+// Which photos the queue starts from: the needs-review flag, just its metrics-split half, or everything.
+const QUEUES = [['', 'needs review'], ['split', 'metrics split'], ['all', 'all']] as const;
 const PAGE = 500;   // the API's per-request cap; stepping past either end loads the neighbouring page
 
 /** Text field that writes back once typing pauses, so the URL (and the query) don't change on every keystroke. */
@@ -26,7 +30,8 @@ function DraftInput({ value, onCommit, className, placeholder }: { value: string
 export default function Review() {
   const [sp, setSp] = useSearchParams();
   const filters: ImageFilters = useMemo(() => ({
-    review: sp.get('review') === 'all' ? undefined : true,
+    review: sp.get('queue') ? undefined : true,
+    split: sp.get('queue') === 'split' || undefined,
     reviewed: sp.get('rated') === 'all' ? undefined : false,
     folder: sp.get('folder') ?? '',
     recursive: sp.get('recursive') !== 'false',
@@ -69,8 +74,11 @@ export default function Review() {
     window.addEventListener('pointerdown', close);
     return () => window.removeEventListener('pointerdown', close);
   }, [menu]);
+  useEffect(() => {   // opening the menu scrolls the thumbnail strip to the photo you're on
+    if (menu) menuRef.current?.querySelector('[data-current]')?.scrollIntoView({ block: 'nearest' });
+  }, [menu]);
   useHotkeys({ f: () => setMenu((m) => !m) });
-  const nActive = ['review', 'rated', 'folder', 'recursive', 'tier', 'subject', 'status', 'q', 'sort'].filter((k) => sp.get(k)).length;
+  const nActive = ['queue', 'rated', 'folder', 'recursive', 'tier', 'subject', 'status', 'q', 'sort'].filter((k) => sp.get(k)).length;
 
   const sel = 'w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 sm:py-1 text-sm';
   const check = 'flex items-center gap-2 text-sm text-gray-300 py-0.5';
@@ -84,8 +92,11 @@ export default function Review() {
           {nActive > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-3.5 h-3.5 rounded-full bg-blue-600 text-white text-[9px] leading-3.5 text-center">{nActive}</span>}
         </button>
         {menu && (
-          <div className="absolute right-0 top-full mt-1 z-20 w-72 rounded-lg border border-gray-700 bg-gray-900 shadow-xl p-3 space-y-2 animate-[menu-in_120ms_ease-out]">
-            <label className={check}><input type="checkbox" checked={!!filters.review} onChange={(e) => set('review', e.target.checked ? undefined : 'all')} /> needs review only</label>
+          <div className="absolute right-0 top-full mt-1 z-20 w-[min(56rem,calc(100vw-1.5rem))] rounded-lg border border-gray-700 bg-gray-900 shadow-xl p-3 flex flex-col md:flex-row gap-3 animate-[menu-in_120ms_ease-out]">
+            <div className="md:w-64 shrink-0 space-y-2">
+            <div className="flex gap-1">
+              {QUEUES.map(([v, label]) => <SegButton key={v} on={(sp.get('queue') ?? '') === v} onClick={() => set('queue', v)} className="flex-1 whitespace-nowrap text-xs px-1 py-1.5 sm:py-1">{label}</SegButton>)}
+            </div>
             <label className={check}><input type="checkbox" checked={filters.reviewed === false} onChange={(e) => set('rated', e.target.checked ? undefined : 'all')} /> hide photos you've rated</label>
             <DraftInput value={filters.folder ?? ''} onCommit={(v) => set('folder', v)} placeholder="folder (relative to photos root)" className={sel} />
             <label className={check}><input type="checkbox" checked={filters.recursive} onChange={(e) => set('recursive', e.target.checked ? undefined : 'false')} /> include subfolders</label>
@@ -103,6 +114,18 @@ export default function Review() {
               <option value="path">by path</option><option value="newest">newest</option><option value="score">by score</option><option value="eye_sharpness">by eye sharpness</option><option value="sharpness">by head sharpness</option>
             </select>
             {nActive > 0 && <button onClick={() => { setSp({}, { replace: true }); setOffset(0); setPicked(null); }} className="text-xs text-gray-400 hover:text-white">reset to defaults</button>}
+            </div>
+            {/* This page of the queue: click one to jump to it. */}
+            <div className="flex-1 min-w-0 max-h-[40vh] md:max-h-[70vh] overflow-y-auto overscroll-contain grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-1 content-start">
+              {items.map((it, j) => (
+                <button key={it.id} data-current={j === i || undefined}
+                  onClick={() => { setPicked({ id: it.id! }); setMenu(false); }} title={it.rel}
+                  className={`relative aspect-[3/2] rounded overflow-hidden bg-gray-950 border-2 ${j === i ? 'border-blue-400' : 'border-transparent hover:border-gray-500'}`}>
+                  <img src={thumbUrl(it.id!)} alt="" loading="lazy" className={`w-full h-full object-cover ${it.reviewed && j !== i ? 'opacity-50' : ''}`} />
+                  <span className="absolute top-0.5 left-0.5 flex gap-0.5"><TierBadge tier={it.focus_tier} small />{it.reviewed && <RatingBadge rating={it.rating} />}</span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>

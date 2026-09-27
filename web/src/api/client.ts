@@ -218,7 +218,7 @@ export interface ImagesPage { total: number; offset: number; items: ImageSummary
 
 export interface ImageFilters {
   folder?: string; recursive?: boolean; tier?: number; keeper?: boolean; subject?: string; status?: string;
-  review?: boolean; lr_rating?: number; lr_label?: string; truth_tier?: number; truth_mismatch?: boolean;
+  review?: boolean; split?: boolean; lr_rating?: number; lr_label?: string; truth_tier?: number; truth_mismatch?: boolean;
   rating?: number; reviewed?: boolean;
   q?: string; sort?: string; offset?: number; limit?: number;
 }

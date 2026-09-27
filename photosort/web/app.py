@@ -305,7 +305,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
     # ---- images -------------------------------------------------------------------
     @app.get("/api/images")
     def list_images(folder: str = "", recursive: bool = True, tier: Optional[int] = None, keeper: Optional[bool] = None,
-                    subject: Optional[str] = None, status: Optional[str] = None, review: Optional[bool] = None,
+                    subject: Optional[str] = None, status: Optional[str] = None, review: Optional[bool] = None, split: Optional[bool] = None,
                     lr_rating: Optional[int] = None, lr_label: Optional[str] = None,
                     truth_tier: Optional[int] = None, truth_mismatch: Optional[bool] = None,
                     rating: Optional[int] = None, reviewed: Optional[bool] = None,
@@ -337,6 +337,8 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             where.append("json_extract(vlm_json,'$.primary_subject') = ?"); params.append(subject)
         if review:
             where.append(REVIEW_SQL)
+        if split:   # the local metrics disagree among themselves (a subset of review)
+            where.append("json_extract(local_json,'$.split') IS NOT NULL")
         if lr_rating is not None:
             where.append("json_extract(lr_json,'$.rating') = ?"); params.append(lr_rating)
         if lr_label:

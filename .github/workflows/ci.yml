@@ -11,7 +11,7 @@ jobs:
   test-py:
     runs-on: [homelab]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -31,13 +31,13 @@ jobs:
   test-web:
     runs-on: [homelab]
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
-          version: 9
-      - uses: actions/setup-node@v4
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version-file: .tool-versions
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - name: Install
@@ -56,7 +56,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set version
         id: version
         run: echo "version=${{ github.ref_name }}-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
@@ -86,7 +86,7 @@ jobs:
     needs: [test-py, test-web]
     runs-on: [homelab]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set version
         id: version
         run: echo "version=${{ github.ref_name }}-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
@@ -117,7 +117,7 @@ jobs:
     if: github.ref_name == 'master' || github.ref_name == 'main'
     runs-on: [homelab]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Helm
         run: curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
       - name: Deploy with Helm

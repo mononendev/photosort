@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -29,7 +29,13 @@ export default function JobDetail() {
     queryKey: ['job-detail', id], queryFn: () => api.jobDetail(id),
     refetchInterval: (q) => (isLive(q.state.data) ? 1000 : q.state.data && isFinished(q.state.data) ? false : 5000),
   });
-  const [open, setOpen] = useState<number | null>(null);
+  // The open photo plus the list it was opened from, so the detail view's arrows step through that list.
+  const [open, setOpenState] = useState<{ id: number; ids: number[] } | null>(null);
+  const setOpen = useCallback((id: number, ids: number[] = []) => setOpenState({ id, ids }), []);
+  const nav = useCallback((dir: 1 | -1) => setOpenState((o) => {
+    const nx = o && o.ids[o.ids.indexOf(o.id) + dir];
+    return o && nx != null ? { ...o, id: nx } : o;
+  }), []);
   const [pick, setPick] = useState<StageName | null>(null);
   if (error) return <p className="text-sm text-red-400">{errMsg(error)}</p>;
   if (!job) return <p className="text-sm text-gray-500">Loading…</p>;
@@ -53,7 +59,7 @@ export default function JobDetail() {
         backend={vlmStage?.backend} model={vlmStage?.model} onOpen={setOpen} />
       <Inputs job={job} />
 
-      {open !== null && <ImageDetail id={open} onClose={() => setOpen(null)} />}
+      {open && <ImageDetail id={open.id} onClose={() => setOpenState(null)} onNav={open.ids.length > 1 ? nav : undefined} />}
     </div>
   );
 }
@@ -180,14 +186,14 @@ function Kpis({ job, stage }: { job: JobDetailT; stage: StageName }) {
 
 // ---- in flight ------------------------------------------------------------------------
 
-function InFlight({ items, onOpen }: { items: ActiveItem[]; onOpen: (id: number) => void }) {
+function InFlight({ items, onOpen }: { items: ActiveItem[]; onOpen: (id: number, ids: number[]) => void }) {
   return (
     <Section title={`Processing now (${items.length})`}
       tip="Images a worker has picked up and not finished yet. Elapsed counts from when that worker started on it.">
       {items.length === 0 ? <p className="text-xs text-gray-500">Between images…</p> : (
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2">
           {items.map((a) => (
-            <button key={a.id} onClick={() => onOpen(a.id)} className="text-left rounded-md border border-gray-800 bg-gray-950 overflow-hidden hover:border-gray-600">
+            <button key={a.id} onClick={() => onOpen(a.id, items.map((x) => x.id))} className="text-left rounded-md border border-gray-800 bg-gray-950 overflow-hidden hover:border-gray-600">
               <div className="aspect-[3/2] bg-gray-800 flex items-center justify-center">
                 {a.has_thumb ? <img src={thumbUrl(a.id)} alt="" className="w-full h-full object-cover" />
                   : <span className="text-[10px] text-gray-500 animate-pulse">analyzing…</span>}
@@ -263,7 +269,7 @@ function BarChart({ title, values, errs, label, unit }: { title: string; values:
 // ---- items ------------------------------------------------------------------------------
 
 function Items({ initialStage, jobId, live, backend, model, onOpen }: {
-  initialStage: string; jobId: number; live: boolean; backend?: string; model?: string; onOpen: (id: number) => void;
+  initialStage: string; jobId: number; live: boolean; backend?: string; model?: string; onOpen: (id: number, ids: number[]) => void;
 }) {
   const [stage, setStage] = useState<string>(initialStage);
   const [errors, setErrors] = useState(false);
@@ -275,6 +281,9 @@ function Items({ initialStage, jobId, live, backend, model, onOpen }: {
     queryFn: () => api.jobItems(jobId, { stage: stage || undefined, errors: errors || undefined, offset, limit }),
     refetchInterval: live && offset === 0 ? 2000 : false,
   });
+  // "all" lists an image once per stage; the detail view's arrows should visit it once.
+  const pageIds = [...new Set(data?.items.map((it) => it.image_id))];
+  const openHere = (imageId: number) => onOpen(imageId, pageIds);
   const filterBtn = (label: string, on: boolean, click: () => void) => <SegButton on={on} onClick={() => { click(); setOffset(0); }}>{label}</SegButton>;
   return (
     <Section title={`Processed images${data ? ` (${fmtNum(data.total)})` : ''}`}
@@ -303,7 +312,7 @@ function Items({ initialStage, jobId, live, backend, model, onOpen }: {
             <tbody>
               {data.items.map((it) => (
                 <ItemRows key={it.id} it={it} open={expanded === it.id} backend={backend} model={model}
-                  onToggle={() => setExpanded(expanded === it.id ? null : it.id)} onOpen={onOpen} />
+                  onToggle={() => setExpanded(expanded === it.id ? null : it.id)} onOpen={openHere} />
               ))}
             </tbody>
           </table>

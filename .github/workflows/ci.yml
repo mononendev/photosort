@@ -22,7 +22,9 @@ jobs:
       - name: Vet
         run: go vet ./...
       - name: Test
-        run: go test -race ./...
+        # The race detector needs cgo, and so a C compiler; the homelab runners don't all have one.
+        run: |
+          if command -v gcc >/dev/null; then CGO_ENABLED=1 go test -race ./...; else go test ./...; fi
 
   test-analyzer:
     runs-on: [homelab]

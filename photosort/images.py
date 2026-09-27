@@ -2,7 +2,8 @@ from __future__ import annotations
 import io
 import os
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Optional
+import numpy as np
 from PIL import Image, ImageOps
 
 try:
@@ -40,8 +41,64 @@ def find_images(paths: Iterable[Path], skip_raw_dupes: bool = False) -> list[Pat
     return files
 
 
-def _load_raw(path: Path) -> Image.Image:
+def _srgb_to_linear(v: np.ndarray) -> np.ndarray:
+    return np.where(v <= 0.04045, v / 12.92, ((v + 0.055) / 1.055) ** 2.4).astype(np.float32)
+
+
+def _linear_to_srgb(v: np.ndarray) -> np.ndarray:
+    v = np.clip(v, 0, 1)
+    return np.where(v <= 0.0031308, v * 12.92, 1.055 * np.power(v, 1 / 2.4) - 0.055).astype(np.float32)
+
+
+_LUMA = np.array([0.2126, 0.7152, 0.0722], np.float32)
+
+
+def exposure_stats(im: Image.Image) -> dict:
+    """Scene brightness in linear light, from a small copy: the log-average ("key") and the 99th percentile."""
+    small = np.asarray(resize_long_edge(im, 256).convert("RGB"), np.float32) / 255
+    y = _srgb_to_linear(small) @ _LUMA
+    return {"key": float(np.exp(np.log(y + 1e-4).mean())), "p99": float(np.percentile(y, 99))}
+
+
+def plan_gain(stats: dict, ex: dict, raw: bool) -> float:
+    """Stops of exposure to add, or 0. A frame is only lifted when its key sits under dark_key; the lift aims the key
+    at target_key, stops short of pushing the 99th percentile past the shoulder, and is capped per source. A JPEG has
+    8 bits of shadow to work with, so it gets a lower bar to clear and a smaller cap than a RAW."""
+    kind = "raw" if raw else "jpeg"
+    if not ex.get("recover", True) or stats["key"] >= ex[f"{kind}_dark_key"]:
+        return 0.0
+    ev = np.log2(ex["target_key"] / stats["key"])
+    ev = min(ev, ex[f"{kind}_max_ev"], np.log2(ex["highlight_cap"] / max(stats["p99"], 1e-6)))
+    return round(float(ev), 2) if ev >= ex["min_ev"] else 0.0
+
+
+def _lift(lin: np.ndarray, ev: float, knee: float = 0.6) -> np.ndarray:
+    """Linear gain, then a soft shoulder above `knee` so lifted highlights roll off instead of clipping. Below the knee
+    the gain is exactly linear, so local contrast ratios (what the focus metrics measure) are left as they were."""
+    x = lin * np.float32(2.0 ** ev)
+    over = x > knee
+    x[over] = knee + (1 - knee) * np.tanh((x[over] - knee) / (1 - knee))
+    return x
+
+
+def _lift_8bit(im: Image.Image, ev: float) -> Image.Image:
+    lin = _srgb_to_linear(np.asarray(im, np.float32) / 255)
+    return Image.fromarray((_linear_to_srgb(_lift(lin, ev)) * 255 + 0.5).astype(np.uint8))
+
+
+def _flip(im: Image.Image, flip: int) -> Image.Image:
+    if flip == 3:
+        return im.rotate(180)
+    if flip == 5:
+        return im.rotate(90, expand=True)
+    if flip == 6:
+        return im.rotate(-90, expand=True)
+    return im
+
+
+def _load_raw(path: Path, ex: Optional[dict]) -> tuple[Image.Image, Optional[dict]]:
     import rawpy
+    info = None
     with rawpy.imread(str(path)) as raw:
         flip = raw.sizes.flip
         try:
@@ -55,26 +112,40 @@ def _load_raw(path: Path) -> Image.Image:
             # Embedded previews are sometimes tiny; fall back to a real demosaic if so.
             if min(im.size) < 1200:
                 raise ValueError("thumb too small")
+            if ex is not None:
+                st = exposure_stats(im)
+                ev = plan_gain(st, ex, raw=True)
+                if ev > 0:
+                    im = _lift_8bit(im, ev)
+                    info = {"ev": ev, "source": "raw", **{k: round(v, 5) for k, v in st.items()}}
         except Exception:
             rgb = raw.postprocess(half_size=True, use_camera_wb=True, no_auto_bright=False, output_bps=8)
             im = Image.fromarray(rgb)
             flip = 0  # postprocess already applies orientation
-    if flip == 3:
-        im = im.rotate(180)
-    elif flip == 5:
-        im = im.rotate(90, expand=True)
-    elif flip == 6:
-        im = im.rotate(-90, expand=True)
-    return im
+    return _flip(im, flip), info
 
 
-def load_rgb(path: Path) -> Image.Image:
-    """Full-resolution RGB image with EXIF orientation applied."""
+def load(path: Path, exposure: Optional[dict] = None) -> tuple[Image.Image, Optional[dict]]:
+    """Full-resolution RGB image with EXIF orientation applied, and what was done to its exposure (None if nothing).
+
+    With an `exposure` config, an underexposed frame is lifted before anything sees it: detection, the metrics, the
+    frame and crop the vision model gets, and the viewer. See plan_gain for when and how far."""
     if path.suffix.lower() in RAW_EXT:
-        return _load_raw(path)
+        return _load_raw(path, exposure)
     im = Image.open(path)
-    im = ImageOps.exif_transpose(im)
-    return im.convert("RGB")
+    im = ImageOps.exif_transpose(im).convert("RGB")
+    info = None
+    if exposure is not None:
+        st = exposure_stats(im)
+        ev = plan_gain(st, exposure, raw=False)
+        if ev > 0:
+            im = _lift_8bit(im, ev)
+            info = {"ev": ev, "source": "jpeg", **{k: round(v, 5) for k, v in st.items()}}
+    return im, info
+
+
+def load_rgb(path: Path, exposure: Optional[dict] = None) -> Image.Image:
+    return load(path, exposure)[0]
 
 
 def resize_long_edge(im: Image.Image, long_edge: int) -> Image.Image:

@@ -85,8 +85,8 @@ def heatmap(gray: np.ndarray) -> dict:
             "log_range": [round(lo, 3), round(hi, 3)]}
 
 
-def focus_debug(path: Path, local: dict) -> dict:
-    im = I.load_rgb(path)
+def focus_debug(path: Path, local: dict, exposure: Optional[dict] = None) -> dict:
+    im = I.load_rgb(path, exposure)
     gray = np.asarray(im.convert("L"), dtype=np.float32) / 255.0
     W, H = im.size
     people = []

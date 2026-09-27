@@ -71,6 +71,9 @@ def context_text(local: dict) -> str:
     lines = [f"Frame: {local['width']}x{local['height']} {local['orientation']}. People detected: {n}."]
     if (local.get("exif_prior") or {}).get("summary"):
         lines.append(f"Camera: {local['exif_prior']['summary']}")
+    if (local.get("exposure") or {}).get("ev"):
+        lines.append(f"The original was underexposed; these images were brightened by {local['exposure']['ev']:.1f} stops "
+                     f"for review, so judge exposure as dark and expect lifted shadow noise.")
     if n and local.get("people"):
         p = local["people"][0]
         af = local.get("af") or {}

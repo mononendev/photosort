@@ -464,7 +464,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
                 raise HTTPException(404)
             p.parent.mkdir(parents=True, exist_ok=True)
             tmp = p.with_suffix(f".{os.getpid()}.{time.monotonic_ns()}.tmp")
-            tmp.write_bytes(I.to_jpeg(I.load_rgb(Path(r["path"])), 92))
+            tmp.write_bytes(I.to_jpeg(I.load_rgb(Path(r["path"]), cfg.get("exposure")), 92))
             tmp.replace(p)
         return media(img_id, "_full")
 
@@ -484,7 +484,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
                 raise HTTPException(404, "original file not found")
             if len(debug_cache) >= 8:
                 debug_cache.pop(next(iter(debug_cache)))
-            debug_cache[key] = _fd(path, json.loads(r["local_json"]))
+            debug_cache[key] = _fd(path, json.loads(r["local_json"]), cfg.get("exposure"))
         return debug_cache[key]
 
     # ---- config / calibration --------------------------------------------------------

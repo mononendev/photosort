@@ -53,6 +53,14 @@ DEFAULTS: dict = {
     "crop_size": 768,            # native-resolution crop around the primary subject (long edge)
     "crop_quality": 88,
     "crop_pad": 0.15,            # padding around the detector box, fraction of box size
+    # Underexposed frames are lifted before the local stage and the vision model see them. Brightness is judged by
+    # the key (log-average luminance, linear light): below *_dark_key the frame is lifted toward target_key, by at
+    # most *_max_ev stops and never so far that the 99th percentile passes highlight_cap; lifts under min_ev are
+    # skipped. A RAW is lifted on its embedded camera JPEG, not re-demosaiced: that keeps the camera's sharpening and
+    # denoise, which the focus thresholds are calibrated on (a plain demosaic moves the metrics by 0.5-3.5x).
+    "exposure": {"recover": True, "target_key": 0.08, "highlight_cap": 0.9, "min_ev": 0.5,
+                 "raw_dark_key": 0.03, "raw_max_ev": 4.0,
+                 "jpeg_dark_key": 0.015, "jpeg_max_ev": 1.5},
     # Local stage
     "detect_long_edge": 1280,
     "detect_conf": 0.25,

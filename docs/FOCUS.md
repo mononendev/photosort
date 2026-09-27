@@ -13,6 +13,15 @@ subject at native resolution, and falls back to the head when the eyes can't be 
 
 ## Steps
 
+0. **Exposure.** An underexposed frame is brightened first; everything after it (detection, the
+   metrics, the vision model's frame and crop, the viewer) sees the lifted image. Brightness is the
+   log-average luminance in linear light; below `exposure.raw_dark_key` (RAW) or the stricter
+   `jpeg_dark_key` it is raised toward `target_key`, by at most 4 stops for RAW and 1.5 for JPEG, and
+   never so far that the brightest 1% pass `highlight_cap` (so night shots lit by fire or stage lights
+   stay dark). A RAW is lifted on its embedded camera JPEG rather than re-demosaiced, which keeps the
+   in-camera sharpening the thresholds are calibrated on. The lift is a pure gain below a highlight
+   shoulder, so the contrast-normalized metrics keep their scale; what changes is that dim regions
+   clear the `EPS` contrast floor, which otherwise scores a sharp but dark eye band near zero.
 1. **People.** YOLO11n-pose runs on a 1280 px copy of the frame and returns a box and 17 keypoints per
    person. Boxes smaller than 0.15% of the frame are ignored. Head, torso and body regions come from the
    keypoints, so a helmeted head still gets a head box.

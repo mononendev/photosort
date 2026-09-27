@@ -112,6 +112,8 @@ export interface LocalResult {
   af_note?: string | null;
   /** What picked people[0]: the camera's AF points, or prominence (size, centering, confidence) */
   primary_by?: 'af' | 'priority';
+  /** Set when an underexposed frame was brightened before analysis: stops added, what was lifted, and the scene key */
+  exposure?: { ev: number; source: 'raw' | 'jpeg'; key: number; p99: number } | null;
   exif_prior?: { dof_risk: string | null; motion_risk: string | null; shake_stops: number | null; pupil_mm?: number | null; summary: string | null };
 }
 

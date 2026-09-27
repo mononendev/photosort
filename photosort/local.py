@@ -506,7 +506,7 @@ def _primary_fields(primary: Optional[dict]) -> dict:
 
 
 def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandmarks] = None) -> LocalResult:
-    im = I.load_rgb(path)
+    im, exposure = I.load(path, cfg.get("exposure"))
     W, H = im.size
     small = I.resize_long_edge(im, cfg["detect_long_edge"])
     scale = W / small.size[0]
@@ -578,7 +578,7 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
         **_primary_fields(primary),
         "af": af, "af_note": af_note, "primary_by": primary_by,
         "crop_box": crop_used,
-        "exif": exif, "exif_prior": prior,
+        "exif": exif, "exif_prior": prior, "exposure": exposure,
         "local_tier": tier, "local_reason": reason,
     }
     return LocalResult(data, frame, crop_jpeg, thumb)

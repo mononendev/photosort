@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -147,12 +150,40 @@ func copyTable(src, dst *db.DB, table string, cols []string) (int, error) {
 	return n, flush()
 }
 
+// analyzerModule runs `python -m photosort_analyzer.models ARGS` in the analyzer project (with the ultralytics extra
+// when it converts a YOLO model), sharing this process's terminal.
+func analyzerModule(cmd *cobra.Command, extra bool, args ...string) error {
+	dir, _ := filepath.Abs(envOr("PHOTOSORT_ANALYZER_DIR", "analyzer"))
+	if !fileExists(filepath.Join(dir, "pyproject.toml")) {
+		return fmt.Errorf("the analyzer project isn't at %s (set PHOTOSORT_ANALYZER_DIR); in the cluster, run the exporter image", dir)
+	}
+	uvArgs := []string{"run", "--quiet", "--project", dir}
+	if extra {
+		uvArgs = append(uvArgs, "--extra", "ultralytics")
+	}
+	c := exec.CommandContext(cmd.Context(), "uv", append(append(uvArgs, "python", "-m", "photosort_analyzer.models"), args...)...)
+	c.Env = append(os.Environ(), "PHOTOSORT_MODELS="+modelsDir())
+	c.Stdout, c.Stderr, c.Stdin = os.Stdout, os.Stderr, os.Stdin
+	return c.Run()
+}
+
 func modelsCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "models", Short: "pose models: list what's installed, fetch more"}
 	cmd.AddCommand(&cobra.Command{
+		Use:   "get NAME...",
+		Short: "install pose models into $PHOTOSORT_MODELS/pose (converts YOLO from ultralytics, downloads RTMO)",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, names []string) error {
+			return analyzerModule(cmd, true, append([]string{"get"}, names...)...)
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
 		Use:   "list",
-		Short: "pose models the analyzer can run",
+		Short: "pose models the analyzer can run, and those it can fetch",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if os.Getenv("PHOTOSORT_ANALYZER") == "" {
+				return analyzerModule(cmd, false, "list")
+			}
 			an, stop, err := connectAnalyzer(cmd.Context())
 			if err != nil {
 				return err

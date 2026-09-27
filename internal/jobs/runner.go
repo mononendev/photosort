@@ -328,10 +328,21 @@ func (r *Runner) unhold(jid int64) {
 	r.mu.Unlock()
 }
 
-func options(j *db.Job) pj.Obj {
+// options are a job's options; a pose model override among them is folded into cfg for its local stage.
+func options(j *db.Job, cfg pj.Obj) pj.Obj {
 	o := pj.Parse(j.OptionsJSON)
 	if o == nil {
 		o = pj.Obj{}
+	}
+	if det := pj.O(o, "detector"); len(det) > 0 {
+		merged := pj.Clone(pj.O(cfg, "detector"))
+		if merged == nil {
+			merged = pj.Obj{}
+		}
+		for k, v := range det {
+			merged[k] = v
+		}
+		cfg["detector"] = merged
 	}
 	return o
 }
@@ -364,7 +375,7 @@ func (r *Runner) RunJob(j *db.Job) error {
 		return err
 	}
 	defer r.unhold(jid)
-	opts := options(j)
+	opts := options(j, cfg)
 	paths := r.paths(j)
 	res, err := r.scanLocal(jid, cfg, paths, opts, func() bool { return r.cancelled(jid) })
 	if err != nil {
@@ -397,7 +408,7 @@ func (r *Runner) runAhead(j *db.Job, aheadStop chan struct{}) error {
 		return err
 	}
 	defer r.unhold(jid)
-	opts := options(j)
+	opts := options(j, cfg)
 	paths := r.paths(j)
 	stop := func() bool {
 		select {

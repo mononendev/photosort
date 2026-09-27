@@ -18,8 +18,12 @@ func TestDefaultsMatchPython(t *testing.T) {
 	if err := json.Unmarshal(b, &py); err != nil {
 		t.Fatal(err)
 	}
-	if d := Diff(py, Defaults()); len(d) > 0 {
-		t.Fatalf("defaults differ from Python's: %v", pj.Dumps(d))
+	// Changed on purpose with the move to ONNX pose models; everything else must match.
+	want := map[string]bool{"detect_model": true, "detect_iou": true}
+	for _, d := range Diff(py, Defaults()) {
+		if !want[pj.Str(d["key"])] {
+			t.Errorf("default differs from Python's: %v", pj.Dumps(d))
+		}
 	}
 }
 

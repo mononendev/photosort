@@ -12,11 +12,17 @@ dependencies = [
     "rawpy",
     "fastapi",
     "uvicorn",
+    "onnxruntime>=1.30.0",
 ]
 
 [project.optional-dependencies]
 # The torch-based detector: only for the golden fixtures and the ONNX parity report, never in the image.
-ultralytics = ["ultralytics", "exifread"]
+ultralytics = [
+    "ultralytics",
+    "exifread",
+    "onnx>=1.23.0",
+    "onnxslim>=0.1.96",
+]
 
 [dependency-groups]
 dev = ["pytest", "httpx2"]

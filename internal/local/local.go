@@ -30,7 +30,8 @@ type Meta struct {
 
 // Detector is the pose model settings the analyzer should use, from the config (and a job's override).
 func Detector(cfg pj.Obj) pj.Obj {
-	d := pj.Obj{"model": cfg["detect_model"], "imgsz": cfg["detect_long_edge"], "conf": cfg["detect_conf"]}
+	d := pj.Obj{"model": cfg["detect_model"], "imgsz": cfg["detect_long_edge"], "conf": cfg["detect_conf"],
+		"iou": pj.Or(cfg["detect_iou"], 0.7)}
 	for k, v := range pj.O(cfg, "detector") {
 		d[k] = v
 	}

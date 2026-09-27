@@ -1,0 +1,1173 @@
+{
+ "json_schema": {
+  "strict=False,max_lengths=False": "{\"type\": \"object\", \"properties\": {\"focus_tier\": {\"type\": \"integer\", \"enum\": [0, 1, 2, 3], \"description\": \"0 = missed, primary person's head not in focus; 1 = soft, head clearly soft but recognizable; 2 = slightly soft, head nearly but not crisply in focus; 3 = sharp, primary person's head/eyes/helmet edges crisp\"}, \"focus_notes\": {\"type\": \"string\", \"description\": \"What is and isn't sharp; where focus landed; motion blur vs missed focus. 1-2 sentences.\"}, \"primary_subject\": {\"type\": \"string\", \"enum\": [\"rider_action\", \"rider_posed\", \"group\", \"crowd_spectators\", \"gear_board\", \"venue_scenery\", \"other\", \"no_people\"]}, \"people_count\": {\"type\": \"integer\", \"description\": \"Number of clearly visible people, 0 if none.\"}, \"composition\": {\"type\": \"string\", \"enum\": [\"full_body\", \"three_quarter\", \"half_body\", \"close_up\", \"environmental\", \"no_subject\"], \"description\": \"Portion of the primary subject in frame. environmental = subject small in a big scene.\"}, \"subject_placement\": {\"type\": \"string\", \"enum\": [\"center\", \"left_third\", \"right_third\", \"top\", \"bottom\", \"edge\", \"none\"]}, \"action\": {\"type\": \"string\", \"description\": \"Short phrase for what the primary subject is doing, e.g. 'carving a berm', 'mid-air jump', 'standing and talking', or 'none'.\"}, \"keywords\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}, \"minItems\": 5, \"maxItems\": 15, \"description\": \"Lowercase nouns/phrases for what is in the photo: objects, setting, gear, tricks, weather, time of day.\"}, \"adjectives\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}, \"minItems\": 3, \"maxItems\": 8, \"description\": \"Mood, style and light descriptors, e.g. 'dynamic', 'golden-hour', 'gritty'.\"}, \"description\": {\"type\": \"string\", \"description\": \"One-sentence caption.\"}, \"quality_remarks\": {\"type\": \"string\", \"description\": \"1-3 sentences a photo editor would write: exposure, motion blur, noise, clipped highlights, distracting elements, horizon, crop suggestion.\"}, \"quality_score\": {\"type\": \"integer\", \"minimum\": 1, \"maximum\": 5, \"description\": \"Overall keeper quality, 1 worst to 5 best.\"}, \"keeper\": {\"type\": \"boolean\", \"description\": \"Would a photographer keep this in the delivered set?\"}}, \"required\": [\"focus_tier\", \"focus_notes\", \"primary_subject\", \"people_count\", \"composition\", \"subject_placement\", \"action\", \"keywords\", \"adjectives\", \"description\", \"quality_remarks\", \"quality_score\", \"keeper\"]}",
+  "strict=False,max_lengths=True": "{\"type\": \"object\", \"properties\": {\"focus_tier\": {\"type\": \"integer\", \"enum\": [0, 1, 2, 3], \"description\": \"0 = missed, primary person's head not in focus; 1 = soft, head clearly soft but recognizable; 2 = slightly soft, head nearly but not crisply in focus; 3 = sharp, primary person's head/eyes/helmet edges crisp\"}, \"focus_notes\": {\"type\": \"string\", \"description\": \"What is and isn't sharp; where focus landed; motion blur vs missed focus. 1-2 sentences.\", \"maxLength\": 220}, \"primary_subject\": {\"type\": \"string\", \"enum\": [\"rider_action\", \"rider_posed\", \"group\", \"crowd_spectators\", \"gear_board\", \"venue_scenery\", \"other\", \"no_people\"]}, \"people_count\": {\"type\": \"integer\", \"description\": \"Number of clearly visible people, 0 if none.\"}, \"composition\": {\"type\": \"string\", \"enum\": [\"full_body\", \"three_quarter\", \"half_body\", \"close_up\", \"environmental\", \"no_subject\"], \"description\": \"Portion of the primary subject in frame. environmental = subject small in a big scene.\"}, \"subject_placement\": {\"type\": \"string\", \"enum\": [\"center\", \"left_third\", \"right_third\", \"top\", \"bottom\", \"edge\", \"none\"]}, \"action\": {\"type\": \"string\", \"description\": \"Short phrase for what the primary subject is doing, e.g. 'carving a berm', 'mid-air jump', 'standing and talking', or 'none'.\", \"maxLength\": 60}, \"keywords\": {\"type\": \"array\", \"items\": {\"type\": \"string\", \"maxLength\": 40}, \"minItems\": 5, \"maxItems\": 15, \"description\": \"Lowercase nouns/phrases for what is in the photo: objects, setting, gear, tricks, weather, time of day.\"}, \"adjectives\": {\"type\": \"array\", \"items\": {\"type\": \"string\", \"maxLength\": 30}, \"minItems\": 3, \"maxItems\": 8, \"description\": \"Mood, style and light descriptors, e.g. 'dynamic', 'golden-hour', 'gritty'.\"}, \"description\": {\"type\": \"string\", \"description\": \"One-sentence caption.\", \"maxLength\": 140}, \"quality_remarks\": {\"type\": \"string\", \"description\": \"1-3 sentences a photo editor would write: exposure, motion blur, noise, clipped highlights, distracting elements, horizon, crop suggestion.\", \"maxLength\": 260}, \"quality_score\": {\"type\": \"integer\", \"minimum\": 1, \"maximum\": 5, \"description\": \"Overall keeper quality, 1 worst to 5 best.\"}, \"keeper\": {\"type\": \"boolean\", \"description\": \"Would a photographer keep this in the delivered set?\"}}, \"required\": [\"focus_tier\", \"focus_notes\", \"primary_subject\", \"people_count\", \"composition\", \"subject_placement\", \"action\", \"keywords\", \"adjectives\", \"description\", \"quality_remarks\", \"quality_score\", \"keeper\"]}",
+  "strict=True,max_lengths=False": "{\"type\": \"object\", \"properties\": {\"focus_tier\": {\"type\": \"integer\", \"enum\": [0, 1, 2, 3], \"description\": \"0 = missed, primary person's head not in focus; 1 = soft, head clearly soft but recognizable; 2 = slightly soft, head nearly but not crisply in focus; 3 = sharp, primary person's head/eyes/helmet edges crisp\"}, \"focus_notes\": {\"type\": \"string\", \"description\": \"What is and isn't sharp; where focus landed; motion blur vs missed focus. 1-2 sentences.\"}, \"primary_subject\": {\"type\": \"string\", \"enum\": [\"rider_action\", \"rider_posed\", \"group\", \"crowd_spectators\", \"gear_board\", \"venue_scenery\", \"other\", \"no_people\"]}, \"people_count\": {\"type\": \"integer\", \"description\": \"Number of clearly visible people, 0 if none.\"}, \"composition\": {\"type\": \"string\", \"enum\": [\"full_body\", \"three_quarter\", \"half_body\", \"close_up\", \"environmental\", \"no_subject\"], \"description\": \"Portion of the primary subject in frame. environmental = subject small in a big scene.\"}, \"subject_placement\": {\"type\": \"string\", \"enum\": [\"center\", \"left_third\", \"right_third\", \"top\", \"bottom\", \"edge\", \"none\"]}, \"action\": {\"type\": \"string\", \"description\": \"Short phrase for what the primary subject is doing, e.g. 'carving a berm', 'mid-air jump', 'standing and talking', or 'none'.\"}, \"keywords\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}, \"minItems\": 5, \"maxItems\": 15, \"description\": \"Lowercase nouns/phrases for what is in the photo: objects, setting, gear, tricks, weather, time of day.\"}, \"adjectives\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}, \"minItems\": 3, \"maxItems\": 8, \"description\": \"Mood, style and light descriptors, e.g. 'dynamic', 'golden-hour', 'gritty'.\"}, \"description\": {\"type\": \"string\", \"description\": \"One-sentence caption.\"}, \"quality_remarks\": {\"type\": \"string\", \"description\": \"1-3 sentences a photo editor would write: exposure, motion blur, noise, clipped highlights, distracting elements, horizon, crop suggestion.\"}, \"quality_score\": {\"type\": \"integer\", \"minimum\": 1, \"maximum\": 5, \"description\": \"Overall keeper quality, 1 worst to 5 best.\"}, \"keeper\": {\"type\": \"boolean\", \"description\": \"Would a photographer keep this in the delivered set?\"}}, \"required\": [\"focus_tier\", \"focus_notes\", \"primary_subject\", \"people_count\", \"composition\", \"subject_placement\", \"action\", \"keywords\", \"adjectives\", \"description\", \"quality_remarks\", \"quality_score\", \"keeper\"], \"additionalProperties\": false}",
+  "strict=True,max_lengths=True": "{\"type\": \"object\", \"properties\": {\"focus_tier\": {\"type\": \"integer\", \"enum\": [0, 1, 2, 3], \"description\": \"0 = missed, primary person's head not in focus; 1 = soft, head clearly soft but recognizable; 2 = slightly soft, head nearly but not crisply in focus; 3 = sharp, primary person's head/eyes/helmet edges crisp\"}, \"focus_notes\": {\"type\": \"string\", \"description\": \"What is and isn't sharp; where focus landed; motion blur vs missed focus. 1-2 sentences.\", \"maxLength\": 220}, \"primary_subject\": {\"type\": \"string\", \"enum\": [\"rider_action\", \"rider_posed\", \"group\", \"crowd_spectators\", \"gear_board\", \"venue_scenery\", \"other\", \"no_people\"]}, \"people_count\": {\"type\": \"integer\", \"description\": \"Number of clearly visible people, 0 if none.\"}, \"composition\": {\"type\": \"string\", \"enum\": [\"full_body\", \"three_quarter\", \"half_body\", \"close_up\", \"environmental\", \"no_subject\"], \"description\": \"Portion of the primary subject in frame. environmental = subject small in a big scene.\"}, \"subject_placement\": {\"type\": \"string\", \"enum\": [\"center\", \"left_third\", \"right_third\", \"top\", \"bottom\", \"edge\", \"none\"]}, \"action\": {\"type\": \"string\", \"description\": \"Short phrase for what the primary subject is doing, e.g. 'carving a berm', 'mid-air jump', 'standing and talking', or 'none'.\", \"maxLength\": 60}, \"keywords\": {\"type\": \"array\", \"items\": {\"type\": \"string\", \"maxLength\": 40}, \"minItems\": 5, \"maxItems\": 15, \"description\": \"Lowercase nouns/phrases for what is in the photo: objects, setting, gear, tricks, weather, time of day.\"}, \"adjectives\": {\"type\": \"array\", \"items\": {\"type\": \"string\", \"maxLength\": 30}, \"minItems\": 3, \"maxItems\": 8, \"description\": \"Mood, style and light descriptors, e.g. 'dynamic', 'golden-hour', 'gritty'.\"}, \"description\": {\"type\": \"string\", \"description\": \"One-sentence caption.\", \"maxLength\": 140}, \"quality_remarks\": {\"type\": \"string\", \"description\": \"1-3 sentences a photo editor would write: exposure, motion blur, noise, clipped highlights, distracting elements, horizon, crop suggestion.\", \"maxLength\": 260}, \"quality_score\": {\"type\": \"integer\", \"minimum\": 1, \"maximum\": 5, \"description\": \"Overall keeper quality, 1 worst to 5 best.\"}, \"keeper\": {\"type\": \"boolean\", \"description\": \"Would a photographer keep this in the delivered set?\"}}, \"required\": [\"focus_tier\", \"focus_notes\", \"primary_subject\", \"people_count\", \"composition\", \"subject_placement\", \"action\", \"keywords\", \"adjectives\", \"description\", \"quality_remarks\", \"quality_score\", \"keeper\"], \"additionalProperties\": false}"
+ },
+ "system_prompt": "You are assisting an action-sports photographer who shoots onewheel (self-balancing electric board) events with fast lenses near wide open, so depth of field is shallow and focus can vary across a single person's body.\n\nFor each photo you get:\n- Image 1: the full frame, downscaled.\n- Image 2 (when present): a crop at native pixel resolution around the primary person's head and upper body, chosen by a person detector. Judge fine focus from this crop; the downscaled frame cannot show it.\n- Detector data: people count, primary subject size and position, and sharpness numbers measured on the original pixels (contrast-normalized; higher is sharper; head/torso/body for the primary person, plus the background). Use them as evidence, not as the answer; the crop is what you can see.\n\nFocus tiers:\nGrade the primary person's head (eyes, face, or helmet edges):\n- 3 sharp: crisply in focus.\n- 2 slightly soft: nearly in focus but not crisp: just in front of or behind the eyes, or slight motion blur; fine detail is a little mushy at 100%.\n- 1 soft: clearly soft: the face is recognizable but detail is gone, from missed focus or motion blur.\n- 0 miss: the head is blurry: no people, focus landed on the background, foreground, torso or board, or on someone else.\nDistinguish missed focus (whole subject soft while something else is crisp) from motion blur (directional smear) in focus_notes.\n\nComposition is the portion of the primary subject in frame. Placement is where the subject sits in the frame.\nKeywords are concrete lowercase library tags for what is in the photo. Adjectives describe mood, style and light. Quality remarks are an editor's cull notes about the photo itself: exposure, blur, noise, clipping, distractions, crop.\nWrite like a photo editor, in short plain sentences about the photo only: focus_notes at most 25 words, description at most 15 words, quality_remarks at most 35 words, 5-10 keywords, 3-5 adjectives. Return only the JSON object.",
+ "context_text": [
+  {
+   "name": "bus_allblur.jpg.json",
+   "fixture": "testdata/golden/bus_allblur.jpg.json",
+   "text": "Frame: 3872x5163 portrait. People detected: 4.\nPrimary subject: 11.6% of frame, center at (0.18, 0.60) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0006, torso 0.0004, body 0.0137, background 0.0097, whole frame 0.0105.\nEye band (both eyes, located by face landmarks): sharpness 0.0014, fine-detail energy ratio 0.0002. This is what decides focus.\nOther people head sharpness: 0.0003, 0.0003, 0.0003.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "bus_bgblur.jpg.json",
+   "fixture": "testdata/golden/bus_bgblur.jpg.json",
+   "text": "Frame: 3872x5163 portrait. People detected: 4.\nPrimary subject: 11.0% of frame, center at (0.18, 0.60) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0082, torso 0.036, body 0.1455, background 0.2281, whole frame 0.1882.\nEye band (both eyes, located by face landmarks): sharpness 0.0084, fine-detail energy ratio 0.0002. This is what decides focus.\nOther people head sharpness: 0.0004, 0.0332, 0.0002.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "bus_portrait.jpg.json",
+   "fixture": "testdata/golden/bus_portrait.jpg.json",
+   "text": "Frame: 5163x3872 landscape. People detected: 3.\nPrimary subject: 15.6% of frame, center at (0.59, 0.72) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.1307, torso 0.4061, body 0.3108, background 0.4709, whole frame 0.408.\nEye band (both eyes, located by pose keypoints): sharpness 0.0373, fine-detail energy ratio 0.003. This is what decides focus.\nOther people head sharpness: 0.0976, 0.1573.\nLocal focus guess: tier 0 (secondary_person_sharp)."
+  },
+  {
+   "name": "bus_sharp.jpg.json",
+   "fixture": "testdata/golden/bus_sharp.jpg.json",
+   "text": "Frame: 3872x5163 portrait. People detected: 4.\nPrimary subject: 10.3% of frame, center at (0.18, 0.60) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0515, torso 0.0627, body 0.3516, background 0.4587, whole frame 0.4086.\nEye band (both eyes, located by face landmarks): sharpness 0.0715, fine-detail energy ratio 0.0008. This is what decides focus.\nOther people head sharpness: 0.0331, 0.1348, 0.016.\nLocal focus guess: tier 2 (secondary_person_sharp)."
+  },
+  {
+   "name": "bus_subjectblur.jpg.json",
+   "fixture": "testdata/golden/bus_subjectblur.jpg.json",
+   "text": "Frame: 3872x5163 portrait. People detected: 4.\nPrimary subject: 10.9% of frame, center at (0.18, 0.60) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0399, torso 0.0327, body 0.2109, background 0.2468, whole frame 0.2376.\nEye band (both eyes, located by face landmarks): sharpness 0.0522, fine-detail energy ratio 0.0011. This is what decides focus.\nOther people head sharpness: 0.0003, 0.1361, 0.0159.\nLocal focus guess: tier 2 (secondary_person_sharp)."
+  },
+  {
+   "name": "zidane_allblur.jpg.json",
+   "fixture": "testdata/golden/zidane_allblur.jpg.json",
+   "text": "Frame: 5962x3354 landscape. People detected: 2.\nPrimary subject: 34.4% of frame, center at (0.37, 0.64) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0017, torso 0.0138, body 0.0092, background 0.0023, whole frame 0.0098.\nEye band (both eyes, located by face landmarks): sharpness 0.0009, fine-detail energy ratio 0.0017. This is what decides focus.\nOther people head sharpness: 0.0003.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "zidane_bgblur.jpg.json",
+   "fixture": "testdata/golden/zidane_bgblur.jpg.json",
+   "text": "Frame: 5962x3354 landscape. People detected: 2.\nPrimary subject: 31.6% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0523, torso 0.1132, body 0.0939, background 0.009, whole frame 0.0814.\nEye band (both eyes, located by face landmarks): sharpness 0.0085, fine-detail energy ratio 0.0008. This is what decides focus.\nOther people head sharpness: 0.0118.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "zidane_dark.jpg.json",
+   "fixture": "testdata/golden/zidane_dark.jpg.json",
+   "text": "Frame: 5962x3354 landscape. People detected: 2.\nThe original was underexposed; these images were brightened by 1.5 stops for review, so judge exposure as dark and expect lifted shadow noise.\nPrimary subject: 31.3% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0287, torso 0.0491, body 0.0486, background 0.0125, whole frame 0.0514.\nEye band (both eyes, located by face landmarks): sharpness 0.0112, fine-detail energy ratio 0.0065. This is what decides focus.\nOther people head sharpness: 0.0118.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "zidane_sharp.jpg.json",
+   "fixture": "testdata/golden/zidane_sharp.jpg.json",
+   "text": "Frame: 5962x3354 landscape. People detected: 2.\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\nOther people head sharpness: 0.0149.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "zidane_subjectblur.jpg.json",
+   "fixture": "testdata/golden/zidane_subjectblur.jpg.json",
+   "text": "Frame: 5962x3354 landscape. People detected: 2.\nPrimary subject: 32.7% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0015, torso 0.0217, body 0.0151, background 0.0289, whole frame 0.0452.\nEye band (both eyes, located by face landmarks): sharpness 0.0011, fine-detail energy ratio 0.0006. This is what decides focus.\nOther people head sharpness: 0.0029.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "IMG_1010.CR2.json",
+   "fixture": "testdata/golden-local/IMG_1010.CR2.json",
+   "text": "Frame: 3456x5184 portrait. People detected: 5.\nCamera: Canon EOS-1D X · 135mm · f/2.2 · 1/2000 s · ISO 1000. very shallow depth of field: only the focus plane can be sharp, judge the head/eyes; fast shutter: motion blur unlikely.\nThe camera's AF points (spot) were on this person: they are the intended subject even if someone else is larger or sharper. Grade focus on them.\nPrimary subject: 2.4% of frame, center at (0.53, 0.54) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.3365, torso 0.3066, body 0.3074, background 0.1852, whole frame 0.1781.\nEye band (both eyes, located by face landmarks): sharpness 1.2191, fine-detail energy ratio 0.0693. This is what decides focus.\nOther people head sharpness: 0.015, 0.0081, 0.0153.\nLocal focus guess: tier 3 (primary_eyes_sharp)."
+  },
+  {
+   "name": "IMG_1018.CR2.json",
+   "fixture": "testdata/golden-local/IMG_1018.CR2.json",
+   "text": "Frame: 3456x5184 portrait. People detected: 2.\nCamera: Canon EOS-1D X · 135mm · f/2.2 · 1/2000 s · ISO 400. very shallow depth of field: only the focus plane can be sharp, judge the head/eyes; fast shutter: motion blur unlikely.\nThe camera's AF points (spot) were on this person: they are the intended subject even if someone else is larger or sharper. Grade focus on them.\nPrimary subject: 10.3% of frame, center at (0.48, 0.55) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.1026, torso 0.1688, body 0.3535, background 0.0619, whole frame 0.0882.\nEye band (both eyes, located by face landmarks): sharpness 0.0583, fine-detail energy ratio 0.0256. This is what decides focus.\nOther people head sharpness: 0.0089.\nLocal focus guess: tier 2 (primary_eyes_slightly_soft)."
+  },
+  {
+   "name": "landscape.heic.json",
+   "fixture": "testdata/golden-local/landscape.heic.json",
+   "text": "Frame: 6016x6016 landscape. People detected: 0.\nWhole-frame sharpness 0.0071. Local focus guess: tier 0 (no people)."
+  },
+  {
+   "name": "lifted_exposure",
+   "local": "{\"af\": null, \"af_note\": \"no Canon AF info (exiftool not installed)\", \"bg_sharp\": 0.0327, \"eps\": 0.002, \"exif\": {}, \"exif_prior\": {\"dof_risk\": null, \"motion_risk\": null, \"pupil_mm\": null, \"shake_stops\": null, \"summary\": null}, \"exposure\": {\"ev\": 2.25, \"key\": 0.001}, \"global_sharp\": 0.1168, \"height\": 3354, \"local_reason\": \"nothing_sharp\", \"local_tier\": 0, \"n_people\": 2, \"noise\": {\"by\": null, \"eff_iso\": null, \"ev\": null, \"iso\": null, \"risk\": null, \"sigma\": 0.1082, \"summary\": null}, \"orientation\": \"landscape\", \"people\": [{\"af_score\": null, \"area_frac\": 0.3181226579707658, \"center\": [0.347, 0.637], \"center_dist\": 0.291, \"conf\": 0.8717710375785828, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0007, \"priority\": 0.25443, \"sharp_body\": 0.0994, \"sharp_eye\": 0.0083, \"sharp_head\": 0.0523, \"sharp_torso\": 0.1148}, {\"af_score\": null, \"area_frac\": 0.2670968009078367, \"center\": [0.73, 0.532], \"center_dist\": 0.328, \"conf\": 0.857153058052063, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0008, \"priority\": 0.20731, \"sharp_body\": 0.1777, \"sharp_eye\": 0.0039, \"sharp_head\": 0.0149, \"sharp_torso\": 0.1057}], \"primary_body_sharp\": 0.0994, \"primary_by\": \"priority\", \"primary_eye_hf\": 0.0007, \"primary_eye_sharp\": 0.0083, \"primary_eye_src\": \"face\", \"primary_head_sharp\": 0.0523, \"split\": {\"gap\": 3, \"grades\": {\"eye\": 0, \"fft\": 0, \"head\": 3}, \"odd\": \"head\"}, \"width\": 5962}",
+   "text": "Frame: 5962x3354 landscape. People detected: 2.\nThe original was underexposed; these images were brightened by 2.2 stops for review, so judge exposure as dark and expect lifted shadow noise.\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\nOther people head sharpness: 0.0149.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "lifted_exposure_int",
+   "local": "{\"af\": null, \"af_note\": \"no Canon AF info (exiftool not installed)\", \"bg_sharp\": 0.0327, \"eps\": 0.002, \"exif\": {}, \"exif_prior\": {\"dof_risk\": null, \"motion_risk\": null, \"pupil_mm\": null, \"shake_stops\": null, \"summary\": null}, \"exposure\": {\"ev\": 2}, \"global_sharp\": 0.1168, \"height\": 3354, \"local_reason\": \"nothing_sharp\", \"local_tier\": 0, \"n_people\": 2, \"noise\": {\"by\": null, \"eff_iso\": null, \"ev\": null, \"iso\": null, \"risk\": null, \"sigma\": 0.1082, \"summary\": null}, \"orientation\": \"landscape\", \"people\": [{\"af_score\": null, \"area_frac\": 0.3181226579707658, \"center\": [0.347, 0.637], \"center_dist\": 0.291, \"conf\": 0.8717710375785828, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0007, \"priority\": 0.25443, \"sharp_body\": 0.0994, \"sharp_eye\": 0.0083, \"sharp_head\": 0.0523, \"sharp_torso\": 0.1148}, {\"af_score\": null, \"area_frac\": 0.2670968009078367, \"center\": [0.73, 0.532], \"center_dist\": 0.328, \"conf\": 0.857153058052063, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0008, \"priority\": 0.20731, \"sharp_body\": 0.1777, \"sharp_eye\": 0.0039, \"sharp_head\": 0.0149, \"sharp_torso\": 0.1057}], \"primary_body_sharp\": 0.0994, \"primary_by\": \"priority\", \"primary_eye_hf\": 0.0007, \"primary_eye_sharp\": 0.0083, \"primary_eye_src\": \"face\", \"primary_head_sharp\": 0.0523, \"split\": {\"gap\": 3, \"grades\": {\"eye\": 0, \"fft\": 0, \"head\": 3}, \"odd\": \"head\"}, \"width\": 5962}",
+   "text": "Frame: 5962x3354 landscape. People detected: 2.\nThe original was underexposed; these images were brightened by 2.0 stops for review, so judge exposure as dark and expect lifted shadow noise.\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\nOther people head sharpness: 0.0149.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "noise_summary",
+   "local": "{\"af\": null, \"af_note\": \"no Canon AF info (exiftool not installed)\", \"bg_sharp\": 0.0327, \"eps\": 0.002, \"exif\": {}, \"exif_prior\": {\"dof_risk\": null, \"motion_risk\": null, \"pupil_mm\": null, \"shake_stops\": null, \"summary\": null}, \"exposure\": null, \"global_sharp\": 0.1168, \"height\": 3354, \"local_reason\": \"nothing_sharp\", \"local_tier\": 0, \"n_people\": 2, \"noise\": {\"by\": null, \"eff_iso\": null, \"ev\": null, \"iso\": null, \"risk\": null, \"sigma\": 0.1082, \"summary\": \"High ISO 12800 (effective 25600): expect visible noise.\"}, \"orientation\": \"landscape\", \"people\": [{\"af_score\": null, \"area_frac\": 0.3181226579707658, \"center\": [0.347, 0.637], \"center_dist\": 0.291, \"conf\": 0.8717710375785828, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0007, \"priority\": 0.25443, \"sharp_body\": 0.0994, \"sharp_eye\": 0.0083, \"sharp_head\": 0.0523, \"sharp_torso\": 0.1148}, {\"af_score\": null, \"area_frac\": 0.2670968009078367, \"center\": [0.73, 0.532], \"center_dist\": 0.328, \"conf\": 0.857153058052063, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0008, \"priority\": 0.20731, \"sharp_body\": 0.1777, \"sharp_eye\": 0.0039, \"sharp_head\": 0.0149, \"sharp_torso\": 0.1057}], \"primary_body_sharp\": 0.0994, \"primary_by\": \"priority\", \"primary_eye_hf\": 0.0007, \"primary_eye_sharp\": 0.0083, \"primary_eye_src\": \"face\", \"primary_head_sharp\": 0.0523, \"split\": {\"gap\": 3, \"grades\": {\"eye\": 0, \"fft\": 0, \"head\": 3}, \"odd\": \"head\"}, \"width\": 5962}",
+   "text": "Frame: 5962x3354 landscape. People detected: 2.\nHigh ISO 12800 (effective 25600): expect visible noise.\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\nOther people head sharpness: 0.0149.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "af_primary",
+   "local": "{\"af\": {\"mode_name\": \"zone\", \"active\": [3, 4]}, \"af_note\": \"no Canon AF info (exiftool not installed)\", \"bg_sharp\": 0.0327, \"eps\": 0.002, \"exif\": {}, \"exif_prior\": {\"dof_risk\": null, \"motion_risk\": null, \"pupil_mm\": null, \"shake_stops\": null, \"summary\": null}, \"exposure\": null, \"global_sharp\": 0.1168, \"height\": 3354, \"local_reason\": \"nothing_sharp\", \"local_tier\": 0, \"n_people\": 2, \"noise\": {\"by\": null, \"eff_iso\": null, \"ev\": null, \"iso\": null, \"risk\": null, \"sigma\": 0.1082, \"summary\": null}, \"orientation\": \"landscape\", \"people\": [{\"af_score\": null, \"area_frac\": 0.3181226579707658, \"center\": [0.347, 0.637], \"center_dist\": 0.291, \"conf\": 0.8717710375785828, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0007, \"priority\": 0.25443, \"sharp_body\": 0.0994, \"sharp_eye\": 0.0083, \"sharp_head\": 0.0523, \"sharp_torso\": 0.1148}, {\"af_score\": null, \"area_frac\": 0.2670968009078367, \"center\": [0.73, 0.532], \"center_dist\": 0.328, \"conf\": 0.857153058052063, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0008, \"priority\": 0.20731, \"sharp_body\": 0.1777, \"sharp_eye\": 0.0039, \"sharp_head\": 0.0149, \"sharp_torso\": 0.1057}], \"primary_body_sharp\": 0.0994, \"primary_by\": \"af\", \"primary_eye_hf\": 0.0007, \"primary_eye_sharp\": 0.0083, \"primary_eye_src\": \"face\", \"primary_head_sharp\": 0.0523, \"split\": {\"gap\": 3, \"grades\": {\"eye\": 0, \"fft\": 0, \"head\": 3}, \"odd\": \"head\"}, \"width\": 5962}",
+   "text": "Frame: 5962x3354 landscape. People detected: 2.\nThe camera's AF points (zone) were on this person: they are the intended subject even if someone else is larger or sharper. Grade focus on them.\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\nOther people head sharpness: 0.0149.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "af_off_person",
+   "local": "{\"af\": {\"mode_name\": \"spot\", \"active\": [30]}, \"af_note\": \"no Canon AF info (exiftool not installed)\", \"bg_sharp\": 0.0327, \"eps\": 0.002, \"exif\": {}, \"exif_prior\": {\"dof_risk\": null, \"motion_risk\": null, \"pupil_mm\": null, \"shake_stops\": null, \"summary\": null}, \"exposure\": null, \"global_sharp\": 0.1168, \"height\": 3354, \"local_reason\": \"nothing_sharp\", \"local_tier\": 0, \"n_people\": 2, \"noise\": {\"by\": null, \"eff_iso\": null, \"ev\": null, \"iso\": null, \"risk\": null, \"sigma\": 0.1082, \"summary\": null}, \"orientation\": \"landscape\", \"people\": [{\"af_score\": null, \"area_frac\": 0.3181226579707658, \"center\": [0.347, 0.637], \"center_dist\": 0.291, \"conf\": 0.8717710375785828, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0007, \"priority\": 0.25443, \"sharp_body\": 0.0994, \"sharp_eye\": 0.0083, \"sharp_head\": 0.0523, \"sharp_torso\": 0.1148}, {\"af_score\": null, \"area_frac\": 0.2670968009078367, \"center\": [0.73, 0.532], \"center_dist\": 0.328, \"conf\": 0.857153058052063, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0008, \"priority\": 0.20731, \"sharp_body\": 0.1777, \"sharp_eye\": 0.0039, \"sharp_head\": 0.0149, \"sharp_torso\": 0.1057}], \"primary_body_sharp\": 0.0994, \"primary_by\": \"priority\", \"primary_eye_hf\": 0.0007, \"primary_eye_sharp\": 0.0083, \"primary_eye_src\": \"face\", \"primary_head_sharp\": 0.0523, \"split\": {\"gap\": 3, \"grades\": {\"eye\": 0, \"fft\": 0, \"head\": 3}, \"odd\": \"head\"}, \"width\": 5962}",
+   "text": "Frame: 5962x3354 landscape. People detected: 2.\nThe camera's AF points (spot) were not on any detected person.\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\nOther people head sharpness: 0.0149.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "af_no_mode",
+   "local": "{\"af\": {\"active\": [1]}, \"af_note\": \"no Canon AF info (exiftool not installed)\", \"bg_sharp\": 0.0327, \"eps\": 0.002, \"exif\": {}, \"exif_prior\": {\"dof_risk\": null, \"motion_risk\": null, \"pupil_mm\": null, \"shake_stops\": null, \"summary\": null}, \"exposure\": null, \"global_sharp\": 0.1168, \"height\": 3354, \"local_reason\": \"nothing_sharp\", \"local_tier\": 0, \"n_people\": 2, \"noise\": {\"by\": null, \"eff_iso\": null, \"ev\": null, \"iso\": null, \"risk\": null, \"sigma\": 0.1082, \"summary\": null}, \"orientation\": \"landscape\", \"people\": [{\"af_score\": null, \"area_frac\": 0.3181226579707658, \"center\": [0.347, 0.637], \"center_dist\": 0.291, \"conf\": 0.8717710375785828, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0007, \"priority\": 0.25443, \"sharp_body\": 0.0994, \"sharp_eye\": 0.0083, \"sharp_head\": 0.0523, \"sharp_torso\": 0.1148}, {\"af_score\": null, \"area_frac\": 0.2670968009078367, \"center\": [0.73, 0.532], \"center_dist\": 0.328, \"conf\": 0.857153058052063, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0008, \"priority\": 0.20731, \"sharp_body\": 0.1777, \"sharp_eye\": 0.0039, \"sharp_head\": 0.0149, \"sharp_torso\": 0.1057}], \"primary_body_sharp\": 0.0994, \"primary_by\": \"priority\", \"primary_eye_hf\": 0.0007, \"primary_eye_sharp\": 0.0083, \"primary_eye_src\": \"face\", \"primary_head_sharp\": 0.0523, \"split\": {\"gap\": 3, \"grades\": {\"eye\": 0, \"fft\": 0, \"head\": 3}, \"odd\": \"head\"}, \"width\": 5962}",
+   "text": "Frame: 5962x3354 landscape. People detected: 2.\nThe camera's AF points (None) were not on any detected person.\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\nOther people head sharpness: 0.0149.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "exif_summary",
+   "local": "{\"af\": null, \"af_note\": \"no Canon AF info (exiftool not installed)\", \"bg_sharp\": 0.0327, \"eps\": 0.002, \"exif\": {}, \"exif_prior\": {\"dof_risk\": null, \"motion_risk\": null, \"pupil_mm\": null, \"shake_stops\": null, \"summary\": \"Canon \\u00b7 85mm \\u00b7 f/1.4 \\u00b7 1/500 s \\u00b7 ISO 400.\"}, \"exposure\": null, \"global_sharp\": 0.1168, \"height\": 3354, \"local_reason\": \"nothing_sharp\", \"local_tier\": 0, \"n_people\": 2, \"noise\": {\"by\": null, \"eff_iso\": null, \"ev\": null, \"iso\": null, \"risk\": null, \"sigma\": 0.1082, \"summary\": null}, \"orientation\": \"landscape\", \"people\": [{\"af_score\": null, \"area_frac\": 0.3181226579707658, \"center\": [0.347, 0.637], \"center_dist\": 0.291, \"conf\": 0.8717710375785828, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0007, \"priority\": 0.25443, \"sharp_body\": 0.0994, \"sharp_eye\": 0.0083, \"sharp_head\": 0.0523, \"sharp_torso\": 0.1148}, {\"af_score\": null, \"area_frac\": 0.2670968009078367, \"center\": [0.73, 0.532], \"center_dist\": 0.328, \"conf\": 0.857153058052063, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0008, \"priority\": 0.20731, \"sharp_body\": 0.1777, \"sharp_eye\": 0.0039, \"sharp_head\": 0.0149, \"sharp_torso\": 0.1057}], \"primary_body_sharp\": 0.0994, \"primary_by\": \"priority\", \"primary_eye_hf\": 0.0007, \"primary_eye_sharp\": 0.0083, \"primary_eye_src\": \"face\", \"primary_head_sharp\": 0.0523, \"split\": {\"gap\": 3, \"grades\": {\"eye\": 0, \"fft\": 0, \"head\": 3}, \"odd\": \"head\"}, \"width\": 5962}",
+   "text": "Frame: 5962x3354 landscape. People detected: 2.\nCamera: Canon · 85mm · f/1.4 · 1/500 s · ISO 400.\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\nOther people head sharpness: 0.0149.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "no_eye",
+   "local": "{\"af\": null, \"af_note\": \"no Canon AF info (exiftool not installed)\", \"bg_sharp\": 0.0327, \"eps\": 0.002, \"exif\": {}, \"exif_prior\": {\"dof_risk\": null, \"motion_risk\": null, \"pupil_mm\": null, \"shake_stops\": null, \"summary\": null}, \"exposure\": null, \"global_sharp\": 0.1168, \"height\": 3354, \"local_reason\": \"nothing_sharp\", \"local_tier\": 0, \"n_people\": 2, \"noise\": {\"by\": null, \"eff_iso\": null, \"ev\": null, \"iso\": null, \"risk\": null, \"sigma\": 0.1082, \"summary\": null}, \"orientation\": \"landscape\", \"people\": [{\"af_score\": null, \"area_frac\": 0.3181226579707658, \"center\": [0.347, 0.637], \"center_dist\": 0.291, \"conf\": 0.8717710375785828, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0007, \"priority\": 0.25443, \"sharp_body\": 0.0994, \"sharp_eye\": null, \"sharp_head\": 0.0523, \"sharp_torso\": 0.1148}, {\"af_score\": null, \"area_frac\": 0.2670968009078367, \"center\": [0.73, 0.532], \"center_dist\": 0.328, \"conf\": 0.857153058052063, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0008, \"priority\": 0.20731, \"sharp_body\": 0.1777, \"sharp_eye\": 0.0039, \"sharp_head\": 0.0149, \"sharp_torso\": 0.1057}], \"primary_body_sharp\": 0.0994, \"primary_by\": \"priority\", \"primary_eye_hf\": 0.0007, \"primary_eye_sharp\": 0.0083, \"primary_eye_src\": \"face\", \"primary_head_sharp\": 0.0523, \"split\": {\"gap\": 3, \"grades\": {\"eye\": 0, \"fft\": 0, \"head\": 3}, \"odd\": \"head\"}, \"width\": 5962}",
+   "text": "Frame: 5962x3354 landscape. People detected: 2.\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\nEyes not located (helmet, visor, turned away, or too small); judge the head.\nOther people head sharpness: 0.0149.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "eye_pose",
+   "local": "{\"af\": null, \"af_note\": \"no Canon AF info (exiftool not installed)\", \"bg_sharp\": 0.0327, \"eps\": 0.002, \"exif\": {}, \"exif_prior\": {\"dof_risk\": null, \"motion_risk\": null, \"pupil_mm\": null, \"shake_stops\": null, \"summary\": null}, \"exposure\": null, \"global_sharp\": 0.1168, \"height\": 3354, \"local_reason\": \"nothing_sharp\", \"local_tier\": 0, \"n_people\": 2, \"noise\": {\"by\": null, \"eff_iso\": null, \"ev\": null, \"iso\": null, \"risk\": null, \"sigma\": 0.1082, \"summary\": null}, \"orientation\": \"landscape\", \"people\": [{\"af_score\": null, \"area_frac\": 0.3181226579707658, \"center\": [0.347, 0.637], \"center_dist\": 0.291, \"conf\": 0.8717710375785828, \"eye_src\": \"pose\", \"head_src\": \"keypoints\", \"hf_eye\": null, \"priority\": 0.25443, \"sharp_body\": 0.0994, \"sharp_eye\": 0.0083, \"sharp_head\": 0.0523, \"sharp_torso\": 0.1148}, {\"af_score\": null, \"area_frac\": 0.2670968009078367, \"center\": [0.73, 0.532], \"center_dist\": 0.328, \"conf\": 0.857153058052063, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0008, \"priority\": 0.20731, \"sharp_body\": 0.1777, \"sharp_eye\": 0.0039, \"sharp_head\": 0.0149, \"sharp_torso\": 0.1057}], \"primary_body_sharp\": 0.0994, \"primary_by\": \"priority\", \"primary_eye_hf\": 0.0007, \"primary_eye_sharp\": 0.0083, \"primary_eye_src\": \"face\", \"primary_head_sharp\": 0.0523, \"split\": {\"gap\": 3, \"grades\": {\"eye\": 0, \"fft\": 0, \"head\": 3}, \"odd\": \"head\"}, \"width\": 5962}",
+   "text": "Frame: 5962x3354 landscape. People detected: 2.\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\nEye band (both eyes, located by pose keypoints): sharpness 0.0083, fine-detail energy ratio None. This is what decides focus.\nOther people head sharpness: 0.0149.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "one_person",
+   "local": "{\"af\": null, \"af_note\": \"no Canon AF info (exiftool not installed)\", \"bg_sharp\": 0.0327, \"eps\": 0.002, \"exif\": {}, \"exif_prior\": {\"dof_risk\": null, \"motion_risk\": null, \"pupil_mm\": null, \"shake_stops\": null, \"summary\": null}, \"exposure\": null, \"global_sharp\": 0.1168, \"height\": 3354, \"local_reason\": \"nothing_sharp\", \"local_tier\": 0, \"n_people\": 1, \"noise\": {\"by\": null, \"eff_iso\": null, \"ev\": null, \"iso\": null, \"risk\": null, \"sigma\": 0.1082, \"summary\": null}, \"orientation\": \"landscape\", \"people\": [{\"af_score\": null, \"area_frac\": 0.3181226579707658, \"center\": [0.347, 0.637], \"center_dist\": 0.291, \"conf\": 0.8717710375785828, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0007, \"priority\": 0.25443, \"sharp_body\": 0.0994, \"sharp_eye\": 0.0083, \"sharp_head\": 0.0523, \"sharp_torso\": 0.1148}], \"primary_body_sharp\": 0.0994, \"primary_by\": \"priority\", \"primary_eye_hf\": 0.0007, \"primary_eye_sharp\": 0.0083, \"primary_eye_src\": \"face\", \"primary_head_sharp\": 0.0523, \"split\": {\"gap\": 3, \"grades\": {\"eye\": 0, \"fft\": 0, \"head\": 3}, \"odd\": \"head\"}, \"width\": 5962}",
+   "text": "Frame: 5962x3354 landscape. People detected: 1.\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "many_people",
+   "local": "{\"af\": null, \"af_note\": \"no Canon AF info (exiftool not installed)\", \"bg_sharp\": 0.0327, \"eps\": 0.002, \"exif\": {}, \"exif_prior\": {\"dof_risk\": null, \"motion_risk\": null, \"pupil_mm\": null, \"shake_stops\": null, \"summary\": null}, \"exposure\": null, \"global_sharp\": 0.1168, \"height\": 3354, \"local_reason\": \"nothing_sharp\", \"local_tier\": 0, \"n_people\": 5, \"noise\": {\"by\": null, \"eff_iso\": null, \"ev\": null, \"iso\": null, \"risk\": null, \"sigma\": 0.1082, \"summary\": null}, \"orientation\": \"landscape\", \"people\": [{\"af_score\": null, \"area_frac\": 0.3181226579707658, \"center\": [0.347, 0.637], \"center_dist\": 0.291, \"conf\": 0.8717710375785828, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0007, \"priority\": 0.25443, \"sharp_body\": 0.0994, \"sharp_eye\": 0.0083, \"sharp_head\": 0.0523, \"sharp_torso\": 0.1148}, {\"af_score\": null, \"area_frac\": 0.2670968009078367, \"center\": [0.73, 0.532], \"center_dist\": 0.328, \"conf\": 0.857153058052063, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0008, \"priority\": 0.20731, \"sharp_body\": 0.1777, \"sharp_eye\": 0.0039, \"sharp_head\": 0.0149, \"sharp_torso\": 0.1057}, {\"sharp_head\": null, \"sharp_body\": 0.05}, {\"sharp_head\": 0.0, \"sharp_body\": null}, {\"sharp_head\": 1e-05, \"sharp_body\": 3.0}], \"primary_body_sharp\": 0.0994, \"primary_by\": \"priority\", \"primary_eye_hf\": 0.0007, \"primary_eye_sharp\": 0.0083, \"primary_eye_src\": \"face\", \"primary_head_sharp\": 0.0523, \"split\": {\"gap\": 3, \"grades\": {\"eye\": 0, \"fft\": 0, \"head\": 3}, \"odd\": \"head\"}, \"width\": 5962}",
+   "text": "Frame: 5962x3354 landscape. People detected: 5.\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\nOther people head sharpness: 0.0149, 0.05, None.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "no_people",
+   "local": "{\"af\": null, \"af_note\": \"no Canon AF info (exiftool not installed)\", \"bg_sharp\": 0.0327, \"eps\": 0.002, \"exif\": {}, \"exif_prior\": {\"dof_risk\": null, \"motion_risk\": null, \"pupil_mm\": null, \"shake_stops\": null, \"summary\": null}, \"exposure\": null, \"global_sharp\": 0.25, \"height\": 3354, \"local_reason\": \"nothing_sharp\", \"local_tier\": 0, \"n_people\": 0, \"noise\": {\"by\": null, \"eff_iso\": null, \"ev\": null, \"iso\": null, \"risk\": null, \"sigma\": 0.1082, \"summary\": null}, \"orientation\": \"landscape\", \"people\": [], \"primary_body_sharp\": 0.0994, \"primary_by\": \"priority\", \"primary_eye_hf\": 0.0007, \"primary_eye_sharp\": 0.0083, \"primary_eye_src\": \"face\", \"primary_head_sharp\": 0.0523, \"split\": {\"gap\": 3, \"grades\": {\"eye\": 0, \"fft\": 0, \"head\": 3}, \"odd\": \"head\"}, \"width\": 5962}",
+   "text": "Frame: 5962x3354 landscape. People detected: 0.\nWhole-frame sharpness 0.25. Local focus guess: tier 0 (no people)."
+  },
+  {
+   "name": "no_people_missing_global",
+   "local": "{\"af\": null, \"af_note\": \"no Canon AF info (exiftool not installed)\", \"bg_sharp\": 0.0327, \"eps\": 0.002, \"exif\": {}, \"exif_prior\": {\"dof_risk\": null, \"motion_risk\": null, \"pupil_mm\": null, \"shake_stops\": null, \"summary\": null}, \"exposure\": null, \"height\": 3354, \"local_reason\": \"nothing_sharp\", \"local_tier\": 0, \"n_people\": 0, \"noise\": {\"by\": null, \"eff_iso\": null, \"ev\": null, \"iso\": null, \"risk\": null, \"sigma\": 0.1082, \"summary\": null}, \"orientation\": \"landscape\", \"people\": [], \"primary_body_sharp\": 0.0994, \"primary_by\": \"priority\", \"primary_eye_hf\": 0.0007, \"primary_eye_sharp\": 0.0083, \"primary_eye_src\": \"face\", \"primary_head_sharp\": 0.0523, \"split\": {\"gap\": 3, \"grades\": {\"eye\": 0, \"fft\": 0, \"head\": 3}, \"odd\": \"head\"}, \"width\": 5962}",
+   "text": "Frame: 5962x3354 landscape. People detected: 0.\nWhole-frame sharpness None. Local focus guess: tier 0 (no people)."
+  },
+  {
+   "name": "missing_optional",
+   "local": "{\"af_note\": \"no Canon AF info (exiftool not installed)\", \"eps\": 0.002, \"exif\": {}, \"height\": 3354, \"local_reason\": \"nothing_sharp\", \"local_tier\": 0, \"n_people\": 2, \"orientation\": \"landscape\", \"people\": [{\"af_score\": null, \"area_frac\": 0.3181226579707658, \"center\": [0.347, 0.637], \"center_dist\": 0.291, \"conf\": 0.8717710375785828, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0007, \"priority\": 0.25443, \"sharp_body\": 0.0994, \"sharp_eye\": 0.0083, \"sharp_head\": 0.0523, \"sharp_torso\": 0.1148}, {\"af_score\": null, \"area_frac\": 0.2670968009078367, \"center\": [0.73, 0.532], \"center_dist\": 0.328, \"conf\": 0.857153058052063, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0008, \"priority\": 0.20731, \"sharp_body\": 0.1777, \"sharp_eye\": 0.0039, \"sharp_head\": 0.0149, \"sharp_torso\": 0.1057}], \"primary_body_sharp\": 0.0994, \"primary_by\": \"priority\", \"primary_eye_hf\": 0.0007, \"primary_eye_sharp\": 0.0083, \"primary_eye_src\": \"face\", \"primary_head_sharp\": 0.0523, \"split\": {\"gap\": 3, \"grades\": {\"eye\": 0, \"fft\": 0, \"head\": 3}, \"odd\": \"head\"}, \"width\": 5962}",
+   "text": "Frame: 5962x3354 landscape. People detected: 2.\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background None, whole frame None.\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\nOther people head sharpness: 0.0149.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "n_without_people_list",
+   "local": "{\"af\": null, \"af_note\": \"no Canon AF info (exiftool not installed)\", \"bg_sharp\": 0.0327, \"eps\": 0.002, \"exif\": {}, \"exif_prior\": {\"dof_risk\": null, \"motion_risk\": null, \"pupil_mm\": null, \"shake_stops\": null, \"summary\": null}, \"exposure\": null, \"global_sharp\": 0.1168, \"height\": 3354, \"local_reason\": \"nothing_sharp\", \"local_tier\": 0, \"n_people\": 2, \"noise\": {\"by\": null, \"eff_iso\": null, \"ev\": null, \"iso\": null, \"risk\": null, \"sigma\": 0.1082, \"summary\": null}, \"orientation\": \"landscape\", \"people\": [], \"primary_body_sharp\": 0.0994, \"primary_by\": \"priority\", \"primary_eye_hf\": 0.0007, \"primary_eye_sharp\": 0.0083, \"primary_eye_src\": \"face\", \"primary_head_sharp\": 0.0523, \"split\": {\"gap\": 3, \"grades\": {\"eye\": 0, \"fft\": 0, \"head\": 3}, \"odd\": \"head\"}, \"width\": 5962}",
+   "text": "Frame: 5962x3354 landscape. People detected: 2.\nWhole-frame sharpness 0.1168. Local focus guess: tier 0 (no people)."
+  },
+  {
+   "name": "small_values",
+   "local": "{\"af\": null, \"af_note\": \"no Canon AF info (exiftool not installed)\", \"bg_sharp\": 0.0327, \"eps\": 0.002, \"exif\": {}, \"exif_prior\": {\"dof_risk\": null, \"motion_risk\": null, \"pupil_mm\": null, \"shake_stops\": null, \"summary\": null}, \"exposure\": null, \"global_sharp\": 0.1168, \"height\": 3354, \"local_reason\": \"nothing_sharp\", \"local_tier\": 0, \"n_people\": 2, \"noise\": {\"by\": null, \"eff_iso\": null, \"ev\": null, \"iso\": null, \"risk\": null, \"sigma\": 0.1082, \"summary\": null}, \"orientation\": \"landscape\", \"people\": [{\"af_score\": null, \"area_frac\": 5e-05, \"center\": [0.347, 0.637], \"center_dist\": 0.291, \"conf\": 0.8717710375785828, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0007, \"priority\": 0.25443, \"sharp_body\": 1.2345678901234568e+17, \"sharp_eye\": 0.0083, \"sharp_head\": 1e-05, \"sharp_torso\": 0.0001}, {\"af_score\": null, \"area_frac\": 0.2670968009078367, \"center\": [0.73, 0.532], \"center_dist\": 0.328, \"conf\": 0.857153058052063, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0008, \"priority\": 0.20731, \"sharp_body\": 0.1777, \"sharp_eye\": 0.0039, \"sharp_head\": 0.0149, \"sharp_torso\": 0.1057}], \"primary_body_sharp\": 0.0994, \"primary_by\": \"priority\", \"primary_eye_hf\": 0.0007, \"primary_eye_sharp\": 0.0083, \"primary_eye_src\": \"face\", \"primary_head_sharp\": 0.0523, \"split\": {\"gap\": 3, \"grades\": {\"eye\": 0, \"fft\": 0, \"head\": 3}, \"odd\": \"head\"}, \"width\": 5962}",
+   "text": "Frame: 5962x3354 landscape. People detected: 2.\nPrimary subject: 0.0% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 1e-05, torso 0.0001, body 1.2345678901234568e+17, background 0.0327, whole frame 0.1168.\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\nOther people head sharpness: 0.0149.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "int_sharp",
+   "local": "{\"af\": null, \"af_note\": \"no Canon AF info (exiftool not installed)\", \"bg_sharp\": 0.0327, \"eps\": 0.002, \"exif\": {}, \"exif_prior\": {\"dof_risk\": null, \"motion_risk\": null, \"pupil_mm\": null, \"shake_stops\": null, \"summary\": null}, \"exposure\": null, \"global_sharp\": 0.1168, \"height\": 3354, \"local_reason\": \"nothing_sharp\", \"local_tier\": 0, \"n_people\": 2, \"noise\": {\"by\": null, \"eff_iso\": null, \"ev\": null, \"iso\": null, \"risk\": null, \"sigma\": 0.1082, \"summary\": null}, \"orientation\": \"landscape\", \"people\": [{\"af_score\": null, \"area_frac\": 0.3181226579707658, \"center\": [0, 1], \"center_dist\": 0.291, \"conf\": 0.8717710375785828, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0007, \"priority\": 0.25443, \"sharp_body\": 0.0994, \"sharp_eye\": 0.0083, \"sharp_head\": 0, \"sharp_torso\": 1}, {\"af_score\": null, \"area_frac\": 0.2670968009078367, \"center\": [0.73, 0.532], \"center_dist\": 0.328, \"conf\": 0.857153058052063, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0008, \"priority\": 0.20731, \"sharp_body\": 0.1777, \"sharp_eye\": 0.0039, \"sharp_head\": 0.0149, \"sharp_torso\": 0.1057}], \"primary_body_sharp\": 0.0994, \"primary_by\": \"priority\", \"primary_eye_hf\": 0.0007, \"primary_eye_sharp\": 0.0083, \"primary_eye_src\": \"face\", \"primary_head_sharp\": 0.0523, \"split\": {\"gap\": 3, \"grades\": {\"eye\": 0, \"fft\": 0, \"head\": 3}, \"odd\": \"head\"}, \"width\": 5962}",
+   "text": "Frame: 5962x3354 landscape. People detected: 2.\nPrimary subject: 31.8% of frame, center at (0.00, 1.00) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0, torso 1, body 0.0994, background 0.0327, whole frame 0.1168.\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\nOther people head sharpness: 0.0149.\nLocal focus guess: tier 0 (nothing_sharp)."
+  },
+  {
+   "name": "empty",
+   "local": "{}",
+   "text": "Detector data unavailable."
+  },
+  {
+   "name": "minimal_no_people",
+   "local": "{\"width\": 10, \"height\": 20, \"orientation\": \"portrait\"}",
+   "text": "Frame: 10x20 portrait. People detected: 0.\nWhole-frame sharpness None. Local focus guess: tier 0 (no people)."
+  },
+  {
+   "name": "missing_width",
+   "local": "{\"height\": 1, \"orientation\": \"x\"}",
+   "error": "KeyError: 'width'"
+  },
+  {
+   "name": "missing_local_tier",
+   "local": "{\"af\": null, \"af_note\": \"no Canon AF info (exiftool not installed)\", \"bg_sharp\": 0.0327, \"eps\": 0.002, \"exif\": {}, \"exif_prior\": {\"dof_risk\": null, \"motion_risk\": null, \"pupil_mm\": null, \"shake_stops\": null, \"summary\": null}, \"exposure\": null, \"global_sharp\": 0.1168, \"height\": 3354, \"local_reason\": \"nothing_sharp\", \"n_people\": 2, \"noise\": {\"by\": null, \"eff_iso\": null, \"ev\": null, \"iso\": null, \"risk\": null, \"sigma\": 0.1082, \"summary\": null}, \"orientation\": \"landscape\", \"people\": [{\"af_score\": null, \"area_frac\": 0.3181226579707658, \"center\": [0.347, 0.637], \"center_dist\": 0.291, \"conf\": 0.8717710375785828, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0007, \"priority\": 0.25443, \"sharp_body\": 0.0994, \"sharp_eye\": 0.0083, \"sharp_head\": 0.0523, \"sharp_torso\": 0.1148}, {\"af_score\": null, \"area_frac\": 0.2670968009078367, \"center\": [0.73, 0.532], \"center_dist\": 0.328, \"conf\": 0.857153058052063, \"eye_src\": \"face\", \"head_src\": \"keypoints\", \"hf_eye\": 0.0008, \"priority\": 0.20731, \"sharp_body\": 0.1777, \"sharp_eye\": 0.0039, \"sharp_head\": 0.0149, \"sharp_torso\": 0.1057}], \"primary_body_sharp\": 0.0994, \"primary_by\": \"priority\", \"primary_eye_hf\": 0.0007, \"primary_eye_sharp\": 0.0083, \"primary_eye_src\": \"face\", \"primary_head_sharp\": 0.0523, \"split\": {\"gap\": 3, \"grades\": {\"eye\": 0, \"fft\": 0, \"head\": 3}, \"odd\": \"head\"}, \"width\": 5962}",
+   "error": "KeyError: 'local_tier'"
+  }
+ ],
+ "validate": [
+  {
+   "name": "test_schema_validate_normalizes",
+   "input": "{\"focus_tier\": 2, \"focus_notes\": \"x\", \"primary_subject\": \"nope\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"x\", \"action\": \"x\", \"keywords\": [\"A\", \"a \"], \"adjectives\": [\"A\", \"a \"], \"description\": \"x\", \"quality_remarks\": \"x\", \"quality_score\": 1, \"keeper\": true}",
+   "output": "{\"focus_tier\": 2, \"focus_notes\": \"x\", \"primary_subject\": \"other\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"x\", \"action\": \"x\", \"keywords\": [\"a\"], \"adjectives\": [\"a\"], \"description\": \"x\", \"quality_remarks\": \"x\", \"quality_score\": 1, \"keeper\": true}"
+  },
+  {
+   "name": "good",
+   "input": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"Onewheel\", \" trail \", \"dirt\", \"helmet\", \"forest\", \"trail\"], \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}",
+   "output": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"dirt\", \"forest\", \"helmet\", \"onewheel\", \"trail\"], \"adjectives\": [\"calm\", \"dynamic\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}"
+  },
+  {
+   "name": "tier_high",
+   "input": "{\"focus_tier\": 9, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"Onewheel\", \" trail \", \"dirt\", \"helmet\", \"forest\", \"trail\"], \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}",
+   "output": "{\"focus_tier\": 3, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"dirt\", \"forest\", \"helmet\", \"onewheel\", \"trail\"], \"adjectives\": [\"calm\", \"dynamic\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}"
+  },
+  {
+   "name": "tier_negative",
+   "input": "{\"focus_tier\": -4, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"Onewheel\", \" trail \", \"dirt\", \"helmet\", \"forest\", \"trail\"], \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}",
+   "output": "{\"focus_tier\": 0, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"dirt\", \"forest\", \"helmet\", \"onewheel\", \"trail\"], \"adjectives\": [\"calm\", \"dynamic\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}"
+  },
+  {
+   "name": "tier_float",
+   "input": "{\"focus_tier\": 2.7, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"Onewheel\", \" trail \", \"dirt\", \"helmet\", \"forest\", \"trail\"], \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}",
+   "output": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"dirt\", \"forest\", \"helmet\", \"onewheel\", \"trail\"], \"adjectives\": [\"calm\", \"dynamic\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}"
+  },
+  {
+   "name": "tier_float_text",
+   "input": "{\"focus_tier\": 3.0, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"Onewheel\", \" trail \", \"dirt\", \"helmet\", \"forest\", \"trail\"], \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}",
+   "output": "{\"focus_tier\": 3, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"dirt\", \"forest\", \"helmet\", \"onewheel\", \"trail\"], \"adjectives\": [\"calm\", \"dynamic\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}"
+  },
+  {
+   "name": "tier_string",
+   "input": "{\"focus_tier\": \" 3 \", \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"Onewheel\", \" trail \", \"dirt\", \"helmet\", \"forest\", \"trail\"], \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}",
+   "output": "{\"focus_tier\": 3, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"dirt\", \"forest\", \"helmet\", \"onewheel\", \"trail\"], \"adjectives\": [\"calm\", \"dynamic\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}"
+  },
+  {
+   "name": "tier_string_bad",
+   "input": "{\"focus_tier\": \"2.5\", \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"Onewheel\", \" trail \", \"dirt\", \"helmet\", \"forest\", \"trail\"], \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}",
+   "error": "ValueError: invalid literal for int() with base 10: '2.5'"
+  },
+  {
+   "name": "tier_null",
+   "input": "{\"focus_tier\": null, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"Onewheel\", \" trail \", \"dirt\", \"helmet\", \"forest\", \"trail\"], \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}",
+   "error": "TypeError: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'"
+  },
+  {
+   "name": "tier_list",
+   "input": "{\"focus_tier\": [1], \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"Onewheel\", \" trail \", \"dirt\", \"helmet\", \"forest\", \"trail\"], \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}",
+   "error": "TypeError: int() argument must be a string, a bytes-like object or a real number, not 'list'"
+  },
+  {
+   "name": "tier_bool",
+   "input": "{\"focus_tier\": true, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"Onewheel\", \" trail \", \"dirt\", \"helmet\", \"forest\", \"trail\"], \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}",
+   "output": "{\"focus_tier\": 1, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"dirt\", \"forest\", \"helmet\", \"onewheel\", \"trail\"], \"adjectives\": [\"calm\", \"dynamic\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}"
+  },
+  {
+   "name": "bad_enums",
+   "input": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"Rider_Action\", \"people_count\": 1, \"composition\": null, \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"Onewheel\", \" trail \", \"dirt\", \"helmet\", \"forest\", \"trail\"], \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}",
+   "output": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"other\", \"people_count\": 1, \"composition\": \"no_subject\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"dirt\", \"forest\", \"helmet\", \"onewheel\", \"trail\"], \"adjectives\": [\"calm\", \"dynamic\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}"
+  },
+  {
+   "name": "keywords_mixed",
+   "input": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"B\", 5, 2.5, null, true, \"  \", \"b\", \"\\u00dcn\\u00efcode\", \"\\u0130stanbul\", \"\\u039f\\u0394\\u039f\\u03a3\"], \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}",
+   "output": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"2.5\", \"5\", \"b\", \"i\\u0307stanbul\", \"none\", \"true\", \"\\u00fcn\\u00efcode\", \"\\u03bf\\u03b4\\u03bf\\u03c2\"], \"adjectives\": [\"calm\", \"dynamic\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}"
+  },
+  {
+   "name": "keywords_string",
+   "input": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": \"Abc a\", \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}",
+   "output": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"a\", \"b\", \"c\"], \"adjectives\": [\"calm\", \"dynamic\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}"
+  },
+  {
+   "name": "keywords_dict",
+   "input": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": {\"Z\": 1, \"y\": 2}, \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}",
+   "output": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"y\", \"z\"], \"adjectives\": [\"calm\", \"dynamic\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}"
+  },
+  {
+   "name": "keywords_nested",
+   "input": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [[\"A\", 1], {\"k\": \"V\"}], \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}",
+   "output": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"['a', 1]\", \"{'k': 'v'}\"], \"adjectives\": [\"calm\", \"dynamic\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}"
+  },
+  {
+   "name": "keywords_int",
+   "input": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": 5, \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}",
+   "error": "TypeError: 'int' object is not iterable"
+  },
+  {
+   "name": "keywords_null",
+   "input": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": null, \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}",
+   "error": "TypeError: 'NoneType' object is not iterable"
+  },
+  {
+   "name": "numbers_text",
+   "input": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [1.0, 1e5, 1E-7, 100000000000000000000, -0, \"Onewheel\", \" trail \", \"dirt\", \"helmet\", \"forest\", \"trail\"], \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}",
+   "output": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"0\", \"1.0\", \"100000.0\", \"100000000000000000000\", \"1e-07\", \"dirt\", \"forest\", \"helmet\", \"onewheel\", \"trail\"], \"adjectives\": [\"calm\", \"dynamic\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true}"
+  },
+  {
+   "name": "missing_two",
+   "input": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"keywords\": [\"Onewheel\", \" trail \", \"dirt\", \"helmet\", \"forest\", \"trail\"], \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4}",
+   "error": "ValueError: missing fields: ['action', 'keeper']"
+  },
+  {
+   "name": "missing_all",
+   "input": "{}",
+   "error": "ValueError: missing fields: ['focus_tier', 'focus_notes', 'primary_subject', 'people_count', 'composition', 'subject_placement', 'action', 'keywords', 'adjectives', 'description', 'quality_remarks', 'quality_score', 'keeper']"
+  },
+  {
+   "name": "list",
+   "input": "[1, 2]",
+   "error": "ValueError: missing fields: ['focus_tier', 'focus_notes', 'primary_subject', 'people_count', 'composition', 'subject_placement', 'action', 'keywords', 'adjectives', 'description', 'quality_remarks', 'quality_score', 'keeper']"
+  },
+  {
+   "name": "string",
+   "input": "\"focus_tier\"",
+   "error": "ValueError: missing fields: ['focus_notes', 'primary_subject', 'people_count', 'composition', 'subject_placement', 'action', 'keywords', 'adjectives', 'description', 'quality_remarks', 'quality_score', 'keeper']"
+  },
+  {
+   "name": "null",
+   "input": "null",
+   "error": "TypeError: argument of type 'NoneType' is not iterable"
+  },
+  {
+   "name": "number",
+   "input": "3",
+   "error": "TypeError: argument of type 'int' is not iterable"
+  },
+  {
+   "name": "extra_fields",
+   "input": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"Onewheel\", \" trail \", \"dirt\", \"helmet\", \"forest\", \"trail\"], \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true, \"extra\": \"kept\", \"nested\": {\"a\": [1, 2.5]}}",
+   "output": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": \"carving\", \"keywords\": [\"dirt\", \"forest\", \"helmet\", \"onewheel\", \"trail\"], \"adjectives\": [\"calm\", \"dynamic\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": true, \"extra\": \"kept\", \"nested\": {\"a\": [1, 2.5]}}"
+  },
+  {
+   "name": "null_values",
+   "input": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": null, \"keywords\": [\"Onewheel\", \" trail \", \"dirt\", \"helmet\", \"forest\", \"trail\"], \"adjectives\": [\"Dynamic\", \"calm\", \"\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": null}",
+   "output": "{\"focus_tier\": 2, \"focus_notes\": \"eyes crisp\", \"primary_subject\": \"rider_action\", \"people_count\": 1, \"composition\": \"full_body\", \"subject_placement\": \"center\", \"action\": null, \"keywords\": [\"dirt\", \"forest\", \"helmet\", \"onewheel\", \"trail\"], \"adjectives\": [\"calm\", \"dynamic\"], \"description\": \"a rider\", \"quality_remarks\": \"fine\", \"quality_score\": 4, \"keeper\": null}"
+  }
+ ],
+ "loads": [
+  {
+   "input": "",
+   "error": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+  },
+  {
+   "input": "   ",
+   "error": "JSONDecodeError: Expecting value: line 1 column 4 (char 3)"
+  },
+  {
+   "input": "{",
+   "error": "JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)"
+  },
+  {
+   "input": "[",
+   "error": "JSONDecodeError: Expecting value: line 1 column 2 (char 1)"
+  },
+  {
+   "input": "{\"a\": 1",
+   "error": "JSONDecodeError: Expecting ',' delimiter: line 1 column 8 (char 7)"
+  },
+  {
+   "input": "{\"a\": 1,",
+   "error": "JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 9 (char 8)"
+  },
+  {
+   "input": "{\"a\": 1,}",
+   "error": "JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 9 (char 8)"
+  },
+  {
+   "input": "{\"a\" 1}",
+   "error": "JSONDecodeError: Expecting ':' delimiter: line 1 column 6 (char 5)"
+  },
+  {
+   "input": "{\"a\": }",
+   "error": "JSONDecodeError: Expecting value: line 1 column 7 (char 6)"
+  },
+  {
+   "input": "[1, 2",
+   "error": "JSONDecodeError: Expecting ',' delimiter: line 1 column 6 (char 5)"
+  },
+  {
+   "input": "[1 2]",
+   "error": "JSONDecodeError: Expecting ',' delimiter: line 1 column 4 (char 3)"
+  },
+  {
+   "input": "[1,]",
+   "error": "JSONDecodeError: Expecting value: line 1 column 4 (char 3)"
+  },
+  {
+   "input": "{\"a\": \"unterminated",
+   "error": "JSONDecodeError: Unterminated string starting at: line 1 column 7 (char 6)"
+  },
+  {
+   "input": "{\"a\": \"bad \\x escape\"}",
+   "error": "JSONDecodeError: Invalid \\escape: line 1 column 12 (char 11)"
+  },
+  {
+   "input": "{\"a\": \"ctrl \u0001 char\"}",
+   "error": "JSONDecodeError: Invalid control character at: line 1 column 13 (char 12)"
+  },
+  {
+   "input": "{\"a\": \"\\u12\"}",
+   "error": "JSONDecodeError: Invalid \\uXXXX escape: line 1 column 9 (char 8)"
+  },
+  {
+   "input": "{\"a\": \"\\u12zz\"}",
+   "error": "JSONDecodeError: Invalid \\uXXXX escape: line 1 column 9 (char 8)"
+  },
+  {
+   "input": "\"\\ud83d\\ude00\"",
+   "output": "\"\\ud83d\\ude00\""
+  },
+  {
+   "input": "{\"a\": 1}}",
+   "error": "JSONDecodeError: Extra data: line 1 column 9 (char 8)"
+  },
+  {
+   "input": "{\"a\": 1} x",
+   "error": "JSONDecodeError: Extra data: line 1 column 10 (char 9)"
+  },
+  {
+   "input": "nul",
+   "error": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+  },
+  {
+   "input": "tru",
+   "error": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+  },
+  {
+   "input": "-",
+   "error": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+  },
+  {
+   "input": "-x",
+   "error": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+  },
+  {
+   "input": "01",
+   "error": "JSONDecodeError: Extra data: line 1 column 2 (char 1)"
+  },
+  {
+   "input": "1.",
+   "error": "JSONDecodeError: Extra data: line 1 column 2 (char 1)"
+  },
+  {
+   "input": "1e",
+   "error": "JSONDecodeError: Extra data: line 1 column 2 (char 1)"
+  },
+  {
+   "input": "1e+",
+   "error": "JSONDecodeError: Extra data: line 1 column 2 (char 1)"
+  },
+  {
+   "input": ".5",
+   "error": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+  },
+  {
+   "input": "{'a': 1}",
+   "error": "JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)"
+  },
+  {
+   "input": "﻿{}",
+   "error": "JSONDecodeError: Unexpected UTF-8 BOM (decode using utf-8-sig): line 1 column 1 (char 0)"
+  },
+  {
+   "input": "{\"a\":\n  [1,\n   2,\n   }",
+   "error": "JSONDecodeError: Expecting value: line 4 column 4 (char 21)"
+  },
+  {
+   "input": "NaN",
+   "output": "NaN"
+  },
+  {
+   "input": "-Infinity",
+   "output": "-Infinity"
+  },
+  {
+   "input": "[Infinity]",
+   "output": "[Infinity]"
+  },
+  {
+   "input": "{\"é\": \"日本\", \"a\":1 \"b\":2}",
+   "error": "JSONDecodeError: Expecting ',' delimiter: line 1 column 19 (char 18)"
+  },
+  {
+   "input": "\n\n{\"a\"",
+   "error": "JSONDecodeError: Expecting ':' delimiter: line 3 column 5 (char 6)"
+  },
+  {
+   "input": "{\"a\": tru}",
+   "error": "JSONDecodeError: Expecting value: line 1 column 7 (char 6)"
+  },
+  {
+   "input": "{\"a\": 1}\n\n",
+   "output": "{\"a\": 1}"
+  },
+  {
+   "input": "[1, 2, 3",
+   "error": "JSONDecodeError: Expecting ',' delimiter: line 1 column 9 (char 8)"
+  },
+  {
+   "input": "{\"a\": [}",
+   "error": "JSONDecodeError: Expecting value: line 1 column 8 (char 7)"
+  }
+ ],
+ "float_repr": [
+  {
+   "bits": "0x0.0p+0",
+   "str": "0.0"
+  },
+  {
+   "bits": "-0x0.0p+0",
+   "str": "-0.0"
+  },
+  {
+   "bits": "0x1.0000000000000p+0",
+   "str": "1.0"
+  },
+  {
+   "bits": "0x1.8000000000000p+1",
+   "str": "3.0"
+  },
+  {
+   "bits": "0x1.999999999999ap-4",
+   "str": "0.1"
+  },
+  {
+   "bits": "0x1.4f8b588e368f1p-17",
+   "str": "1e-05"
+  },
+  {
+   "bits": "0x1.a36e2eb1c432dp-14",
+   "str": "0.0001"
+  },
+  {
+   "bits": "0x1.02e4b6ce5dc68p-13",
+   "str": "0.00012345"
+  },
+  {
+   "bits": "0x1.1c37937e08000p+53",
+   "str": "1e+16"
+  },
+  {
+   "bits": "0x1.c6bf526340000p+49",
+   "str": "1000000000000000.0"
+  },
+  {
+   "bits": "0x1.b69b4ba630f35p+56",
+   "str": "1.2345678901234568e+17"
+  },
+  {
+   "bits": "0x1.1eb2d66005835p+997",
+   "str": "1.5e+300"
+  },
+  {
+   "bits": "0x1.ac9a7b3b7302fp-996",
+   "str": "2.5e-300"
+  },
+  {
+   "bits": "0x1.3333333333334p-2",
+   "str": "0.30000000000000004"
+  },
+  {
+   "bits": "0x1.0f0cf064dd592p+73",
+   "str": "1e+22"
+  },
+  {
+   "bits": "0x1.81cd6c8b43958p+13",
+   "str": "12345.678"
+  },
+  {
+   "bits": "-0x1.d000000000000p+2",
+   "str": "-7.25"
+  },
+  {
+   "bits": "0x0.0000000000001p-1022",
+   "str": "5e-324"
+  },
+  {
+   "bits": "0x1.fffffffffffffp+1023",
+   "str": "1.7976931348623157e+308"
+  },
+  {
+   "bits": "0x1.9000000000000p+6",
+   "str": "100.0"
+  },
+  {
+   "bits": "0x1.0000000000000p-1",
+   "str": "0.5"
+  }
+ ],
+ "str_repr": [
+  {
+   "s": "plain",
+   "repr": "'plain'"
+  },
+  {
+   "s": "it's",
+   "repr": "\"it's\""
+  },
+  {
+   "s": "say \"hi\"",
+   "repr": "'say \"hi\"'"
+  },
+  {
+   "s": "both ' and \"",
+   "repr": "'both \\' and \"'"
+  },
+  {
+   "s": "tab\tnew\nline\\",
+   "repr": "'tab\\tnew\\nline\\\\'"
+  },
+  {
+   "s": "\u0000é日本 😀",
+   "repr": "'\\x00\\x7f\\x85é日本\\u2028😀'"
+  },
+  {
+   "s": "zero​width",
+   "repr": "'zero\\u200bwidth'"
+  }
+ ],
+ "dumps": [
+  {
+   "value": {
+    "a": "é日本😀\"\\\n",
+    "b": [
+     1,
+     2.5,
+     null,
+     true,
+     false
+    ],
+    "c": {}
+   },
+   "text": "{\"a\": \"\\u00e9\\u65e5\\u672c\\ud83d\\ude00\\u007f\\\"\\\\\\n\", \"b\": [1, 2.5, null, true, false], \"c\": {}}"
+  },
+  {
+   "value": [],
+   "text": "[]"
+  },
+  {
+   "value": "",
+   "text": "\"\""
+  },
+  {
+   "value": 0.1,
+   "text": "0.1"
+  }
+ ],
+ "requests": {
+  "frame_b64": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAAgADADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDzSiiivkT+iAooooAKKKKACiiigAooooAKKKKAP//Z",
+  "crop_b64": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAAYABgDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwB9FFFfkp+GhRRRQAUUUUAFFFFAH//Z",
+  "context": "Frame: 5962x3354 landscape. People detected: 2.\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\nOther people head sharpness: 0.0149.\nLocal focus guess: tier 0 (nothing_sharp).",
+  "config": {
+   "af": {
+    "min_score": 0.5,
+    "near": 2.0,
+    "use": true,
+    "y_up": true
+   },
+   "anthropic_effort": "low",
+   "backend": "ollama",
+   "batch_size": 1000,
+   "crop_pad": 0.15,
+   "crop_quality": 88,
+   "crop_size": 768,
+   "dedup_head_iou": 0.25,
+   "dedup_head_tol": 0.1,
+   "dedup_iou": 0.6,
+   "detect_conf": 0.25,
+   "detect_long_edge": 1280,
+   "detect_model": "yolo11n-pose.pt",
+   "exif": {
+    "action_shutter": 0.002,
+    "crop_factor": 1.0,
+    "shake_margin": 1.5,
+    "wide_open_f": 2.0
+   },
+   "exposure": {
+    "highlight_cap": 0.9,
+    "jpeg_dark_key": 0.015,
+    "jpeg_max_ev": 1.5,
+    "min_ev": 0.5,
+    "raw_dark_key": 0.03,
+    "raw_max_ev": 4.0,
+    "recover": true,
+    "target_key": 0.08
+   },
+   "eye_max_people": 4,
+   "face_conf": 0.6,
+   "face_model": "face_detection_yunet_2023mar.onnx",
+   "focus": {
+    "eye_tier1_min": 0.02,
+    "eye_tier2_min": 0.035,
+    "eye_tier3_min": 0.06,
+    "eyewear_ratio": 3.0,
+    "floor_conf": 0.5,
+    "floor_grade": 3,
+    "floor_tier": 2,
+    "front_edge": 0.01,
+    "front_max_gap": 0.5,
+    "front_max_grade": 1,
+    "front_min_drop": 0.25,
+    "front_min_height": 1.0,
+    "hf_tier1_min": 0.01,
+    "hf_tier2_min": 0.017,
+    "hf_tier3_min": 0.03,
+    "plane_body_max_extra": null,
+    "plane_max_extra": 0.4,
+    "split_steps": 2,
+    "tier1_min": 0.01,
+    "tier2_min": 0.017,
+    "tier3_min": 0.03,
+    "use_eyes": true,
+    "use_front": true,
+    "use_hf": true,
+    "use_plane": true
+   },
+   "focus_source": "vlm",
+   "frame_long_edge": 1568,
+   "frame_quality": 82,
+   "gemini_thinking_level": "LOW",
+   "groups": {
+    "1": {
+     "folder": "group_1",
+     "keywords": []
+    },
+    "2": {
+     "folder": "group_2",
+     "keywords": []
+    },
+    "3": {
+     "folder": "group_3",
+     "keywords": []
+    },
+    "4": {
+     "folder": "group_4",
+     "keywords": []
+    }
+   },
+   "local_ahead": true,
+   "max_output_tokens": 1024,
+   "min_person_frac": 0.0015,
+   "model": null,
+   "noise": {
+    "high_iso": 6400,
+    "high_sigma": null,
+    "margin": 1.5,
+    "medium_sigma": null,
+    "noisy_iso": 1600
+   },
+   "ollama_frame_long_edge": 1024,
+   "ollama_num_ctx": 8192,
+   "ollama_num_predict": 1536,
+   "ollama_schema_max_lengths": true,
+   "truth": {
+    "label_tiers": {
+     "Blue": 3,
+     "Green": 3,
+     "Orange": 1,
+     "Red": 0,
+     "Yellow": 2
+    },
+    "rating_tiers": {
+     "0": null,
+     "1": 0,
+     "2": 1,
+     "3": 2,
+     "4": 3,
+     "5": 3
+    }
+   },
+   "vlm_concurrency": 1,
+   "workers": 4
+  },
+  "payloads": {
+   "ollama": "{\"model\": \"qwen3-vl:4b-instruct\", \"messages\": [{\"role\": \"system\", \"content\": \"You are assisting an action-sports photographer who shoots onewheel (self-balancing electric board) events with fast lenses near wide open, so depth of field is shallow and focus can vary across a single person's body.\\n\\nFor each photo you get:\\n- Image 1: the full frame, downscaled.\\n- Image 2 (when present): a crop at native pixel resolution around the primary person's head and upper body, chosen by a person detector. Judge fine focus from this crop; the downscaled frame cannot show it.\\n- Detector data: people count, primary subject size and position, and sharpness numbers measured on the original pixels (contrast-normalized; higher is sharper; head/torso/body for the primary person, plus the background). Use them as evidence, not as the answer; the crop is what you can see.\\n\\nFocus tiers:\\nGrade the primary person's head (eyes, face, or helmet edges):\\n- 3 sharp: crisply in focus.\\n- 2 slightly soft: nearly in focus but not crisp: just in front of or behind the eyes, or slight motion blur; fine detail is a little mushy at 100%.\\n- 1 soft: clearly soft: the face is recognizable but detail is gone, from missed focus or motion blur.\\n- 0 miss: the head is blurry: no people, focus landed on the background, foreground, torso or board, or on someone else.\\nDistinguish missed focus (whole subject soft while something else is crisp) from motion blur (directional smear) in focus_notes.\\n\\nComposition is the portion of the primary subject in frame. Placement is where the subject sits in the frame.\\nKeywords are concrete lowercase library tags for what is in the photo. Adjectives describe mood, style and light. Quality remarks are an editor's cull notes about the photo itself: exposure, blur, noise, clipping, distractions, crop.\\nWrite like a photo editor, in short plain sentences about the photo only: focus_notes at most 25 words, description at most 15 words, quality_remarks at most 35 words, 5-10 keywords, 3-5 adjectives. Return only the JSON object.\"}, {\"role\": \"user\", \"content\": \"Image 1: full frame.\\nImage 2: native-resolution crop of the primary subject's head and upper body.\\n\\nFrame: 5962x3354 landscape. People detected: 2.\\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\\nOther people head sharpness: 0.0149.\\nLocal focus guess: tier 0 (nothing_sharp).\\n\\nAnalyze the photo and return the JSON object.\", \"images\": [\"/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAAgADADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDzSiiivkT+iAooooAKKKKACiiigAooooAKKKKAP//Z\", \"/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAAYABgDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwB9FFFfkp+GhRRRQAUUUUAFFFFAH//Z\"]}], \"format\": {\"type\": \"object\", \"properties\": {\"focus_tier\": {\"type\": \"integer\", \"enum\": [0, 1, 2, 3], \"description\": \"0 = missed, primary person's head not in focus; 1 = soft, head clearly soft but recognizable; 2 = slightly soft, head nearly but not crisply in focus; 3 = sharp, primary person's head/eyes/helmet edges crisp\"}, \"focus_notes\": {\"type\": \"string\", \"description\": \"What is and isn't sharp; where focus landed; motion blur vs missed focus. 1-2 sentences.\", \"maxLength\": 220}, \"primary_subject\": {\"type\": \"string\", \"enum\": [\"rider_action\", \"rider_posed\", \"group\", \"crowd_spectators\", \"gear_board\", \"venue_scenery\", \"other\", \"no_people\"]}, \"people_count\": {\"type\": \"integer\", \"description\": \"Number of clearly visible people, 0 if none.\"}, \"composition\": {\"type\": \"string\", \"enum\": [\"full_body\", \"three_quarter\", \"half_body\", \"close_up\", \"environmental\", \"no_subject\"], \"description\": \"Portion of the primary subject in frame. environmental = subject small in a big scene.\"}, \"subject_placement\": {\"type\": \"string\", \"enum\": [\"center\", \"left_third\", \"right_third\", \"top\", \"bottom\", \"edge\", \"none\"]}, \"action\": {\"type\": \"string\", \"description\": \"Short phrase for what the primary subject is doing, e.g. 'carving a berm', 'mid-air jump', 'standing and talking', or 'none'.\", \"maxLength\": 60}, \"keywords\": {\"type\": \"array\", \"items\": {\"type\": \"string\", \"maxLength\": 40}, \"minItems\": 5, \"maxItems\": 15, \"description\": \"Lowercase nouns/phrases for what is in the photo: objects, setting, gear, tricks, weather, time of day.\"}, \"adjectives\": {\"type\": \"array\", \"items\": {\"type\": \"string\", \"maxLength\": 30}, \"minItems\": 3, \"maxItems\": 8, \"description\": \"Mood, style and light descriptors, e.g. 'dynamic', 'golden-hour', 'gritty'.\"}, \"description\": {\"type\": \"string\", \"description\": \"One-sentence caption.\", \"maxLength\": 140}, \"quality_remarks\": {\"type\": \"string\", \"description\": \"1-3 sentences a photo editor would write: exposure, motion blur, noise, clipped highlights, distracting elements, horizon, crop suggestion.\", \"maxLength\": 260}, \"quality_score\": {\"type\": \"integer\", \"minimum\": 1, \"maximum\": 5, \"description\": \"Overall keeper quality, 1 worst to 5 best.\"}, \"keeper\": {\"type\": \"boolean\", \"description\": \"Would a photographer keep this in the delivered set?\"}}, \"required\": [\"focus_tier\", \"focus_notes\", \"primary_subject\", \"people_count\", \"composition\", \"subject_placement\", \"action\", \"keywords\", \"adjectives\", \"description\", \"quality_remarks\", \"quality_score\", \"keeper\"]}, \"stream\": false, \"think\": false, \"keep_alive\": \"30m\", \"options\": {\"temperature\": 0.7, \"top_p\": 0.8, \"top_k\": 20, \"repeat_penalty\": 1.1, \"repeat_last_n\": 128, \"num_predict\": 1536, \"num_ctx\": 8192}}",
+   "ollama_nocrop_nomax": "{\"model\": \"qwen3-vl:8b\", \"messages\": [{\"role\": \"system\", \"content\": \"You are assisting an action-sports photographer who shoots onewheel (self-balancing electric board) events with fast lenses near wide open, so depth of field is shallow and focus can vary across a single person's body.\\n\\nFor each photo you get:\\n- Image 1: the full frame, downscaled.\\n- Image 2 (when present): a crop at native pixel resolution around the primary person's head and upper body, chosen by a person detector. Judge fine focus from this crop; the downscaled frame cannot show it.\\n- Detector data: people count, primary subject size and position, and sharpness numbers measured on the original pixels (contrast-normalized; higher is sharper; head/torso/body for the primary person, plus the background). Use them as evidence, not as the answer; the crop is what you can see.\\n\\nFocus tiers:\\nGrade the primary person's head (eyes, face, or helmet edges):\\n- 3 sharp: crisply in focus.\\n- 2 slightly soft: nearly in focus but not crisp: just in front of or behind the eyes, or slight motion blur; fine detail is a little mushy at 100%.\\n- 1 soft: clearly soft: the face is recognizable but detail is gone, from missed focus or motion blur.\\n- 0 miss: the head is blurry: no people, focus landed on the background, foreground, torso or board, or on someone else.\\nDistinguish missed focus (whole subject soft while something else is crisp) from motion blur (directional smear) in focus_notes.\\n\\nComposition is the portion of the primary subject in frame. Placement is where the subject sits in the frame.\\nKeywords are concrete lowercase library tags for what is in the photo. Adjectives describe mood, style and light. Quality remarks are an editor's cull notes about the photo itself: exposure, blur, noise, clipping, distractions, crop.\\nWrite like a photo editor, in short plain sentences about the photo only: focus_notes at most 25 words, description at most 15 words, quality_remarks at most 35 words, 5-10 keywords, 3-5 adjectives. Return only the JSON object.\"}, {\"role\": \"user\", \"content\": \"Image 1: full frame.\\n\\nFrame: 5962x3354 landscape. People detected: 2.\\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\\nOther people head sharpness: 0.0149.\\nLocal focus guess: tier 0 (nothing_sharp).\\n\\nAnalyze the photo and return the JSON object.\", \"images\": [\"/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAAgADADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDzSiiivkT+iAooooAKKKKACiiigAooooAKKKKAP//Z\"]}], \"format\": {\"type\": \"object\", \"properties\": {\"focus_tier\": {\"type\": \"integer\", \"enum\": [0, 1, 2, 3], \"description\": \"0 = missed, primary person's head not in focus; 1 = soft, head clearly soft but recognizable; 2 = slightly soft, head nearly but not crisply in focus; 3 = sharp, primary person's head/eyes/helmet edges crisp\"}, \"focus_notes\": {\"type\": \"string\", \"description\": \"What is and isn't sharp; where focus landed; motion blur vs missed focus. 1-2 sentences.\"}, \"primary_subject\": {\"type\": \"string\", \"enum\": [\"rider_action\", \"rider_posed\", \"group\", \"crowd_spectators\", \"gear_board\", \"venue_scenery\", \"other\", \"no_people\"]}, \"people_count\": {\"type\": \"integer\", \"description\": \"Number of clearly visible people, 0 if none.\"}, \"composition\": {\"type\": \"string\", \"enum\": [\"full_body\", \"three_quarter\", \"half_body\", \"close_up\", \"environmental\", \"no_subject\"], \"description\": \"Portion of the primary subject in frame. environmental = subject small in a big scene.\"}, \"subject_placement\": {\"type\": \"string\", \"enum\": [\"center\", \"left_third\", \"right_third\", \"top\", \"bottom\", \"edge\", \"none\"]}, \"action\": {\"type\": \"string\", \"description\": \"Short phrase for what the primary subject is doing, e.g. 'carving a berm', 'mid-air jump', 'standing and talking', or 'none'.\"}, \"keywords\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}, \"minItems\": 5, \"maxItems\": 15, \"description\": \"Lowercase nouns/phrases for what is in the photo: objects, setting, gear, tricks, weather, time of day.\"}, \"adjectives\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}, \"minItems\": 3, \"maxItems\": 8, \"description\": \"Mood, style and light descriptors, e.g. 'dynamic', 'golden-hour', 'gritty'.\"}, \"description\": {\"type\": \"string\", \"description\": \"One-sentence caption.\"}, \"quality_remarks\": {\"type\": \"string\", \"description\": \"1-3 sentences a photo editor would write: exposure, motion blur, noise, clipped highlights, distracting elements, horizon, crop suggestion.\"}, \"quality_score\": {\"type\": \"integer\", \"minimum\": 1, \"maximum\": 5, \"description\": \"Overall keeper quality, 1 worst to 5 best.\"}, \"keeper\": {\"type\": \"boolean\", \"description\": \"Would a photographer keep this in the delivered set?\"}}, \"required\": [\"focus_tier\", \"focus_notes\", \"primary_subject\", \"people_count\", \"composition\", \"subject_placement\", \"action\", \"keywords\", \"adjectives\", \"description\", \"quality_remarks\", \"quality_score\", \"keeper\"]}, \"stream\": false, \"think\": false, \"keep_alive\": \"30m\", \"options\": {\"temperature\": 0.7, \"top_p\": 0.8, \"top_k\": 20, \"repeat_penalty\": 1.1, \"repeat_last_n\": 128, \"num_predict\": 900, \"num_ctx\": 8192}}",
+   "anthropic_opus": "{\"model\": \"claude-opus-5\", \"max_tokens\": 1024, \"system\": [{\"type\": \"text\", \"text\": \"You are assisting an action-sports photographer who shoots onewheel (self-balancing electric board) events with fast lenses near wide open, so depth of field is shallow and focus can vary across a single person's body.\\n\\nFor each photo you get:\\n- Image 1: the full frame, downscaled.\\n- Image 2 (when present): a crop at native pixel resolution around the primary person's head and upper body, chosen by a person detector. Judge fine focus from this crop; the downscaled frame cannot show it.\\n- Detector data: people count, primary subject size and position, and sharpness numbers measured on the original pixels (contrast-normalized; higher is sharper; head/torso/body for the primary person, plus the background). Use them as evidence, not as the answer; the crop is what you can see.\\n\\nFocus tiers:\\nGrade the primary person's head (eyes, face, or helmet edges):\\n- 3 sharp: crisply in focus.\\n- 2 slightly soft: nearly in focus but not crisp: just in front of or behind the eyes, or slight motion blur; fine detail is a little mushy at 100%.\\n- 1 soft: clearly soft: the face is recognizable but detail is gone, from missed focus or motion blur.\\n- 0 miss: the head is blurry: no people, focus landed on the background, foreground, torso or board, or on someone else.\\nDistinguish missed focus (whole subject soft while something else is crisp) from motion blur (directional smear) in focus_notes.\\n\\nComposition is the portion of the primary subject in frame. Placement is where the subject sits in the frame.\\nKeywords are concrete lowercase library tags for what is in the photo. Adjectives describe mood, style and light. Quality remarks are an editor's cull notes about the photo itself: exposure, blur, noise, clipping, distractions, crop.\\nWrite like a photo editor, in short plain sentences about the photo only: focus_notes at most 25 words, description at most 15 words, quality_remarks at most 35 words, 5-10 keywords, 3-5 adjectives. Return only the JSON object.\", \"cache_control\": {\"type\": \"ephemeral\"}}], \"messages\": [{\"role\": \"user\", \"content\": [{\"type\": \"text\", \"text\": \"Image 1: full frame.\"}, {\"type\": \"image\", \"source\": {\"type\": \"base64\", \"media_type\": \"image/jpeg\", \"data\": \"/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAAgADADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDzSiiivkT+iAooooAKKKKACiiigAooooAKKKKAP//Z\"}}, {\"type\": \"text\", \"text\": \"Image 2: native-resolution crop of the primary subject's head and upper body.\"}, {\"type\": \"image\", \"source\": {\"type\": \"base64\", \"media_type\": \"image/jpeg\", \"data\": \"/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAAYABgDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwB9FFFfkp+GhRRRQAUUUUAFFFFAH//Z\"}}, {\"type\": \"text\", \"text\": \"Frame: 5962x3354 landscape. People detected: 2.\\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\\nOther people head sharpness: 0.0149.\\nLocal focus guess: tier 0 (nothing_sharp).\\n\\nAnalyze the photo and return the JSON object.\"}]}], \"output_config\": {\"format\": {\"type\": \"json_schema\", \"schema\": {\"type\": \"object\", \"properties\": {\"focus_tier\": {\"type\": \"integer\", \"enum\": [0, 1, 2, 3], \"description\": \"0 = missed, primary person's head not in focus; 1 = soft, head clearly soft but recognizable; 2 = slightly soft, head nearly but not crisply in focus; 3 = sharp, primary person's head/eyes/helmet edges crisp\"}, \"focus_notes\": {\"type\": \"string\", \"description\": \"What is and isn't sharp; where focus landed; motion blur vs missed focus. 1-2 sentences.\"}, \"primary_subject\": {\"type\": \"string\", \"enum\": [\"rider_action\", \"rider_posed\", \"group\", \"crowd_spectators\", \"gear_board\", \"venue_scenery\", \"other\", \"no_people\"]}, \"people_count\": {\"type\": \"integer\", \"description\": \"Number of clearly visible people, 0 if none.\"}, \"composition\": {\"type\": \"string\", \"enum\": [\"full_body\", \"three_quarter\", \"half_body\", \"close_up\", \"environmental\", \"no_subject\"], \"description\": \"Portion of the primary subject in frame. environmental = subject small in a big scene.\"}, \"subject_placement\": {\"type\": \"string\", \"enum\": [\"center\", \"left_third\", \"right_third\", \"top\", \"bottom\", \"edge\", \"none\"]}, \"action\": {\"type\": \"string\", \"description\": \"Short phrase for what the primary subject is doing, e.g. 'carving a berm', 'mid-air jump', 'standing and talking', or 'none'.\"}, \"keywords\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}, \"minItems\": 5, \"maxItems\": 15, \"description\": \"Lowercase nouns/phrases for what is in the photo: objects, setting, gear, tricks, weather, time of day.\"}, \"adjectives\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}, \"minItems\": 3, \"maxItems\": 8, \"description\": \"Mood, style and light descriptors, e.g. 'dynamic', 'golden-hour', 'gritty'.\"}, \"description\": {\"type\": \"string\", \"description\": \"One-sentence caption.\"}, \"quality_remarks\": {\"type\": \"string\", \"description\": \"1-3 sentences a photo editor would write: exposure, motion blur, noise, clipped highlights, distracting elements, horizon, crop suggestion.\"}, \"quality_score\": {\"type\": \"integer\", \"minimum\": 1, \"maximum\": 5, \"description\": \"Overall keeper quality, 1 worst to 5 best.\"}, \"keeper\": {\"type\": \"boolean\", \"description\": \"Would a photographer keep this in the delivered set?\"}}, \"required\": [\"focus_tier\", \"focus_notes\", \"primary_subject\", \"people_count\", \"composition\", \"subject_placement\", \"action\", \"keywords\", \"adjectives\", \"description\", \"quality_remarks\", \"quality_score\", \"keeper\"], \"additionalProperties\": false}}, \"effort\": \"low\"}}",
+   "anthropic_haiku_nocrop": "{\"model\": \"claude-haiku-4-5\", \"max_tokens\": 1024, \"system\": [{\"type\": \"text\", \"text\": \"You are assisting an action-sports photographer who shoots onewheel (self-balancing electric board) events with fast lenses near wide open, so depth of field is shallow and focus can vary across a single person's body.\\n\\nFor each photo you get:\\n- Image 1: the full frame, downscaled.\\n- Image 2 (when present): a crop at native pixel resolution around the primary person's head and upper body, chosen by a person detector. Judge fine focus from this crop; the downscaled frame cannot show it.\\n- Detector data: people count, primary subject size and position, and sharpness numbers measured on the original pixels (contrast-normalized; higher is sharper; head/torso/body for the primary person, plus the background). Use them as evidence, not as the answer; the crop is what you can see.\\n\\nFocus tiers:\\nGrade the primary person's head (eyes, face, or helmet edges):\\n- 3 sharp: crisply in focus.\\n- 2 slightly soft: nearly in focus but not crisp: just in front of or behind the eyes, or slight motion blur; fine detail is a little mushy at 100%.\\n- 1 soft: clearly soft: the face is recognizable but detail is gone, from missed focus or motion blur.\\n- 0 miss: the head is blurry: no people, focus landed on the background, foreground, torso or board, or on someone else.\\nDistinguish missed focus (whole subject soft while something else is crisp) from motion blur (directional smear) in focus_notes.\\n\\nComposition is the portion of the primary subject in frame. Placement is where the subject sits in the frame.\\nKeywords are concrete lowercase library tags for what is in the photo. Adjectives describe mood, style and light. Quality remarks are an editor's cull notes about the photo itself: exposure, blur, noise, clipping, distractions, crop.\\nWrite like a photo editor, in short plain sentences about the photo only: focus_notes at most 25 words, description at most 15 words, quality_remarks at most 35 words, 5-10 keywords, 3-5 adjectives. Return only the JSON object.\", \"cache_control\": {\"type\": \"ephemeral\"}}], \"messages\": [{\"role\": \"user\", \"content\": [{\"type\": \"text\", \"text\": \"Image 1: full frame.\"}, {\"type\": \"image\", \"source\": {\"type\": \"base64\", \"media_type\": \"image/jpeg\", \"data\": \"/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAAgADADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDzSiiivkT+iAooooAKKKKACiiigAooooAKKKKAP//Z\"}}, {\"type\": \"text\", \"text\": \"Frame: 5962x3354 landscape. People detected: 2.\\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\\nOther people head sharpness: 0.0149.\\nLocal focus guess: tier 0 (nothing_sharp).\\n\\nAnalyze the photo and return the JSON object.\"}]}], \"output_config\": {\"format\": {\"type\": \"json_schema\", \"schema\": {\"type\": \"object\", \"properties\": {\"focus_tier\": {\"type\": \"integer\", \"enum\": [0, 1, 2, 3], \"description\": \"0 = missed, primary person's head not in focus; 1 = soft, head clearly soft but recognizable; 2 = slightly soft, head nearly but not crisply in focus; 3 = sharp, primary person's head/eyes/helmet edges crisp\"}, \"focus_notes\": {\"type\": \"string\", \"description\": \"What is and isn't sharp; where focus landed; motion blur vs missed focus. 1-2 sentences.\"}, \"primary_subject\": {\"type\": \"string\", \"enum\": [\"rider_action\", \"rider_posed\", \"group\", \"crowd_spectators\", \"gear_board\", \"venue_scenery\", \"other\", \"no_people\"]}, \"people_count\": {\"type\": \"integer\", \"description\": \"Number of clearly visible people, 0 if none.\"}, \"composition\": {\"type\": \"string\", \"enum\": [\"full_body\", \"three_quarter\", \"half_body\", \"close_up\", \"environmental\", \"no_subject\"], \"description\": \"Portion of the primary subject in frame. environmental = subject small in a big scene.\"}, \"subject_placement\": {\"type\": \"string\", \"enum\": [\"center\", \"left_third\", \"right_third\", \"top\", \"bottom\", \"edge\", \"none\"]}, \"action\": {\"type\": \"string\", \"description\": \"Short phrase for what the primary subject is doing, e.g. 'carving a berm', 'mid-air jump', 'standing and talking', or 'none'.\"}, \"keywords\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}, \"minItems\": 5, \"maxItems\": 15, \"description\": \"Lowercase nouns/phrases for what is in the photo: objects, setting, gear, tricks, weather, time of day.\"}, \"adjectives\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}, \"minItems\": 3, \"maxItems\": 8, \"description\": \"Mood, style and light descriptors, e.g. 'dynamic', 'golden-hour', 'gritty'.\"}, \"description\": {\"type\": \"string\", \"description\": \"One-sentence caption.\"}, \"quality_remarks\": {\"type\": \"string\", \"description\": \"1-3 sentences a photo editor would write: exposure, motion blur, noise, clipped highlights, distracting elements, horizon, crop suggestion.\"}, \"quality_score\": {\"type\": \"integer\", \"minimum\": 1, \"maximum\": 5, \"description\": \"Overall keeper quality, 1 worst to 5 best.\"}, \"keeper\": {\"type\": \"boolean\", \"description\": \"Would a photographer keep this in the delivered set?\"}}, \"required\": [\"focus_tier\", \"focus_notes\", \"primary_subject\", \"people_count\", \"composition\", \"subject_placement\", \"action\", \"keywords\", \"adjectives\", \"description\", \"quality_remarks\", \"quality_score\", \"keeper\"], \"additionalProperties\": false}}}}",
+   "anthropic_effort": "{\"model\": \"claude-sonnet-5\", \"max_tokens\": 1024, \"system\": [{\"type\": \"text\", \"text\": \"You are assisting an action-sports photographer who shoots onewheel (self-balancing electric board) events with fast lenses near wide open, so depth of field is shallow and focus can vary across a single person's body.\\n\\nFor each photo you get:\\n- Image 1: the full frame, downscaled.\\n- Image 2 (when present): a crop at native pixel resolution around the primary person's head and upper body, chosen by a person detector. Judge fine focus from this crop; the downscaled frame cannot show it.\\n- Detector data: people count, primary subject size and position, and sharpness numbers measured on the original pixels (contrast-normalized; higher is sharper; head/torso/body for the primary person, plus the background). Use them as evidence, not as the answer; the crop is what you can see.\\n\\nFocus tiers:\\nGrade the primary person's head (eyes, face, or helmet edges):\\n- 3 sharp: crisply in focus.\\n- 2 slightly soft: nearly in focus but not crisp: just in front of or behind the eyes, or slight motion blur; fine detail is a little mushy at 100%.\\n- 1 soft: clearly soft: the face is recognizable but detail is gone, from missed focus or motion blur.\\n- 0 miss: the head is blurry: no people, focus landed on the background, foreground, torso or board, or on someone else.\\nDistinguish missed focus (whole subject soft while something else is crisp) from motion blur (directional smear) in focus_notes.\\n\\nComposition is the portion of the primary subject in frame. Placement is where the subject sits in the frame.\\nKeywords are concrete lowercase library tags for what is in the photo. Adjectives describe mood, style and light. Quality remarks are an editor's cull notes about the photo itself: exposure, blur, noise, clipping, distractions, crop.\\nWrite like a photo editor, in short plain sentences about the photo only: focus_notes at most 25 words, description at most 15 words, quality_remarks at most 35 words, 5-10 keywords, 3-5 adjectives. Return only the JSON object.\", \"cache_control\": {\"type\": \"ephemeral\"}}], \"messages\": [{\"role\": \"user\", \"content\": [{\"type\": \"text\", \"text\": \"Image 1: full frame.\"}, {\"type\": \"image\", \"source\": {\"type\": \"base64\", \"media_type\": \"image/jpeg\", \"data\": \"/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAAgADADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDzSiiivkT+iAooooAKKKKACiiigAooooAKKKKAP//Z\"}}, {\"type\": \"text\", \"text\": \"Image 2: native-resolution crop of the primary subject's head and upper body.\"}, {\"type\": \"image\", \"source\": {\"type\": \"base64\", \"media_type\": \"image/jpeg\", \"data\": \"/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAAYABgDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwB9FFFfkp+GhRRRQAUUUUAFFFFAH//Z\"}}, {\"type\": \"text\", \"text\": \"Frame: 5962x3354 landscape. People detected: 2.\\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\\nOther people head sharpness: 0.0149.\\nLocal focus guess: tier 0 (nothing_sharp).\\n\\nAnalyze the photo and return the JSON object.\"}]}], \"output_config\": {\"format\": {\"type\": \"json_schema\", \"schema\": {\"type\": \"object\", \"properties\": {\"focus_tier\": {\"type\": \"integer\", \"enum\": [0, 1, 2, 3], \"description\": \"0 = missed, primary person's head not in focus; 1 = soft, head clearly soft but recognizable; 2 = slightly soft, head nearly but not crisply in focus; 3 = sharp, primary person's head/eyes/helmet edges crisp\"}, \"focus_notes\": {\"type\": \"string\", \"description\": \"What is and isn't sharp; where focus landed; motion blur vs missed focus. 1-2 sentences.\"}, \"primary_subject\": {\"type\": \"string\", \"enum\": [\"rider_action\", \"rider_posed\", \"group\", \"crowd_spectators\", \"gear_board\", \"venue_scenery\", \"other\", \"no_people\"]}, \"people_count\": {\"type\": \"integer\", \"description\": \"Number of clearly visible people, 0 if none.\"}, \"composition\": {\"type\": \"string\", \"enum\": [\"full_body\", \"three_quarter\", \"half_body\", \"close_up\", \"environmental\", \"no_subject\"], \"description\": \"Portion of the primary subject in frame. environmental = subject small in a big scene.\"}, \"subject_placement\": {\"type\": \"string\", \"enum\": [\"center\", \"left_third\", \"right_third\", \"top\", \"bottom\", \"edge\", \"none\"]}, \"action\": {\"type\": \"string\", \"description\": \"Short phrase for what the primary subject is doing, e.g. 'carving a berm', 'mid-air jump', 'standing and talking', or 'none'.\"}, \"keywords\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}, \"minItems\": 5, \"maxItems\": 15, \"description\": \"Lowercase nouns/phrases for what is in the photo: objects, setting, gear, tricks, weather, time of day.\"}, \"adjectives\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}, \"minItems\": 3, \"maxItems\": 8, \"description\": \"Mood, style and light descriptors, e.g. 'dynamic', 'golden-hour', 'gritty'.\"}, \"description\": {\"type\": \"string\", \"description\": \"One-sentence caption.\"}, \"quality_remarks\": {\"type\": \"string\", \"description\": \"1-3 sentences a photo editor would write: exposure, motion blur, noise, clipped highlights, distracting elements, horizon, crop suggestion.\"}, \"quality_score\": {\"type\": \"integer\", \"minimum\": 1, \"maximum\": 5, \"description\": \"Overall keeper quality, 1 worst to 5 best.\"}, \"keeper\": {\"type\": \"boolean\", \"description\": \"Would a photographer keep this in the delivered set?\"}}, \"required\": [\"focus_tier\", \"focus_notes\", \"primary_subject\", \"people_count\", \"composition\", \"subject_placement\", \"action\", \"keywords\", \"adjectives\", \"description\", \"quality_remarks\", \"quality_score\", \"keeper\"], \"additionalProperties\": false}}, \"effort\": \"high\"}}",
+   "gemini_3": "{\"key\": \"42\", \"request\": {\"system_instruction\": {\"parts\": [{\"text\": \"You are assisting an action-sports photographer who shoots onewheel (self-balancing electric board) events with fast lenses near wide open, so depth of field is shallow and focus can vary across a single person's body.\\n\\nFor each photo you get:\\n- Image 1: the full frame, downscaled.\\n- Image 2 (when present): a crop at native pixel resolution around the primary person's head and upper body, chosen by a person detector. Judge fine focus from this crop; the downscaled frame cannot show it.\\n- Detector data: people count, primary subject size and position, and sharpness numbers measured on the original pixels (contrast-normalized; higher is sharper; head/torso/body for the primary person, plus the background). Use them as evidence, not as the answer; the crop is what you can see.\\n\\nFocus tiers:\\nGrade the primary person's head (eyes, face, or helmet edges):\\n- 3 sharp: crisply in focus.\\n- 2 slightly soft: nearly in focus but not crisp: just in front of or behind the eyes, or slight motion blur; fine detail is a little mushy at 100%.\\n- 1 soft: clearly soft: the face is recognizable but detail is gone, from missed focus or motion blur.\\n- 0 miss: the head is blurry: no people, focus landed on the background, foreground, torso or board, or on someone else.\\nDistinguish missed focus (whole subject soft while something else is crisp) from motion blur (directional smear) in focus_notes.\\n\\nComposition is the portion of the primary subject in frame. Placement is where the subject sits in the frame.\\nKeywords are concrete lowercase library tags for what is in the photo. Adjectives describe mood, style and light. Quality remarks are an editor's cull notes about the photo itself: exposure, blur, noise, clipping, distractions, crop.\\nWrite like a photo editor, in short plain sentences about the photo only: focus_notes at most 25 words, description at most 15 words, quality_remarks at most 35 words, 5-10 keywords, 3-5 adjectives. Return only the JSON object.\"}]}, \"contents\": [{\"parts\": [{\"text\": \"Image 1: full frame.\"}, {\"media_resolution\": {\"level\": \"MEDIA_RESOLUTION_HIGH\"}, \"inline_data\": {\"data\": \"_9j_4AAQSkZJRgABAQAAAQABAAD_2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7_2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7_wAARCAAgADADASIAAhEBAxEB_8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL_8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4-Tl5ufo6erx8vP09fb3-Pn6_8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL_8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3-Pn6_9oADAMBAAIRAxEAPwDzSiiivkT-iAooooAKKKKACiiigAooooAKKKKAP__Z\", \"mime_type\": \"image/jpeg\"}}, {\"text\": \"Image 2: native-resolution crop of the primary subject's head and upper body.\"}, {\"media_resolution\": {\"level\": \"MEDIA_RESOLUTION_MEDIUM\"}, \"inline_data\": {\"data\": \"_9j_4AAQSkZJRgABAQAAAQABAAD_2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7_2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7_wAARCAAYABgDASIAAhEBAxEB_8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL_8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4-Tl5ufo6erx8vP09fb3-Pn6_8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL_8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3-Pn6_9oADAMBAAIRAxEAPwB9FFFfkp-GhRRRQAUUUUAFFFFAH__Z\", \"mime_type\": \"image/jpeg\"}}, {\"text\": \"Frame: 5962x3354 landscape. People detected: 2.\\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\\nOther people head sharpness: 0.0149.\\nLocal focus guess: tier 0 (nothing_sharp).\\n\\nAnalyze the photo and return the JSON object.\"}], \"role\": \"user\"}], \"generation_config\": {\"response_json_schema\": {\"type\": \"object\", \"properties\": {\"focus_tier\": {\"type\": \"integer\", \"enum\": [0, 1, 2, 3], \"description\": \"0 = missed, primary person's head not in focus; 1 = soft, head clearly soft but recognizable; 2 = slightly soft, head nearly but not crisply in focus; 3 = sharp, primary person's head/eyes/helmet edges crisp\"}, \"focus_notes\": {\"type\": \"string\", \"description\": \"What is and isn't sharp; where focus landed; motion blur vs missed focus. 1-2 sentences.\"}, \"primary_subject\": {\"type\": \"string\", \"enum\": [\"rider_action\", \"rider_posed\", \"group\", \"crowd_spectators\", \"gear_board\", \"venue_scenery\", \"other\", \"no_people\"]}, \"people_count\": {\"type\": \"integer\", \"description\": \"Number of clearly visible people, 0 if none.\"}, \"composition\": {\"type\": \"string\", \"enum\": [\"full_body\", \"three_quarter\", \"half_body\", \"close_up\", \"environmental\", \"no_subject\"], \"description\": \"Portion of the primary subject in frame. environmental = subject small in a big scene.\"}, \"subject_placement\": {\"type\": \"string\", \"enum\": [\"center\", \"left_third\", \"right_third\", \"top\", \"bottom\", \"edge\", \"none\"]}, \"action\": {\"type\": \"string\", \"description\": \"Short phrase for what the primary subject is doing, e.g. 'carving a berm', 'mid-air jump', 'standing and talking', or 'none'.\"}, \"keywords\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}, \"minItems\": 5, \"maxItems\": 15, \"description\": \"Lowercase nouns/phrases for what is in the photo: objects, setting, gear, tricks, weather, time of day.\"}, \"adjectives\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}, \"minItems\": 3, \"maxItems\": 8, \"description\": \"Mood, style and light descriptors, e.g. 'dynamic', 'golden-hour', 'gritty'.\"}, \"description\": {\"type\": \"string\", \"description\": \"One-sentence caption.\"}, \"quality_remarks\": {\"type\": \"string\", \"description\": \"1-3 sentences a photo editor would write: exposure, motion blur, noise, clipped highlights, distracting elements, horizon, crop suggestion.\"}, \"quality_score\": {\"type\": \"integer\", \"minimum\": 1, \"maximum\": 5, \"description\": \"Overall keeper quality, 1 worst to 5 best.\"}, \"keeper\": {\"type\": \"boolean\", \"description\": \"Would a photographer keep this in the delivered set?\"}}, \"required\": [\"focus_tier\", \"focus_notes\", \"primary_subject\", \"people_count\", \"composition\", \"subject_placement\", \"action\", \"keywords\", \"adjectives\", \"description\", \"quality_remarks\", \"quality_score\", \"keeper\"]}, \"max_output_tokens\": 1024, \"response_mime_type\": \"application/json\", \"thinking_config\": {\"thinking_level\": \"LOW\"}}}}",
+   "gemini_3_nocrop_high": "{\"key\": \"43\", \"request\": {\"system_instruction\": {\"parts\": [{\"text\": \"You are assisting an action-sports photographer who shoots onewheel (self-balancing electric board) events with fast lenses near wide open, so depth of field is shallow and focus can vary across a single person's body.\\n\\nFor each photo you get:\\n- Image 1: the full frame, downscaled.\\n- Image 2 (when present): a crop at native pixel resolution around the primary person's head and upper body, chosen by a person detector. Judge fine focus from this crop; the downscaled frame cannot show it.\\n- Detector data: people count, primary subject size and position, and sharpness numbers measured on the original pixels (contrast-normalized; higher is sharper; head/torso/body for the primary person, plus the background). Use them as evidence, not as the answer; the crop is what you can see.\\n\\nFocus tiers:\\nGrade the primary person's head (eyes, face, or helmet edges):\\n- 3 sharp: crisply in focus.\\n- 2 slightly soft: nearly in focus but not crisp: just in front of or behind the eyes, or slight motion blur; fine detail is a little mushy at 100%.\\n- 1 soft: clearly soft: the face is recognizable but detail is gone, from missed focus or motion blur.\\n- 0 miss: the head is blurry: no people, focus landed on the background, foreground, torso or board, or on someone else.\\nDistinguish missed focus (whole subject soft while something else is crisp) from motion blur (directional smear) in focus_notes.\\n\\nComposition is the portion of the primary subject in frame. Placement is where the subject sits in the frame.\\nKeywords are concrete lowercase library tags for what is in the photo. Adjectives describe mood, style and light. Quality remarks are an editor's cull notes about the photo itself: exposure, blur, noise, clipping, distractions, crop.\\nWrite like a photo editor, in short plain sentences about the photo only: focus_notes at most 25 words, description at most 15 words, quality_remarks at most 35 words, 5-10 keywords, 3-5 adjectives. Return only the JSON object.\"}]}, \"contents\": [{\"parts\": [{\"text\": \"Image 1: full frame.\"}, {\"media_resolution\": {\"level\": \"MEDIA_RESOLUTION_HIGH\"}, \"inline_data\": {\"data\": \"_9j_4AAQSkZJRgABAQAAAQABAAD_2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7_2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7_wAARCAAgADADASIAAhEBAxEB_8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL_8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4-Tl5ufo6erx8vP09fb3-Pn6_8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL_8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3-Pn6_9oADAMBAAIRAxEAPwDzSiiivkT-iAooooAKKKKACiiigAooooAKKKKAP__Z\", \"mime_type\": \"image/jpeg\"}}, {\"text\": \"Frame: 5962x3354 landscape. People detected: 2.\\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\\nOther people head sharpness: 0.0149.\\nLocal focus guess: tier 0 (nothing_sharp).\\n\\nAnalyze the photo and return the JSON object.\"}], \"role\": \"user\"}], \"generation_config\": {\"response_json_schema\": {\"type\": \"object\", \"properties\": {\"focus_tier\": {\"type\": \"integer\", \"enum\": [0, 1, 2, 3], \"description\": \"0 = missed, primary person's head not in focus; 1 = soft, head clearly soft but recognizable; 2 = slightly soft, head nearly but not crisply in focus; 3 = sharp, primary person's head/eyes/helmet edges crisp\"}, \"focus_notes\": {\"type\": \"string\", \"description\": \"What is and isn't sharp; where focus landed; motion blur vs missed focus. 1-2 sentences.\"}, \"primary_subject\": {\"type\": \"string\", \"enum\": [\"rider_action\", \"rider_posed\", \"group\", \"crowd_spectators\", \"gear_board\", \"venue_scenery\", \"other\", \"no_people\"]}, \"people_count\": {\"type\": \"integer\", \"description\": \"Number of clearly visible people, 0 if none.\"}, \"composition\": {\"type\": \"string\", \"enum\": [\"full_body\", \"three_quarter\", \"half_body\", \"close_up\", \"environmental\", \"no_subject\"], \"description\": \"Portion of the primary subject in frame. environmental = subject small in a big scene.\"}, \"subject_placement\": {\"type\": \"string\", \"enum\": [\"center\", \"left_third\", \"right_third\", \"top\", \"bottom\", \"edge\", \"none\"]}, \"action\": {\"type\": \"string\", \"description\": \"Short phrase for what the primary subject is doing, e.g. 'carving a berm', 'mid-air jump', 'standing and talking', or 'none'.\"}, \"keywords\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}, \"minItems\": 5, \"maxItems\": 15, \"description\": \"Lowercase nouns/phrases for what is in the photo: objects, setting, gear, tricks, weather, time of day.\"}, \"adjectives\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}, \"minItems\": 3, \"maxItems\": 8, \"description\": \"Mood, style and light descriptors, e.g. 'dynamic', 'golden-hour', 'gritty'.\"}, \"description\": {\"type\": \"string\", \"description\": \"One-sentence caption.\"}, \"quality_remarks\": {\"type\": \"string\", \"description\": \"1-3 sentences a photo editor would write: exposure, motion blur, noise, clipped highlights, distracting elements, horizon, crop suggestion.\"}, \"quality_score\": {\"type\": \"integer\", \"minimum\": 1, \"maximum\": 5, \"description\": \"Overall keeper quality, 1 worst to 5 best.\"}, \"keeper\": {\"type\": \"boolean\", \"description\": \"Would a photographer keep this in the delivered set?\"}}, \"required\": [\"focus_tier\", \"focus_notes\", \"primary_subject\", \"people_count\", \"composition\", \"subject_placement\", \"action\", \"keywords\", \"adjectives\", \"description\", \"quality_remarks\", \"quality_score\", \"keeper\"]}, \"max_output_tokens\": 1024, \"response_mime_type\": \"application/json\", \"thinking_config\": {\"thinking_level\": \"HIGH\"}}}}",
+   "gemini_2": "{\"key\": \"42\", \"request\": {\"system_instruction\": {\"parts\": [{\"text\": \"You are assisting an action-sports photographer who shoots onewheel (self-balancing electric board) events with fast lenses near wide open, so depth of field is shallow and focus can vary across a single person's body.\\n\\nFor each photo you get:\\n- Image 1: the full frame, downscaled.\\n- Image 2 (when present): a crop at native pixel resolution around the primary person's head and upper body, chosen by a person detector. Judge fine focus from this crop; the downscaled frame cannot show it.\\n- Detector data: people count, primary subject size and position, and sharpness numbers measured on the original pixels (contrast-normalized; higher is sharper; head/torso/body for the primary person, plus the background). Use them as evidence, not as the answer; the crop is what you can see.\\n\\nFocus tiers:\\nGrade the primary person's head (eyes, face, or helmet edges):\\n- 3 sharp: crisply in focus.\\n- 2 slightly soft: nearly in focus but not crisp: just in front of or behind the eyes, or slight motion blur; fine detail is a little mushy at 100%.\\n- 1 soft: clearly soft: the face is recognizable but detail is gone, from missed focus or motion blur.\\n- 0 miss: the head is blurry: no people, focus landed on the background, foreground, torso or board, or on someone else.\\nDistinguish missed focus (whole subject soft while something else is crisp) from motion blur (directional smear) in focus_notes.\\n\\nComposition is the portion of the primary subject in frame. Placement is where the subject sits in the frame.\\nKeywords are concrete lowercase library tags for what is in the photo. Adjectives describe mood, style and light. Quality remarks are an editor's cull notes about the photo itself: exposure, blur, noise, clipping, distractions, crop.\\nWrite like a photo editor, in short plain sentences about the photo only: focus_notes at most 25 words, description at most 15 words, quality_remarks at most 35 words, 5-10 keywords, 3-5 adjectives. Return only the JSON object.\"}]}, \"contents\": [{\"parts\": [{\"text\": \"Image 1: full frame.\"}, {\"inline_data\": {\"data\": \"_9j_4AAQSkZJRgABAQAAAQABAAD_2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7_2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7_wAARCAAgADADASIAAhEBAxEB_8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL_8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4-Tl5ufo6erx8vP09fb3-Pn6_8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL_8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3-Pn6_9oADAMBAAIRAxEAPwDzSiiivkT-iAooooAKKKKACiiigAooooAKKKKAP__Z\", \"mime_type\": \"image/jpeg\"}}, {\"text\": \"Image 2: native-resolution crop of the primary subject's head and upper body.\"}, {\"inline_data\": {\"data\": \"_9j_4AAQSkZJRgABAQAAAQABAAD_2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7_2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7_wAARCAAYABgDASIAAhEBAxEB_8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL_8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4-Tl5ufo6erx8vP09fb3-Pn6_8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL_8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3-Pn6_9oADAMBAAIRAxEAPwB9FFFfkp-GhRRRQAUUUUAFFFFAH__Z\", \"mime_type\": \"image/jpeg\"}}, {\"text\": \"Frame: 5962x3354 landscape. People detected: 2.\\nPrimary subject: 31.8% of frame, center at (0.35, 0.64) (0,0 = top-left). Head located by keypoints.\\nSharpness (higher = sharper): head 0.0523, torso 0.1148, body 0.0994, background 0.0327, whole frame 0.1168.\\nEye band (both eyes, located by face landmarks): sharpness 0.0083, fine-detail energy ratio 0.0007. This is what decides focus.\\nOther people head sharpness: 0.0149.\\nLocal focus guess: tier 0 (nothing_sharp).\\n\\nAnalyze the photo and return the JSON object.\"}], \"role\": \"user\"}], \"generation_config\": {\"response_json_schema\": {\"type\": \"object\", \"properties\": {\"focus_tier\": {\"type\": \"integer\", \"enum\": [0, 1, 2, 3], \"description\": \"0 = missed, primary person's head not in focus; 1 = soft, head clearly soft but recognizable; 2 = slightly soft, head nearly but not crisply in focus; 3 = sharp, primary person's head/eyes/helmet edges crisp\"}, \"focus_notes\": {\"type\": \"string\", \"description\": \"What is and isn't sharp; where focus landed; motion blur vs missed focus. 1-2 sentences.\"}, \"primary_subject\": {\"type\": \"string\", \"enum\": [\"rider_action\", \"rider_posed\", \"group\", \"crowd_spectators\", \"gear_board\", \"venue_scenery\", \"other\", \"no_people\"]}, \"people_count\": {\"type\": \"integer\", \"description\": \"Number of clearly visible people, 0 if none.\"}, \"composition\": {\"type\": \"string\", \"enum\": [\"full_body\", \"three_quarter\", \"half_body\", \"close_up\", \"environmental\", \"no_subject\"], \"description\": \"Portion of the primary subject in frame. environmental = subject small in a big scene.\"}, \"subject_placement\": {\"type\": \"string\", \"enum\": [\"center\", \"left_third\", \"right_third\", \"top\", \"bottom\", \"edge\", \"none\"]}, \"action\": {\"type\": \"string\", \"description\": \"Short phrase for what the primary subject is doing, e.g. 'carving a berm', 'mid-air jump', 'standing and talking', or 'none'.\"}, \"keywords\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}, \"minItems\": 5, \"maxItems\": 15, \"description\": \"Lowercase nouns/phrases for what is in the photo: objects, setting, gear, tricks, weather, time of day.\"}, \"adjectives\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}, \"minItems\": 3, \"maxItems\": 8, \"description\": \"Mood, style and light descriptors, e.g. 'dynamic', 'golden-hour', 'gritty'.\"}, \"description\": {\"type\": \"string\", \"description\": \"One-sentence caption.\"}, \"quality_remarks\": {\"type\": \"string\", \"description\": \"1-3 sentences a photo editor would write: exposure, motion blur, noise, clipped highlights, distracting elements, horizon, crop suggestion.\"}, \"quality_score\": {\"type\": \"integer\", \"minimum\": 1, \"maximum\": 5, \"description\": \"Overall keeper quality, 1 worst to 5 best.\"}, \"keeper\": {\"type\": \"boolean\", \"description\": \"Would a photographer keep this in the delivered set?\"}}, \"required\": [\"focus_tier\", \"focus_notes\", \"primary_subject\", \"people_count\", \"composition\", \"subject_placement\", \"action\", \"keywords\", \"adjectives\", \"description\", \"quality_remarks\", \"quality_score\", \"keeper\"]}, \"max_output_tokens\": 1024, \"response_mime_type\": \"application/json\", \"thinking_config\": {\"thinking_budget\": 0}}}}"
+  }
+ },
+ "estimates": [
+  {
+   "backend": "gemini",
+   "model": "gemini-2.5-flash-lite",
+   "n_with": 7,
+   "n_without": 3,
+   "estimate": {
+    "model": "gemini-2.5-flash-lite",
+    "input_tokens": 31704,
+    "output_tokens": 3500,
+    "interactive_usd": 0.0,
+    "batch_usd": 0.0,
+    "priced": true
+   }
+  },
+  {
+   "backend": "gemini",
+   "model": "gemini-2.5-flash",
+   "n_with": 7,
+   "n_without": 3,
+   "estimate": {
+    "model": "gemini-2.5-flash",
+    "input_tokens": 31704,
+    "output_tokens": 3500,
+    "interactive_usd": 0.02,
+    "batch_usd": 0.01,
+    "priced": true
+   }
+  },
+  {
+   "backend": "gemini",
+   "model": "gemini-3.1-flash-lite",
+   "n_with": 7,
+   "n_without": 3,
+   "estimate": {
+    "model": "gemini-3.1-flash-lite",
+    "input_tokens": 24120,
+    "output_tokens": 3500,
+    "interactive_usd": 0.01,
+    "batch_usd": 0.01,
+    "priced": true
+   }
+  },
+  {
+   "backend": "gemini",
+   "model": "gemini-3.5-flash-lite",
+   "n_with": 7,
+   "n_without": 3,
+   "estimate": {
+    "model": "gemini-3.5-flash-lite",
+    "input_tokens": 24120,
+    "output_tokens": 3500,
+    "interactive_usd": 0.02,
+    "batch_usd": 0.01,
+    "priced": true
+   }
+  },
+  {
+   "backend": "gemini",
+   "model": "gemini-3.5-flash",
+   "n_with": 7,
+   "n_without": 3,
+   "estimate": {
+    "model": "gemini-3.5-flash",
+    "input_tokens": 24120,
+    "output_tokens": 3500,
+    "interactive_usd": 0.07,
+    "batch_usd": 0.03,
+    "priced": true
+   }
+  },
+  {
+   "backend": "gemini",
+   "model": "gemini-3.8-flash",
+   "n_with": 7,
+   "n_without": 3,
+   "estimate": {
+    "model": "gemini-3.8-flash",
+    "input_tokens": 24120,
+    "output_tokens": 3500,
+    "interactive_usd": 0.03,
+    "batch_usd": 0.02,
+    "priced": true
+   }
+  },
+  {
+   "backend": "anthropic",
+   "model": "claude-haiku-4-5",
+   "n_with": 7,
+   "n_without": 3,
+   "estimate": {
+    "model": "claude-haiku-4-5",
+    "input_tokens": 30502,
+    "output_tokens": 3500,
+    "interactive_usd": 0.05,
+    "batch_usd": 0.02,
+    "priced": true
+   }
+  },
+  {
+   "backend": "anthropic",
+   "model": "claude-sonnet-5",
+   "n_with": 7,
+   "n_without": 3,
+   "estimate": {
+    "model": "claude-sonnet-5",
+    "input_tokens": 36342,
+    "output_tokens": 3500,
+    "interactive_usd": 0.11,
+    "batch_usd": 0.05,
+    "priced": true
+   }
+  },
+  {
+   "backend": "anthropic",
+   "model": "claude-opus-5",
+   "n_with": 7,
+   "n_without": 3,
+   "estimate": {
+    "model": "claude-opus-5",
+    "input_tokens": 36342,
+    "output_tokens": 3500,
+    "interactive_usd": 0.27,
+    "batch_usd": 0.13,
+    "priced": true
+   }
+  },
+  {
+   "backend": "anthropic",
+   "model": "unknown-model",
+   "n_with": 7,
+   "n_without": 3,
+   "estimate": {
+    "model": "unknown-model",
+    "input_tokens": 36342,
+    "output_tokens": 3500,
+    "interactive_usd": 0.0,
+    "batch_usd": 0.0,
+    "priced": false
+   }
+  },
+  {
+   "backend": "ollama",
+   "model": "qwen3-vl:4b",
+   "n_with": 7,
+   "n_without": 3,
+   "estimate": {
+    "model": "qwen3-vl:4b",
+    "input_tokens": 30760,
+    "output_tokens": 3500,
+    "interactive_usd": 0.0,
+    "batch_usd": 0.0,
+    "priced": true
+   }
+  },
+  {
+   "backend": "ollama",
+   "model": "qwen3-vl:4b",
+   "n_with": 0,
+   "n_without": 5,
+   "estimate": {
+    "model": "qwen3-vl:4b",
+    "input_tokens": 12500,
+    "output_tokens": 1750,
+    "interactive_usd": 0.0,
+    "batch_usd": 0.0,
+    "priced": true
+   }
+  }
+ ],
+ "image_tokens": [
+  {
+   "model": "gemini-3.5-flash",
+   "w": 1568,
+   "h": 1045,
+   "tokens": 1120
+  },
+  {
+   "model": "gemini-3.5-flash",
+   "w": 768,
+   "h": 768,
+   "tokens": 1120
+  },
+  {
+   "model": "gemini-3.5-flash",
+   "w": 300,
+   "h": 200,
+   "tokens": 1120
+  },
+  {
+   "model": "gemini-3.5-flash",
+   "w": 384,
+   "h": 100,
+   "tokens": 1120
+  },
+  {
+   "model": "gemini-3.5-flash",
+   "w": 1,
+   "h": 1,
+   "tokens": 1120
+  },
+  {
+   "model": "gemini-3.5-flash",
+   "w": 4000,
+   "h": 3000,
+   "tokens": 1120
+  },
+  {
+   "model": "gemini-2.5-flash",
+   "w": 1568,
+   "h": 1045,
+   "tokens": 1548
+  },
+  {
+   "model": "gemini-2.5-flash",
+   "w": 768,
+   "h": 768,
+   "tokens": 1032
+  },
+  {
+   "model": "gemini-2.5-flash",
+   "w": 300,
+   "h": 200,
+   "tokens": 258
+  },
+  {
+   "model": "gemini-2.5-flash",
+   "w": 384,
+   "h": 100,
+   "tokens": 258
+  },
+  {
+   "model": "gemini-2.5-flash",
+   "w": 1,
+   "h": 1,
+   "tokens": 258
+  },
+  {
+   "model": "gemini-2.5-flash",
+   "w": 4000,
+   "h": 3000,
+   "tokens": 1032
+  },
+  {
+   "model": "claude-opus-5",
+   "w": 1568,
+   "h": 1045,
+   "tokens": 2184
+  },
+  {
+   "model": "claude-opus-5",
+   "w": 768,
+   "h": 768,
+   "tokens": 786
+  },
+  {
+   "model": "claude-opus-5",
+   "w": 300,
+   "h": 200,
+   "tokens": 80
+  },
+  {
+   "model": "claude-opus-5",
+   "w": 384,
+   "h": 100,
+   "tokens": 51
+  },
+  {
+   "model": "claude-opus-5",
+   "w": 1,
+   "h": 1,
+   "tokens": 0
+  },
+  {
+   "model": "claude-opus-5",
+   "w": 4000,
+   "h": 3000,
+   "tokens": 4784
+  },
+  {
+   "model": "claude-haiku-4-5",
+   "w": 1568,
+   "h": 1045,
+   "tokens": 1600
+  },
+  {
+   "model": "claude-haiku-4-5",
+   "w": 768,
+   "h": 768,
+   "tokens": 786
+  },
+  {
+   "model": "claude-haiku-4-5",
+   "w": 300,
+   "h": 200,
+   "tokens": 80
+  },
+  {
+   "model": "claude-haiku-4-5",
+   "w": 384,
+   "h": 100,
+   "tokens": 51
+  },
+  {
+   "model": "claude-haiku-4-5",
+   "w": 1,
+   "h": 1,
+   "tokens": 0
+  },
+  {
+   "model": "claude-haiku-4-5",
+   "w": 4000,
+   "h": 3000,
+   "tokens": 1600
+  },
+  {
+   "model": "other",
+   "w": 1568,
+   "h": 1045,
+   "tokens": 2184
+  },
+  {
+   "model": "other",
+   "w": 768,
+   "h": 768,
+   "tokens": 786
+  },
+  {
+   "model": "other",
+   "w": 300,
+   "h": 200,
+   "tokens": 80
+  },
+  {
+   "model": "other",
+   "w": 384,
+   "h": 100,
+   "tokens": 51
+  },
+  {
+   "model": "other",
+   "w": 1,
+   "h": 1,
+   "tokens": 0
+  },
+  {
+   "model": "other",
+   "w": 4000,
+   "h": 3000,
+   "tokens": 16000
+  }
+ ],
+ "prices": [
+  [
+   "gemini-2.5-flash-lite",
+   0.1,
+   0.4
+  ],
+  [
+   "gemini-2.5-flash",
+   0.3,
+   2.5
+  ],
+  [
+   "gemini-3.1-flash-lite",
+   0.25,
+   1.5
+  ],
+  [
+   "gemini-3.5-flash-lite",
+   0.3,
+   2.5
+  ],
+  [
+   "gemini-3.5-flash",
+   1.5,
+   9.0
+  ],
+  [
+   "gemini-3.8-flash",
+   0.75,
+   3.75
+  ],
+  [
+   "claude-haiku-4-5",
+   1.0,
+   5.0
+  ],
+  [
+   "claude-sonnet-5",
+   2.0,
+   10.0
+  ],
+  [
+   "claude-opus-5",
+   5.0,
+   25.0
+  ]
+ ],
+ "shrink": {
+  "w": 2001,
+  "h": 999,
+  "long_edge": 1024,
+  "out": [
+   1024,
+   511
+  ]
+ }
+}

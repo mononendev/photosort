@@ -58,10 +58,13 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
   const ov = { mutate: (o: Parameters<typeof api.override>[1]) => save({ id, o }) };
   // Culling: q/w/e/r/t (or the bottom bar on a phone) rate the photo, mark it reviewed, and move on to the next one.
   const rate = useCallback((r: number) => { save({ id, o: { rating: r } }); onNav?.(1); }, [save, id, onNav]);
+  // Backspace takes your rating back off (the photo is unreviewed again) and stays put.
+  const unrate = useCallback(() => save({ id, o: { clear_rating: true } }), [save, id]);
   useHotkeys({
     Escape: onClose,
     ...(onNav && { ArrowRight: () => onNav(1), ArrowLeft: () => onNav(-1) }),
     ...Object.fromEntries(RATINGS.map((r) => [r.key, (e: KeyboardEvent) => { if (!e.repeat) rate(r.value); }])),
+    Backspace: (e) => { if (!e.repeat && data?.reviewed) unrate(); },
   });
   const v = data?.vlm;
   const l = data?.local;
@@ -94,7 +97,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
           <span className="font-mono text-sm text-gray-300 truncate min-w-0 flex-1 sm:flex-none">{data?.rel ?? id}</span>
           <span className="order-last basis-full sm:basis-auto sm:order-none flex flex-wrap items-center gap-x-3 gap-y-1">
           {data && <Tip plain tip={explainFinal(data, cfg)}><TierBadge tier={data.focus_tier} /></Tip>}
-          {data?.reviewed && <Tip plain tip="You rated this photo (q/w/e/r/t). Re-running jobs never changes it; only another rating or reset does."><span className="inline-flex items-center gap-1 text-xs text-gray-300"><RatingBadge rating={data.rating} /> reviewed</span></Tip>}
+          {data?.reviewed && <Tip plain tip="You rated this photo (q/w/e/r/t). Re-running jobs never changes it; only another rating, clearing it (⌫), or reset does."><span className="inline-flex items-center gap-1 text-xs text-gray-300"><RatingBadge rating={data.rating} /> reviewed</span></Tip>}
           {ovm.isError && <span className="text-xs text-red-400">couldn't save: {String(ovm.error?.message ?? ovm.error)}</span>}
           <Tip plain tip={<>Quality score (1–5) and keep/cull verdict: {data?.override?.quality_score != null || data?.override?.keeper != null ? 'your call.' : "the vision model's opinion of the whole photo (exposure, framing, moment), not just focus."}</>}>
             <span className="inline-flex items-center gap-2">
@@ -202,13 +205,14 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
             <div className="rounded-lg border border-gray-800 p-3 space-y-2">
               <div className="text-xs uppercase tracking-wide text-gray-500"><Tip tip="Your overrides. They beat the local and model results in the grid, the filters, and every export (tree, CSV, XMP). Reset clears them. They aren't used as calibration truth; import your exported ratings for that.">Your call</Tip></div>
               <div className="flex flex-wrap gap-1 text-xs items-center">
-                <span className="text-gray-500 w-14"><Tip tip="Your cull: 0 missed, 1 soft, 2 slightly soft, 3 sharp set the focus tier; ★ marks a banger (sharp, and one of the best). Keys q w e r t. Rating marks the photo reviewed and moves to the next one.">rating</Tip></span>
+                <span className="text-gray-500 w-14"><Tip tip="Your cull: 0 missed, 1 soft, 2 slightly soft, 3 sharp set the focus tier; ★ marks a banger (sharp, and one of the best). Keys q w e r t. Rating marks the photo reviewed and moves to the next one; clear (⌫) takes it back off.">rating</Tip></span>
                 {RATINGS.map((r) => (
                   <button key={r.value} onClick={() => rate(r.value)} title={`${r.label} (${r.key})`}
                     className={`px-3 py-2 sm:px-2 sm:py-1 rounded border transition active:scale-95 ${data?.rating === r.value ? r.cls : 'border-gray-700 hover:border-gray-500'}`}>
                     {r.short} <kbd className="hidden sm:inline text-[10px] text-gray-500">{r.key}</kbd>
                   </button>
                 ))}
+                {data?.reviewed && <button onClick={unrate} title="Clear your rating (Backspace)" className="ml-auto px-2 py-2 sm:py-1 text-gray-400 hover:text-white">clear <kbd className="hidden sm:inline text-[10px] text-gray-500">⌫</kbd></button>}
               </div>
               <div className="flex flex-wrap gap-1 text-xs items-center">
                 <span className="text-gray-500 w-14">score</span>

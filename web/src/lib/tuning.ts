@@ -93,6 +93,15 @@ export const GROUPS: Group[] = [
     ],
   },
   {
+    title: 'Metrics split',
+    intro: 'The eye band Laplacian, eye band FFT ratio and head box Laplacian are each graded on their own cuts. They measure the same head, so one far from the others usually means a box landed wrong (an eye band on a visor while the head is sharp). That never moves the tier; it flags the photo for review.',
+    params: [
+      { key: 'focus.split_steps', label: 'flag at a gap of', kind: 'number', nullable: true, whenOn: 2, step: 1, min: 1, max: 3, unit: 'tiers', applies: 'rescore',
+        up: 'fewer photos flagged: only wilder splits',
+        help: 'A photo needs review when one metric grades at least this many tiers from the nearest of the others. Lower flags more photos; off never flags.' },
+    ],
+  },
+  {
     title: 'Camera settings (EXIF)',
     intro: 'Shutter, aperture and focal length flag motion-blur and depth-of-field risk. Only the motion-blur risk can move a tier: a borderline tier 3 at a risky shutter speed drops to 2.',
     params: [

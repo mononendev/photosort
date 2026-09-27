@@ -81,6 +81,7 @@ jobs:
     needs: [version, test-go, test-analyzer, test-web]
     runs-on: [homelab]
     strategy:
+      fail-fast: false   # one image failing shouldn't cancel the others' builds
       matrix:
         image: [api, analyzer, ui]
     steps:

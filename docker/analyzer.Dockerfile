@@ -9,8 +9,9 @@ ARG PYTHON=3.13
 FROM python:${PYTHON}-slim AS models
 ARG POSE_MODELS="yolo11n-pose yolo26s-pose rtmo-s"
 COPY --from=ghcr.io/astral-sh/uv:0.12 /uv /usr/local/bin/uv
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system --index-url https://download.pytorch.org/whl/cpu torch torchvision \
+# No uv cache here: torch is ~1.5 GB unpacked, and a cached copy beside it doubles that on the builder's disk.
+ENV UV_NO_CACHE=1
+RUN uv pip install --system --index-url https://download.pytorch.org/whl/cpu torch torchvision \
  && uv pip install --system ultralytics onnx onnxslim onnxruntime pillow pillow-heif rawpy numpy \
  && uv pip uninstall --system opencv-python \
  && uv pip install --system --reinstall opencv-python-headless  # ultralytics pulls the GUI build; they share cv2/

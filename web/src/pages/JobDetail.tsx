@@ -107,6 +107,7 @@ function StageLine({ name, st }: { name: StageName; st: JobStage }) {
   if (name !== 'scan') {
     bits.push(st.total ? `${fmtNum(st.done ?? 0)}/${fmtNum(st.total)} images` : 'nothing new');
     if (st.errors) bits.push(`${st.errors} errors`);
+    if (st.skipped) bits.push(`skipped ${fmtNum(st.skipped)} at local tier 0`);
   }
   if (name === 'local') bits.push(`${st.workers ?? '?'} workers`, st.device ? `on ${st.device}` : '');
   if (name === 'vlm') bits.push(`${st.backend}/${st.model}`, `×${st.concurrency ?? 1} concurrent`);

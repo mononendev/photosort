@@ -25,7 +25,7 @@ export function Stars({ n }: { n: number | null | undefined }) {
 
 export function StatusDot({ status }: { status: string }) {
   const c: Record<string, string> = {
-    untracked: 'bg-gray-600', pending: 'bg-gray-400', analyzed: 'bg-blue-400', tagged: 'bg-emerald-400', error: 'bg-red-500',
+    untracked: 'bg-gray-600', pending: 'bg-gray-400', analyzed: 'bg-blue-400', skipped: 'bg-slate-500', tagged: 'bg-emerald-400', error: 'bg-red-500',
   };
   return <span className={`inline-block w-2 h-2 rounded-full ${c[status] ?? 'bg-gray-600'}`} title={status} />;
 }

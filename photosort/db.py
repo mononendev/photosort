@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS images (
   batch_id TEXT,             -- cloud batch this image was submitted in
   vlm_json TEXT,             -- stage 2 parsed result
   vlm_usage TEXT,            -- token usage json
+  vlm_skip TEXT,             -- why a job left it for the vision model (e.g. local tier 0); cleared when either stage reruns
   override_json TEXT,        -- manual corrections from the UI
   error TEXT,
   local_at REAL, vlm_at REAL
@@ -50,6 +51,7 @@ CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state);
 MIGRATIONS = [
     ("images", "folder", "TEXT"), ("images", "override_json", "TEXT"),
     ("images", "local_at", "REAL"), ("images", "vlm_at", "REAL"), ("images", "lr_json", "TEXT"), ("images", "truth_json", "TEXT"),
+    ("images", "vlm_skip", "TEXT"),
     ("jobs", "stages_json", "TEXT"),   # per-stage timings and settings, written as the job moves through them
     ("jobs", "owner", "TEXT"), ("jobs", "heartbeat", "REAL"),
 ]
@@ -198,12 +200,12 @@ class DB:
 
     def set_local(self, img_id: int, data: Optional[dict], error: Optional[str] = None):
         with self.lock, self.conn as c:
-            c.execute("UPDATE images SET local_json=?, error=?, local_at=? WHERE id=?",
+            c.execute("UPDATE images SET local_json=?, error=?, local_at=?, vlm_skip=NULL WHERE id=?",
                       (json.dumps(data) if data else None, error, time.time() if data else None, img_id))
 
     def set_vlm(self, img_id: int, data: Optional[dict], usage: Optional[dict], error: Optional[str]):
         with self.lock, self.conn as c:
-            c.execute("UPDATE images SET vlm_json=?, vlm_usage=?, error=?, vlm_at=? WHERE id=?",
+            c.execute("UPDATE images SET vlm_json=?, vlm_usage=?, error=?, vlm_at=?, vlm_skip=NULL WHERE id=?",
                       (json.dumps(data) if data else None, json.dumps(usage) if usage else None, error,
                        time.time() if data else None, img_id))
 
@@ -213,11 +215,16 @@ class DB:
         self.set_vlm(int(res.key), res.data if ok else None, res.usage, None if ok else res.error)
         return ok
 
+    def set_vlm_skip(self, ids: list[int], reason: str):
+        """Mark images a job deliberately left for the vision model, so they read as skipped rather than pending."""
+        with self.lock, self.conn as c:
+            c.executemany("UPDATE images SET vlm_skip=? WHERE id=?", [(reason, i) for i in ids])
+
     def set_local_many(self, items: list[tuple[int, dict]]):
         """set_local for many images in one transaction."""
         now = time.time()
         with self.lock, self.conn as c:
-            c.executemany("UPDATE images SET local_json=?, error=NULL, local_at=? WHERE id=?",
+            c.executemany("UPDATE images SET local_json=?, error=NULL, local_at=?, vlm_skip=NULL WHERE id=?",
                           [(json.dumps(d), now, i) for i, d in items])
 
     def set_lr(self, img_id: int, data: Optional[dict]):

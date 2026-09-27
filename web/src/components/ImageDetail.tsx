@@ -171,7 +171,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
                 <Row k="score" v={<><Stars n={v.quality_score} /> {v.keeper ? 'keeper' : 'cull'}</>} tip="The model's overall quality (1–5) and whether a photographer would deliver it. Your call overrides both." />
               </div>
             ) : (
-              <p className="text-sm text-gray-500">{data?.status === 'analyzed' ? 'Not yet tagged by the vision model.' : data?.error ?? 'Not processed.'}</p>
+              <p className="text-sm text-gray-500">{data?.status === 'skipped' ? `Skipped by the vision model (${data.vlm_skip}): the job had "skip nobody-in-focus" on. Re-tag with it off to have the model look.` : data?.status === 'analyzed' ? 'Not yet tagged by the vision model.' : data?.error ?? 'Not processed.'}</p>
             )}
             {l && !l.af && l.af_note && <div className="text-xs text-gray-600">AF: {l.af_note}</div>}
             {l?.af && (

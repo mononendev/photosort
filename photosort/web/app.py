@@ -95,7 +95,9 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         return {
             "id": row["id"], "path": row["path"], "rel": rel(row["path"]), "name": Path(row["path"]).name,
             "folder": rel(row["folder"] or str(Path(row["path"]).parent)),
-            "status": "tagged" if row["vlm_json"] else ("analyzed" if row["local_json"] else ("error" if row["error"] else "pending")),
+            "status": ("tagged" if row["vlm_json"] else "skipped" if row["local_json"] and row["vlm_skip"]
+                       else "analyzed" if row["local_json"] else "error" if row["error"] else "pending"),
+            "vlm_skip": row["vlm_skip"],
             "has_crop": bool(local and local.get("n_people")),
             "focus_tier": rec["focus_tier"], "focus_tier_local": rec["focus_tier_local"], "focus_tier_vlm": rec["focus_tier_vlm"],
             "review": rec["review"], "subject": rec["subject"], "composition": rec["composition"],
@@ -309,7 +311,9 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         if status == "pending":
             where.append("local_json IS NULL")
         elif status == "analyzed":
-            where.append("local_json IS NOT NULL AND vlm_json IS NULL")
+            where.append("local_json IS NOT NULL AND vlm_json IS NULL AND vlm_skip IS NULL")
+        elif status == "skipped":
+            where.append("local_json IS NOT NULL AND vlm_json IS NULL AND vlm_skip IS NOT NULL")
         elif status == "tagged":
             where.append("vlm_json IS NOT NULL")
         elif status == "error":

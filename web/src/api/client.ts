@@ -2,7 +2,7 @@
 // Types (mirror photosort/web/app.py)
 // ---------------------------------------------------------------------------
 
-export type ImageStatus = 'untracked' | 'pending' | 'analyzed' | 'tagged' | 'error';
+export type ImageStatus = 'untracked' | 'pending' | 'analyzed' | 'skipped' | 'tagged' | 'error';
 
 export interface ImageSummary {
   id: number | null;
@@ -26,6 +26,7 @@ export interface ImageSummary {
   people_count?: number | null;
   description?: string | null;
   error?: string | null;
+  vlm_skip?: string | null;    // why a job left it for the vision model (status 'skipped')
   lr_rating?: number | null;   // rating from an existing sidecar next to the file (informational)
   lr_label?: string | null;
   truth_tier?: number | null;  // your exported ground truth for calibration
@@ -146,6 +147,7 @@ export interface Job {
 export interface JobStage {
   started: number; finished?: number; total?: number; done?: number; errors?: number; files?: number;
   workers?: number; device?: string | null; backend?: string; model?: string; concurrency?: number; base_url?: string | null;
+  skipped?: number;            // vlm: images left out at local tier 0 (skip nobody-in-focus)
 }
 export interface VlmUsage {
   in?: number | null; out?: number | null; seconds?: number; model?: string;

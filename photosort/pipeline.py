@@ -231,16 +231,25 @@ class JobRunner(threading.Thread):
                 + ("" if opts.get("retry_errors") else " AND error IS NULL"))
         prior, errors = self.db.job_finished_images(jid, "vlm")
         rows = [r for r in self.db.rows_under(paths, cond) if r["id"] not in prior] if paths else []
+        skipped = 0
         if opts.get("skip_tier0", False):
+            tier0 = [r for r in rows if json.loads(r["local_json"])["local_tier"] == 0]
+            # only untagged ones change state; a tagged image keeps its old tags and stays "tagged"
+            self.db.set_vlm_skip([r["id"] for r in tier0 if not r["vlm_json"]], "local tier 0")
+            skipped = len(tier0)
             rows = [r for r in rows if json.loads(r["local_json"])["local_tier"] > 0]
         prefix = f"{local_note} · " if local_note else ""
+        skip_note = f" · skipped {skipped} at local tier 0" if skipped else ""
         if not rows and not prior:
-            self._job(jid, message=f"{prefix}{bname}/{model}: nothing new to tag")
+            self._job(jid, message=f"{prefix}{bname}/{model}: nothing new to tag{skip_note}")
+            if skipped:  # the stage card then says why nothing went to the model
+                self._stage(jid, "vlm", total=0, skipped=skipped, backend=bname, model=model, concurrency=conc)
             return
         total = len(prior) + len(rows)
-        self._job(jid, stage="vlm", total=total, done=len(prior), errors=local_err + errors, message=f"{prefix}{bname}/{model}")
+        self._job(jid, stage="vlm", total=total, done=len(prior), errors=local_err + errors,
+                  message=f"{prefix}{bname}/{model}{skip_note}")
         self._stage(jid, "vlm", total=total, backend=bname, model=model, concurrency=conc,
-                    base_url=getattr(backend, "base_url", None))
+                    base_url=getattr(backend, "base_url", None), **({"skipped": skipped} if skipped else {}))
         prog = self._progress(jid, "vlm", len(prior))
 
         def one(r):

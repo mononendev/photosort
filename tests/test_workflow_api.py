@@ -116,8 +116,14 @@ def test_vlm_errors_are_counted_and_retried(api):
 
 
 def test_skip_tier0(api):
-    api.run([""], skip_tier0=True)
-    assert {n: i["status"] for n, i in by_name(api).items()} == {"sharp.jpg": "tagged", "soft.jpg": "analyzed", "empty.jpg": "analyzed"}
+    j = api.run([""], skip_tier0=True)
+    assert {n: i["status"] for n, i in by_name(api).items()} == {"sharp.jpg": "tagged", "soft.jpg": "skipped", "empty.jpg": "skipped"}
+    assert j["message"].endswith("skipped 2 at local tier 0") and j["stages"]["vlm"]["skipped"] == 2
+    assert by_name(api, status="skipped")["soft.jpg"]["vlm_skip"] == "local tier 0" and by_name(api, status="analyzed") == {}
+    j = api.run([""], skip_tier0=True)               # nothing left to tag; the card still says why
+    assert j["message"].endswith("nothing new to tag · skipped 2 at local tier 0") and j["stages"]["vlm"]["total"] == 0
+    api.run([""])                                    # without the skip the model tags them and the mark clears
+    assert {i["status"] for i in by_name(api).values()} == {"tagged"} and by_name(api)["soft.jpg"]["vlm_skip"] is None
 
 
 def test_cancel_queued_job(api):

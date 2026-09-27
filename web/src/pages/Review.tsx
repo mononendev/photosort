@@ -9,7 +9,7 @@ import { RatingBadge, TierBadge } from '../components/TierBadge';
 import useHotkeys from '../hooks/useHotkeys';
 
 // Which photos the queue starts from: the needs-review flag, just its metrics-split half, or everything.
-// Ctrl/⌘-click on metrics split (or clicking it again) flips it to everything *but* the metrics-split photos.
+// Ctrl/⌘-click on metrics split (or clicking it again) flips it to the needs-review photos *without* a metrics split.
 const QUEUES = [['', 'needs review'], ['split', 'metrics split'], ['all', 'all']] as const;
 const PAGE = 500;   // the API's per-request cap; stepping past either end loads the neighbouring page
 
@@ -31,7 +31,7 @@ function DraftInput({ value, onCommit, className, placeholder }: { value: string
 export default function Review() {
   const [sp, setSp] = useSearchParams();
   const filters: ImageFilters = useMemo(() => ({
-    review: sp.get('queue') ? undefined : true,
+    review: !sp.get('queue') || sp.get('queue') === 'nosplit' || undefined,
     split: sp.get('queue') === 'split' ? true : sp.get('queue') === 'nosplit' ? false : undefined,
     reviewed: sp.get('rated') === 'all' ? undefined : false,
     folder: sp.get('folder') ?? '',
@@ -101,9 +101,9 @@ export default function Review() {
                 if (v !== 'split') return <SegButton key={v} on={cur === v} onClick={() => set('queue', v)} className="flex-1 whitespace-nowrap text-xs px-1 py-1.5 sm:py-1">{label}</SegButton>;
                 const not = cur === 'nosplit';
                 return (
-                  <SegButton key={v} on={cur === 'split' || not} title="ctrl/⌘-click (or click again): everything but the metrics-split photos"
+                  <SegButton key={v} on={cur === 'split' || not} title="ctrl/⌘-click (or click again): needs review, minus the metrics-split photos"
                     onClick={(e) => set('queue', e.ctrlKey || e.metaKey || cur === 'split' ? 'nosplit' : 'split')}
-                    className="flex-1 whitespace-nowrap text-xs px-1 py-1.5 sm:py-1">{not ? 'all but split' : label}</SegButton>
+                    className="flex-1 whitespace-nowrap text-xs px-1 py-1.5 sm:py-1">{not ? 'review − split' : label}</SegButton>
                 );
               })}
             </div>

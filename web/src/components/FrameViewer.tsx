@@ -26,9 +26,9 @@ type View = { zoom: number; ox: number; oy: number };   // zoom over fit-to-scre
  * + / − zoom around the center. Escape closes the viewer only; arrow keys still step through images.
  * On touch screens: pinch zooms around the fingers, one finger pans, double-tap zooms in (or back to fit).
  */
-export default function FrameViewer({ id, name, l, grades, layers, selected, onSelect, heat, bar, onClose, onNav }: {
+export default function FrameViewer({ id, name, l, grades, layers, selected, onSelect, heat, bar, ratings, onClose, onNav }: {
   id: number; name: string; l: LocalResult; grades: Grade[]; layers: Set<Layer>; selected: number; onSelect: (i: number) => void;
-  heat?: FocusDebug['heatmap']; bar: ReactNode; onClose: () => void; onNav?: (dir: 1 | -1) => void;
+  heat?: FocusDebug['heatmap']; bar: ReactNode; ratings?: ReactNode; onClose: () => void; onNav?: (dir: 1 | -1) => void;
 }) {
   const W = l.width, H = l.height;
   const stage = useRef<HTMLDivElement>(null);
@@ -198,6 +198,7 @@ export default function FrameViewer({ id, name, l, grades, layers, selected, onS
           <button onClick={reset} className="px-2.5 py-1 sm:px-2 sm:py-0 rounded border border-gray-700 hover:border-gray-500 active:bg-gray-800">fit</button>
           <button onClick={onClose} aria-label="Close" className="px-2 text-lg text-gray-400 hover:text-white active:bg-gray-800 rounded">✕</button>
         </span>
+        {ratings && <div className="basis-full">{ratings}</div>}
       </div>
       <div className="absolute inset-x-0 bottom-0 z-10 flex items-start gap-4 px-4 py-1 border-t border-gray-800 bg-black/80 backdrop-blur-sm overflow-hidden"
         style={{ height: `calc(${INSET_B}px + env(safe-area-inset-bottom))`, paddingBottom: 'env(safe-area-inset-bottom)' }}>

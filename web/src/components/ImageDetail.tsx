@@ -6,6 +6,7 @@ import Tip from './Tip';
 import FrameOverlay from './FrameOverlay';
 import FrameViewer from './FrameViewer';
 import LayerBar from './LayerBar';
+import RatingsStrip from './RatingsStrip';
 import { FocusMath, PersonInspector } from './PersonInspector';
 import { gradePerson } from '../lib/pose';
 import useHotkeys from '../hooks/useHotkeys';
@@ -142,7 +143,8 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
           <div className={`space-y-3 min-w-0 md:col-start-1 md:row-start-1 ${inline ? WIDE.frame : ''}`}>
             {l && layerBar}
             <FrameOverlay id={id} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} onOpen={() => setFull(true)} />
-            {full && l && <FrameViewer id={id} name={data?.rel ?? String(id)} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} bar={layerBar} onClose={closeFull} onNav={onNav} />}
+            {full && l && <FrameViewer id={id} name={data?.rel ?? String(id)} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} bar={layerBar}
+              ratings={data && <RatingsStrip d={data} cfg={cfg} localTip={localTip} />} onClose={closeFull} onNav={onNav} />}
             {data?.has_crop && (
               <div className="flex flex-col sm:flex-row gap-3 items-start">
                 <img src={cropUrl(id)} alt="head crop" className="w-full max-w-64 sm:w-64 shrink-0 rounded-lg bg-gray-900" />

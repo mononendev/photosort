@@ -339,3 +339,24 @@ def test_stats_keepers_follow_overrides(api):
     ids = {n: i["id"] for n, i in by_name(api).items()}
     api.patch(f"/api/images/{ids['soft.jpg']}", json={"keeper": False})
     assert api.get("/api/stats").json()["keepers"] == 2 == len(by_name(api, keeper=True))
+
+
+def test_trace(api):
+    api.run([""])
+    imgs = by_name(api)
+    keys = ["scan", "exposure", "exif", "detect", "primary", "eyes", "grade", "local", "split", "vlm", "final", "review", "export"]
+    for name, it in imgs.items():
+        t = api.get(f"/api/images/{it['id']}/trace").json()
+        assert [s["key"] for s in t["stages"]] == keys
+        assert t["check"]["traced"] == t["check"]["engine"] == t["check"]["stored"], name
+        assert t["final"]["tier"] == it["focus_tier"]
+        local = next(s for s in t["stages"] if s["key"] == "local")
+        assert sum(n["decided"] for n in local["nodes"]) == 1   # exactly one rule settles the tier
+    empty = api.get(f"/api/images/{imgs['empty.jpg']['id']}/trace").json()
+    assert empty["check"]["engine"] == [0, "no_people"] and empty["primary"] is None
+    rated = api.patch(f"/api/images/{imgs['sharp.jpg']['id']}", json={"rating": 4}).json()
+    t = api.get(f"/api/images/{rated['id']}/trace").json()
+    final = next(s for s in t["stages"] if s["key"] == "final")
+    assert final["nodes"][0]["decided"] and t["final"]["tier"] == 3
+    assert "bangers/sharp.jpg" in next(s for s in t["stages"] if s["key"] == "export")["table"]["rows"]
+    assert api.get("/api/images/99999/trace").status_code == 404

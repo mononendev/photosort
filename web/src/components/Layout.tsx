@@ -10,6 +10,7 @@ const NAV = [
   { label: 'Browse', to: '/browse' },
   { label: 'Photos', to: '/photos' },
   { label: 'Review', to: '/review' },
+  { label: 'Trace', to: '/trace' },
   { label: 'Jobs', to: '/jobs' },
   { label: 'Calibrate', to: '/calibrate' },
   { label: 'Export', to: '/export' },

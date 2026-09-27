@@ -466,6 +466,15 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
                 "usage": jcol(r, "vlm_usage"),
                 "final": sorter.final_record(r, cfg.get("focus_source", "vlm"))}
 
+    @app.get("/api/images/{img_id}/trace")
+    def image_trace(img_id: int):
+        """Every rule the pipeline applies to this photo, in order, with its inputs and outcome (the Trace page)."""
+        from ..trace import trace
+        r = db.row(img_id)
+        if not r:
+            raise HTTPException(404)
+        return trace(r, cfg, rel(r["path"]))
+
     @app.get("/api/images/{img_id}/vlm-request")
     def vlm_request(img_id: int, backend: Optional[str] = None, model: Optional[str] = None):
         """The request the vision model gets for this image, as the backend builds it, with image bytes

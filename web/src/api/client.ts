@@ -142,6 +142,41 @@ export interface ImageDetail extends ImageSummary {
 export interface TreeDir {
   name: string; path: string; images_direct: number; tracked: number; local_done: number; vlm_done: number; errors: number;
 }
+/** GET /api/images/{id}/trace (photosort/trace.py): every rule the pipeline applies to one photo, in order. */
+export interface TraceKV { k: string; v: unknown; note?: string }
+export interface TracePerson { n: number; ok: boolean; tests?: Record<string, boolean>; conf?: number | null; grade?: number | null }
+export interface TraceNode {
+  q: string;
+  /** true: the rule holds (fires); false: it doesn't; null: off, or nothing to read */
+  result: boolean | null;
+  rule: string | null; inputs: TraceKV[];
+  /** What firing does (or would have done, when not reached) */
+  effect: string | null; note: string | null;
+  /** false when an earlier rule already decided, or its branch wasn't taken; it is evaluated anyway */
+  reached: boolean;
+  /** the one rule that settled the stage */
+  decided: boolean;
+  people: TracePerson[] | null;
+}
+export type TraceTable =
+  | { kind: 'people'; rows: { n: number; conf: number; area: number; center: number; priority: number | null; head_src: string }[] }
+  | { kind: 'scores'; rows: { n: number; af_score: number | null; priority: number | null }[] }
+  | { kind: 'grade'; tiers: number[]; rows: { label: string; value: number | null; cuts: (number | null)[]; ok: boolean[] }[] }
+  | { kind: 'paths'; rows: string[] };
+export interface TraceStage {
+  key: string; title: string;
+  state: 'done' | 'skipped' | 'pending' | 'error' | 'off';
+  summary: string; facts: TraceKV[]; nodes: TraceNode[]; table: TraceTable | null;
+  outcome: { label: string; tier?: number | null; reason?: string; person?: number } | null;
+}
+export interface Trace {
+  id: number; rel: string; focus_source: string; stages: TraceStage[];
+  /** local tier as this walk reaches it, as local.local_tier gives it now, and as stored at the last (re)score */
+  check: { traced?: [number | null, string | null]; engine?: [number, string]; stored?: [number | null, string | null] };
+  primary: number | null;
+  final: { tier: number | null; local: number | null; vlm: number | null; review: boolean; rating: number | null };
+}
+
 export interface Tree { path: string; dirs: TreeDir[]; files: ImageSummary[] }
 
 export type JobState = 'queued' | 'running' | 'preempting' | 'cancelling' | 'done' | 'cancelled' | 'failed';
@@ -283,6 +318,7 @@ export const api = {
   images: (f: ImageFilters) => request<ImagesPage>(`/api/images${qs(f as Record<string, unknown>)}`),
   imageFacets: () => request<ImageFacets>('/api/images/facets'),
   image: (id: number) => request<ImageDetail>(`/api/images/${id}`),
+  trace: (id: number) => request<Trace>(`/api/images/${id}/trace`),
   focusDebug: (id: number) => request<FocusDebug>(`/api/images/${id}/focus-debug`),
   override: (id: number, o: Override & { clear?: boolean; clear_rating?: boolean }) =>
     request<ImageDetail>(`/api/images/${id}`, { method: 'PATCH', body: JSON.stringify(o) }),

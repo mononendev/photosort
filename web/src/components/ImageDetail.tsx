@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { api, cropUrl, RATINGS } from '../api/client';
 import { TierBadge, Stars } from './TierBadge';
 import Tip from './Tip';
@@ -117,6 +118,11 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
           <span className="font-mono text-sm text-gray-300 truncate min-w-0 flex-1 sm:flex-none">{data?.rel ?? id}</span>
           <span className="sm:ml-auto flex items-center gap-1 sm:gap-2">
             {toolbar}
+            <Link to={`/trace/${id}`} title="Every rule the pipeline ran on this photo, and which one decided"
+              className="flex items-center gap-1 px-3 py-1.5 sm:px-2 sm:py-0.5 rounded text-xs text-gray-400 hover:text-white active:bg-gray-800">
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="5" r="2" /><circle cx="6" cy="19" r="2" /><circle cx="18" cy="12" r="2" /><path d="M6 7v10M6 12h10" /></svg>
+              <span className="hidden sm:inline">trace</span>
+            </Link>
             {onNav && <button onClick={() => onNav(-1)} aria-label="Previous photo" className="px-3 py-1.5 sm:px-2 sm:py-0 rounded text-gray-400 hover:text-white active:bg-gray-800">←</button>}
             {onNav && <button onClick={() => onNav(1)} aria-label="Next photo" className="px-3 py-1.5 sm:px-2 sm:py-0 rounded text-gray-400 hover:text-white active:bg-gray-800">→</button>}
             {onClose && <button onClick={onClose} aria-label="Close" className="px-3 py-1.5 sm:px-2 sm:py-0 rounded text-gray-400 hover:text-white active:bg-gray-800">✕</button>}

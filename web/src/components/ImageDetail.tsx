@@ -118,15 +118,17 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
             <button onClick={onClose} aria-label="Close" className="px-3 py-1.5 sm:px-2 sm:py-0 rounded text-gray-400 hover:text-white active:bg-gray-800">✕</button>
           </span>
         </div>
-        <div className="grid md:grid-cols-[1fr_380px] gap-4 p-3 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <div className="space-y-3">
+        <div className="grid md:grid-cols-[minmax(0,1fr)_380px] gap-4 p-3 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          {/* Frame and crop sit beside the sidebar; the people and focus-math panels run the full width below
+              both on md+ (grid placement, so the DOM order, and the stacking on phones, stays the same). */}
+          <div className="space-y-3 min-w-0 md:col-start-1 md:row-start-1">
             {l && layerBar}
             <FrameOverlay id={id} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} onOpen={() => setFull(true)} />
             {full && l && <FrameViewer id={id} name={data?.rel ?? String(id)} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} bar={layerBar} onClose={closeFull} onNav={onNav} />}
             {data?.has_crop && (
               <div className="flex flex-col sm:flex-row gap-3 items-start">
                 <img src={cropUrl(id)} alt="head crop" className="w-full max-w-64 sm:w-64 shrink-0 rounded-lg bg-gray-900" />
-                <div className="text-xs text-gray-400 space-y-1">
+                <div className="text-xs text-gray-400 space-y-1 min-w-0 [overflow-wrap:anywhere]">
                   <div>Native-resolution crop of the primary subject's head and upper body (what the model judges focus from). Hover any number for what it means.</div>
                   {p && l && (
                     <div className="font-mono text-gray-300 space-y-0.5">
@@ -144,17 +146,17 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
                 </div>
               </div>
             )}
-            {l && <PersonInspector l={l} cfg={cfg} grades={grades} localTip={localTip} selected={person} onSelect={setPerson} />}
-            {l && l.people?.length > 0 && (
-              <div className="rounded-lg border border-gray-800 p-3 space-y-2">
-                <button onClick={() => setShowMath(!showMath)} className="text-xs uppercase tracking-wide text-gray-500 hover:text-gray-300">
-                  {showMath ? '▾' : '▸'} focus math · person #{person + 1}
-                </button>
-                {showMath && <FocusMath d={dbg.data?.people?.[person]} p={l.people[person]} loading={dbg.isFetching && !dbg.data} error={dbg.error ? String(dbg.error.message) : undefined} />}
-              </div>
-            )}
           </div>
-          <div className="space-y-4">
+          {l && <div className="min-w-0 md:col-span-2"><PersonInspector l={l} cfg={cfg} grades={grades} localTip={localTip} selected={person} onSelect={setPerson} /></div>}
+          {l && l.people?.length > 0 && (
+            <div className="rounded-lg border border-gray-800 p-3 space-y-2 min-w-0 md:col-span-2">
+              <button onClick={() => setShowMath(!showMath)} className="text-xs uppercase tracking-wide text-gray-500 hover:text-gray-300">
+                {showMath ? '▾' : '▸'} focus math · person #{person + 1}
+              </button>
+              {showMath && <FocusMath d={dbg.data?.people?.[person]} p={l.people[person]} loading={dbg.isFetching && !dbg.data} error={dbg.error ? String(dbg.error.message) : undefined} />}
+            </div>
+          )}
+          <div className="space-y-4 min-w-0 md:col-start-2 md:row-start-1">
             {v ? (
               <div>
                 <Row k="model tier" v={<TierBadge tier={v.focus_tier} />} tip={<>The vision model's own focus verdict, from the downscaled frame plus the native-resolution crop, with the local numbers passed as evidence. Tier {v.focus_tier} means {TIER_MEANING[v.focus_tier]}.</>} />

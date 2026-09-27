@@ -97,7 +97,7 @@ export const PersonInspector = memo(function PersonInspector({ l, cfg, grades, l
             <Gauge key={c.label} label={c.label} value={c.value} thr={c.t}
               tip={c.label.includes('FFT') ? METRIC_TIPS.fft : c.label.includes('eye') ? METRIC_TIPS.eyes : METRIC_TIPS.head} />
           ))}
-          {g.onEyes && <Gauge label="head box Laplacian (not deciding)" value={p.sharp_head} thr={tierCuts(thr, '')} tip={METRIC_TIPS.head} />}
+          {g.onEyes && !g.checks.some((c) => c.label.startsWith('head')) && <Gauge label="head box Laplacian (not deciding)" value={p.sharp_head} thr={tierCuts(thr, '')} tip={METRIC_TIPS.head} />}
           <Gauge label="regions compared" value={p.sharp_head} refs={others.slice(1)} note="(head)"
             tip={<>Head against torso, whole body and background on the same log axis. Torso or background well right of the head suggests focus landed behind or below the face.</>} />
         </div>

@@ -72,6 +72,16 @@ def test_clear_rating_keeps_other_overrides(client):
     assert ids(client, reviewed=True) == []
 
 
+def test_stars_set_and_clear_without_touching_the_rating(client):
+    a, _ = ids(client)
+    d = client.patch(f"/api/images/{a}", json={"quality_score": 4}).json()
+    assert (d["quality_score"], d["reviewed"]) == (4, False)    # stars alone don't mark it reviewed
+    client.patch(f"/api/images/{a}", json={"rating": 3})
+    d = client.patch(f"/api/images/{a}", json={"clear_score": True}).json()
+    assert d["override"].get("quality_score") is None and (d["rating"], d["reviewed"]) == (3, True)
+    assert client.patch(f"/api/images/{a}", json={"quality_score": 6}).status_code == 422
+
+
 def test_lift_after_tagging_marks_verdict_stale_and_keeps_rating(client):
     a, _ = ids(client)
     client.patch(f"/api/images/{a}", json={"rating": 3})

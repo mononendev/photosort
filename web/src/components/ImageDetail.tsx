@@ -14,6 +14,11 @@ import useHotkeys from '../hooks/useHotkeys';
 import useStore from '../hooks/useStore';
 import { METRIC_TIPS, TIER_MEANING, explainDisagree, explainLocal, explainPrior, explainSplit, splitShort } from '../lib/explain';
 
+const STARS = [1, 2, 3, 4, 5];
+/** Star n lit amber up to your stars; without yours, dimly up to the model's score. */
+const starCls = (n: number, mine: number | null, shown: number | null | undefined) =>
+  mine != null ? (n <= mine ? 'text-amber-300' : 'text-gray-600') : n <= (shown ?? 0) ? 'text-amber-300/40' : 'text-gray-600';
+
 function Row({ k, v, tip }: { k: string; v: React.ReactNode; tip?: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[88px_1fr] sm:grid-cols-[110px_1fr] gap-2 text-sm py-0.5">
@@ -79,11 +84,16 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
   const rate = useCallback((r: number) => { save({ id, o: { rating: r } }); onNav?.(1); }, [save, id, onNav]);
   // Backspace takes your rating back off (the photo is unreviewed again) and stays put.
   const unrate = useCallback(() => save({ id, o: { clear_rating: true } }), [save, id]);
+  // Stars: 1-5 set your quality score, 6 takes it back off (the model's shows through again). Neither moves on.
+  const star = useCallback((n: number | null) => save({ id, o: n ? { quality_score: n } : { clear_score: true } }), [save, id]);
+  const myStars = data?.override?.quality_score ?? null;
   useHotkeys({
     ...(onClose && { Escape: onClose }),
     ...(onNav && { ArrowRight: () => onNav(1), ArrowLeft: () => onNav(-1) }),
     ...Object.fromEntries(RATINGS.map((r) => [r.key, (e: KeyboardEvent) => { if (!e.repeat) rate(r.value); }])),
     Backspace: (e) => { if (!e.repeat && data?.reviewed) unrate(); },
+    ...Object.fromEntries(STARS.map((n) => [String(n), (e: KeyboardEvent) => { if (!e.repeat) star(n); }])),
+    '6': (e) => { if (!e.repeat && myStars != null) star(null); },
   });
   const v = data?.vlm;
   const l = data?.local;
@@ -234,10 +244,14 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
                 {data?.reviewed && <button onClick={unrate} title="Clear your rating (Backspace)" className="ml-auto px-2 py-2 sm:py-1 text-gray-400 hover:text-white">clear <kbd className="hidden sm:inline text-[10px] text-gray-500">⌫</kbd></button>}
               </div>
               <div className="flex flex-wrap gap-1 text-xs items-center">
-                <span className="text-gray-500 w-14">score</span>
-                {[1, 2, 3, 4, 5].map((s) => (
-                  <button key={s} onClick={() => ov.mutate({ quality_score: s })} className={`px-3 py-2 sm:px-2 sm:py-1 rounded border transition active:scale-95 ${data?.quality_score === s ? 'border-amber-500 bg-amber-900/30' : 'border-gray-700 hover:border-gray-500'}`}>{s}</button>
+                <span className="text-gray-500 w-14"><Tip tip="Your stars (1–5): they replace the model's quality score everywhere, and export as the XMP star rating. Keys 1–5; 6 clears yours so the model's shows again. Unlike a rating, stars don't move on to the next photo.">stars</Tip></span>
+                {STARS.map((n) => (
+                  <button key={n} onClick={() => star(n)} title={`${n} star${n > 1 ? 's' : ''} (${n})`} aria-label={`${n} star${n > 1 ? 's' : ''}`}
+                    className={`px-2.5 py-2 sm:px-1.5 sm:py-1 rounded border transition active:scale-95 ${myStars === n ? 'border-amber-500 bg-amber-900/30' : 'border-gray-700 hover:border-gray-500'}`}>
+                    <span className={starCls(n, myStars, data?.quality_score)}>★</span> <kbd className="hidden sm:inline text-[10px] text-gray-500">{n}</kbd>
+                  </button>
                 ))}
+                {myStars != null && <button onClick={() => star(null)} title="Clear your stars (6)" className="ml-auto px-2 py-2 sm:py-1 text-gray-400 hover:text-white">clear <kbd className="hidden sm:inline text-[10px] text-gray-500">6</kbd></button>}
               </div>
               <div className="flex flex-wrap gap-1 text-xs items-center">
                 <span className="text-gray-500 w-14">keep</span>
@@ -253,6 +267,12 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
           </div>
         </div>
         <div className="sm:hidden sticky bottom-0 z-10 grid grid-cols-5 gap-2 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] border-t border-gray-800 bg-gray-950/95 backdrop-blur">
+          {STARS.map((n) => (
+            <button key={n} onClick={() => star(myStars === n ? null : n)} aria-label={myStars === n ? 'Clear your stars' : `${n} star${n > 1 ? 's' : ''}`}
+              className={`h-9 rounded-lg border text-lg transition active:scale-95 ${myStars === n ? 'border-amber-500 bg-amber-900/30' : 'border-gray-800'}`}>
+              <span className={starCls(n, myStars, data?.quality_score)}>★</span>
+            </button>
+          ))}
           {RATINGS.map((r) => (
             <button key={r.value} onClick={() => rate(r.value)} aria-label={`Rate ${r.label}`}
               className={`h-12 rounded-lg border text-lg font-semibold transition active:scale-95 ${data?.rating === r.value ? `${r.solid} ring-2 ring-white/70` : r.cls}`}>

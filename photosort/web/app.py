@@ -29,11 +29,12 @@ class JobIn(BaseModel):
 class OverrideIn(BaseModel):
     rating: Optional[int] = Field(None, ge=0, le=4)   # your cull: 0-3 focus tier, 4 banger; marks the photo reviewed
     focus_tier: Optional[int] = Field(None, ge=0, le=3)
-    quality_score: Optional[int] = None
+    quality_score: Optional[int] = Field(None, ge=1, le=5)   # your stars; beat the model's score and export as xmp:Rating
     keeper: Optional[bool] = None
     note: Optional[str] = None
     clear: bool = False
     clear_rating: bool = False    # drop just your rating (and the reviewed mark); keeps score, keeper and note
+    clear_score: bool = False     # drop just your stars; the model's score shows through again
 
 
 class ConfigIn(BaseModel):
@@ -530,8 +531,10 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         elif o.clear_rating:
             for k in ("rating", "focus_tier", "reviewed", "reviewed_at"):
                 cur.pop(k, None)
+        elif o.clear_score:
+            cur.pop("quality_score", None)
         else:
-            for k, v in o.model_dump(exclude={"clear", "clear_rating"}, exclude_none=True).items():
+            for k, v in o.model_dump(exclude={"clear", "clear_rating", "clear_score"}, exclude_none=True).items():
                 cur[k] = v
             # A rating or a focus tier is your verdict on the photo: the two stay in step, and the photo counts as
             # reviewed. Only another rating or a reset changes it; jobs and rescans never write override_json.

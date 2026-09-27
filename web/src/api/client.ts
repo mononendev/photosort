@@ -320,7 +320,7 @@ export const api = {
   image: (id: number) => request<ImageDetail>(`/api/images/${id}`),
   trace: (id: number) => request<Trace>(`/api/images/${id}/trace`),
   focusDebug: (id: number) => request<FocusDebug>(`/api/images/${id}/focus-debug`),
-  override: (id: number, o: Override & { clear?: boolean; clear_rating?: boolean }) =>
+  override: (id: number, o: Override & { clear?: boolean; clear_rating?: boolean; clear_score?: boolean }) =>
     request<ImageDetail>(`/api/images/${id}`, { method: 'PATCH', body: JSON.stringify(o) }),
   jobs: () => request<Job[]>('/api/jobs'),
   createJob: (paths: string[], options: JobOptions) =>

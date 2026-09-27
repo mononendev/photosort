@@ -493,6 +493,10 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
     def get_config():
         return {k: v for k, v in cfg.items() if not k.startswith("_")}
 
+    @app.get("/api/config/defaults")
+    def get_config_defaults():
+        return config.DEFAULTS
+
     @app.put("/api/config")
     def put_config(c: ConfigIn):
         for k, v in c.values.items():
@@ -523,7 +527,9 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             return {**base, "percentiles": {}, "samples": []}
         arr = np.array([v[0] for v in vals])
         idx = np.linspace(0, len(vals) - 1, min(n, len(vals))).astype(int)
+        # quantiles[i] is the score i% of photos are at or below: the UI reads a cut's pass rate off it as you type.
         return {**base, "count": len(vals), "percentiles": {f"p{q}": round(float(np.percentile(arr, q)), 4) for q in (5, 10, 25, 50, 75, 90, 95)},
+                "quantiles": [float(f"{v:.4g}") for v in np.percentile(arr, np.arange(101))],
                 "samples": [{"id": vals[i][1], "sharp": vals[i][0], "tier": vals[i][2]} for i in idx]}
 
     # ---- ground truth -----------------------------------------------------------------

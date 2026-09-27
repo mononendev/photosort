@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, cropUrl, FOCUS_METRIC_LABEL, TIER_COLOR, TIERS } from '../api/client';
-import type { FocusMetric, RescoreResult, TruthMatrixRow, TruthSource, TruthSummary } from '../api/client';
+import { api, FOCUS_METRIC_LABEL, TIERS } from '../api/client';
+import type { FocusMetric, TruthMatrixRow, TruthSource, TruthSummary } from '../api/client';
+import FocusThresholds from '../components/FocusThresholds';
 import SegButton from '../components/SegButton';
+import TuningPanel from '../components/TuningPanel';
 import Tip from '../components/Tip';
 import { errMsg } from '../lib/format';
 
@@ -98,61 +100,16 @@ function GroundTruth({ onApply, applying }: { onApply: (values: Record<string, n
 
 export default function Calibrate() {
   const qc = useQueryClient();
-  const [metric, setMetric] = useState<FocusMetric>('eye');
-  const { data } = useQuery({ queryKey: ['calibration', metric], queryFn: () => api.calibration(48, metric) });
-  // Inputs show the server thresholds until edited (keyed by config name; missing = not edited yet).
-  const [edits, setEdits] = useState<Record<string, string>>({});
-  const keys = data?.keys ?? ['', '', ''];   // tier 3, 2, 1
-  const shown = (k: string) => edits[k] ?? String(data?.thresholds?.[k] ?? '');
   const save = useMutation({
     mutationFn: async (values: Record<string, number>) => { await api.putConfig({ focus: values }); return api.rescore(); },
-    onSuccess: () => { setEdits({}); qc.invalidateQueries(); },
+    onSuccess: () => qc.invalidateQueries(),
   });
-  const sel = 'bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm w-28';
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <h1 className="text-lg font-semibold">Calibrate</h1>
       <GroundTruth onApply={(values) => save.mutate(values)} applying={save.isPending} />
-      <h2 className="font-semibold">Local focus thresholds</h2>
-      <p className="text-sm text-gray-400 max-w-3xl">Focus is judged on a band across both eyes when they can be located (face landmarks, else the pose model's eye keypoints). There the eye band must clear two thresholds: the contrast-normalized Laplacian and the FFT detail ratio, which drops faster for slight softness. When no eyes are found (helmet, visor, turned away), the head-box Laplacian is used. Crops below are the primary subject ordered softest to sharpest by the chosen metric. Find where a miss becomes soft, soft becomes slightly soft, and slightly soft becomes sharp, enter those three numbers, and re-score. This only affects the <em>local</em> tier. Metrics added after an image was analyzed need a fresh local pass on it.</p>
-      <div className="flex flex-wrap gap-1 text-sm">
-        {(Object.keys(FOCUS_METRIC_LABEL) as FocusMetric[]).map((m) => (
-          <Tip key={m} plain tip={METRIC_TAB_TIP[m]}><SegButton on={m === metric} onClick={() => setMetric(m)} className="px-3 py-1">{FOCUS_METRIC_LABEL[m]}</SegButton></Tip>
-        ))}
-      </div>
-      {data?.percentiles && (
-        <Tip tip="Distribution of this metric over the primary subject of every analyzed photo. p50 is the median, and p90 means 90% of photos score at or below it. If the current tier-3 cut sits below p25, most photos pass it and the tier isn't picky." className="text-xs text-gray-400 font-mono break-words">{data.count ?? 0} images · {Object.entries(data.percentiles).map(([k, v]) => `${k}=${v}`).join('  ')}</Tip>
-      )}
-      {keys[0] && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-          {[...keys].reverse().map((k, i) => (
-            <span key={k} className="inline-flex items-center gap-2">
-              <span className="text-gray-500">tier {i + 1} ≥</span><input value={shown(k)} onChange={(e) => setEdits({ ...edits, [k]: e.target.value })} className={sel} />
-            </span>
-          ))}
-          <button onClick={() => save.mutate(Object.fromEntries(keys.map((k) => [k, Number(shown(k))])))} disabled={save.isPending} className="px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-40">save + re-score</button>
-          {save.isPending && <span className="text-gray-500">re-scoring…</span>}
-          {save.data && <RescoreSummary r={save.data} />}
-          {save.error && <span className="text-red-400">re-score failed: {errMsg(save.error)}</span>}
-        </div>
-      )}
-      <div className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(110px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]">
-        {data?.samples.map((s) => (
-          <div key={s.id} className="rounded-lg overflow-hidden border border-gray-800 bg-gray-900">
-            <img src={cropUrl(s.id)} alt="" loading="lazy" className="w-full aspect-square object-cover" />
-            <div className="px-2 py-1 text-xs font-mono flex justify-between"><span>{s.sharp.toFixed(4)}</span><span style={{ color: TIER_COLOR[s.tier] }}>tier {s.tier}</span></div>
-          </div>
-        ))}
-      </div>
+      <FocusThresholds onSave={(values) => save.mutate(values)} saving={save.isPending} saved={save.data} error={save.error} />
+      <TuningPanel />
     </div>
-  );
-}
-
-function RescoreSummary({ r }: { r: RescoreResult }) {
-  return (
-    <span className="text-gray-400">
-      {r.changed} images changed tier · AF points read on {r.af_backfilled} · primary re-picked on {r.primary_changed}
-      {r.errors > 0 && <span className="text-amber-400" title={r.first_error ?? ''}> · {r.errors} failed (hover for the first)</span>}
-    </span>
   );
 }

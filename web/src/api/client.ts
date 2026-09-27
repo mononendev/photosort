@@ -206,6 +206,7 @@ export interface Health {
 export interface Calibration {
   metric: FocusMetric; keys: [string, string, string];  // [tier3, tier2, tier1] keys in config.focus
   count?: number; percentiles: Record<string, number>; thresholds?: Record<string, number | boolean>;
+  quantiles?: number[];   // 101 values: quantiles[i] is the score i% of photos are at or below
   samples: { id: number; sharp: number; tier: number }[];
 }
 
@@ -277,6 +278,7 @@ export const api = {
   cancelJob: (id: number) => request<Job>(`/api/jobs/${id}/cancel`, { method: 'POST' }),
   overrideJob: (id: number) => request<Job>(`/api/jobs/${id}/override`, { method: 'POST' }),
   config: () => request<Record<string, unknown>>('/api/config'),
+  configDefaults: () => request<Record<string, unknown>>('/api/config/defaults'),
   putConfig: (values: Record<string, unknown>) =>
     request<Record<string, unknown>>('/api/config', { method: 'PUT', body: JSON.stringify({ values }) }),
   rescore: () => request<RescoreResult>('/api/rescore', { method: 'POST' }),

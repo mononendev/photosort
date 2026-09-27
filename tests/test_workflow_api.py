@@ -207,12 +207,16 @@ def test_config_and_rescore(api):
     res = api.post("/api/rescore").json()
     assert res["changed"] == 1 and res["errors"] == 0
     assert by_name(api)["sharp.jpg"]["focus_tier"] == 0
+    # Defaults stay the shipped values whatever is saved, so the UI can offer "reset to default".
+    assert api.get("/api/config/defaults").json()["focus"]["tier3_min"] == 0.03
 
 
 def test_calibration_and_ground_truth(api):
     api.run([""], vlm=False)
     cal = api.get("/api/calibration", params={"metric": "head"}).json()
     assert cal["count"] == 2 and [s["tier"] for s in cal["samples"]] == [0, 3] and "p50" in cal["percentiles"]
+    q = cal["quantiles"]
+    assert len(q) == 101 and q == sorted(q) and q[0] == min(s["sharp"] for s in cal["samples"])
     assert api.get("/api/calibration", params={"metric": "eye"}).json()["samples"] == []
     assert api.get("/api/calibration", params={"metric": "nope"}).status_code == 400
 

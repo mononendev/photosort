@@ -98,7 +98,13 @@ labels (Blue/Green 3, Yellow 2, Orange 1, Red 0), then stars (4-5 → 3, 3 → 2
 
 **By eye.** The Calibrate page (or `photosort calibrate --metric eye|hf|head`) shows primary subjects
 ordered softest to sharpest with their values. Pick the values where a miss becomes soft, soft
-becomes slightly soft, and slightly soft becomes sharp, enter them, and re-score.
+becomes slightly soft, and slightly soft becomes sharp, enter them, and re-score. On the page, every metric
+is higher-is-sharper: a cut is the minimum score for its tier, so raising it is stricter. Each cut shows the
+share of photos that reach it as you type, and markers between the crops move with it.
+
+Every other knob below (and the EXIF, AF, exposure and detection settings) is editable in the page's
+"Focus rules and other tuning" section, with which way is stricter and when a change takes effect: on
+re-score, on a photo's next local pass, or on its next vision-model tag.
 
 Re-scoring only re-applies thresholds to stored numbers, so it takes seconds. Leaning tier 3 slightly
 high is usually right: a false "sharp" costs more than a false "check this".

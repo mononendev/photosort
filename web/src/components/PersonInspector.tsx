@@ -56,7 +56,7 @@ export const PersonInspector = memo(function PersonInspector({ l, cfg, grades, l
   ];
   const thr = focusThr(cfg) as Record<string, number>;
   return (
-    <div className="rounded-lg border border-gray-800 p-3 space-y-3">
+    <div className="@container rounded-lg border border-gray-800 p-3 space-y-3">
       <div className="flex flex-wrap items-center gap-1 text-xs">
         <span className="uppercase tracking-wide text-gray-500 mr-1">people</span>
         {people.map((_, j) => {
@@ -71,7 +71,7 @@ export const PersonInspector = memo(function PersonInspector({ l, cfg, grades, l
         <span className="ml-auto text-gray-500">{l.n_people} found</span>
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid @xl:grid-cols-2 gap-4">
         <div className="space-y-2">
           <div className="text-xs text-gray-300">
             <span style={{ color: PERSON_COLORS[i % PERSON_COLORS.length] }}>Person #{i + 1}</span>

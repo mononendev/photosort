@@ -80,7 +80,7 @@ export default function Layout() {
           </nav>
         )}
       </header>
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-4 py-4 sm:py-6">
+      <main className={`flex-1 ${pathname === '/review' ? '' : 'max-w-7xl '}w-full mx-auto px-3 sm:px-4 py-4 sm:py-6`}>
         <Outlet />
       </main>
       <footer className="text-center text-xs text-gray-600 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">

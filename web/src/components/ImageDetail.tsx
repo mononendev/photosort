@@ -21,6 +21,16 @@ function Row({ k, v, tip }: { k: string; v: React.ReactNode; tip?: React.ReactNo
   );
 }
 
+// Inline (Review tab) on xl+: people and focus math | frame and crop | model and your call. The second row
+// is 1fr so the tall frame and sidebar spans don't open a gap between people and focus math.
+const WIDE = {
+  grid: 'xl:grid-cols-[340px_minmax(0,1fr)_360px] 2xl:grid-cols-[420px_minmax(0,1fr)_400px] xl:grid-rows-[auto_1fr] xl:[--frame-h:78vh]',
+  frame: 'xl:col-start-2 xl:row-span-2',
+  people: 'xl:col-span-1 xl:col-start-1 xl:row-start-1',
+  math: 'xl:col-span-1 xl:col-start-1 xl:row-start-2 xl:self-start',
+  side: 'xl:col-start-3 xl:row-span-2',
+};
+
 /** A modal over the gallery; without `onClose` it renders inline as the page itself (the Review tab). */
 export default function ImageDetail({ id, onClose, onNav }: { id: number; onClose?: () => void; onNav?: (dir: 1 | -1) => void }) {
   const inline = !onClose;
@@ -125,10 +135,11 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
             {onClose && <button onClick={onClose} aria-label="Close" className="px-3 py-1.5 sm:px-2 sm:py-0 rounded text-gray-400 hover:text-white active:bg-gray-800">✕</button>}
           </span>
         </div>
-        <div className="grid md:grid-cols-[minmax(0,1fr)_380px] gap-4 p-3 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className={`grid md:grid-cols-[minmax(0,1fr)_380px] gap-4 p-3 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))] ${inline ? WIDE.grid : ''}`}>
           {/* Frame and crop sit beside the sidebar; the people and focus-math panels run the full width below
-              both on md+ (grid placement, so the DOM order, and the stacking on phones, stays the same). */}
-          <div className="space-y-3 min-w-0 md:col-start-1 md:row-start-1">
+              both on md+ (grid placement, so the DOM order, and the stacking on phones, stays the same).
+              Inline on a wide screen, people and focus math move to a left column and the frame grows. */}
+          <div className={`space-y-3 min-w-0 md:col-start-1 md:row-start-1 ${inline ? WIDE.frame : ''}`}>
             {l && layerBar}
             <FrameOverlay id={id} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} onOpen={() => setFull(true)} />
             {full && l && <FrameViewer id={id} name={data?.rel ?? String(id)} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} bar={layerBar} onClose={closeFull} onNav={onNav} />}
@@ -154,16 +165,16 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
               </div>
             )}
           </div>
-          {l && <div className="min-w-0 md:col-span-2"><PersonInspector l={l} cfg={cfg} grades={grades} localTip={localTip} selected={person} onSelect={setPerson} /></div>}
+          {l && <div className={`min-w-0 md:col-span-2 ${inline ? WIDE.people : ''}`}><PersonInspector l={l} cfg={cfg} grades={grades} localTip={localTip} selected={person} onSelect={setPerson} /></div>}
           {l && l.people?.length > 0 && (
-            <div className="rounded-lg border border-gray-800 p-3 space-y-2 min-w-0 md:col-span-2">
+            <div className={`rounded-lg border border-gray-800 p-3 space-y-2 min-w-0 md:col-span-2 ${inline ? WIDE.math : ''}`}>
               <button onClick={() => setShowMath(!showMath)} className="text-xs uppercase tracking-wide text-gray-500 hover:text-gray-300">
                 {showMath ? '▾' : '▸'} focus math · person #{person + 1}
               </button>
               {showMath && <FocusMath d={dbg.data?.people?.[person]} p={l.people[person]} loading={dbg.isFetching && !dbg.data} error={dbg.error ? String(dbg.error.message) : undefined} />}
             </div>
           )}
-          <div className="space-y-4 min-w-0 md:col-start-2 md:row-start-1">
+          <div className={`space-y-4 min-w-0 md:col-start-2 md:row-start-1 ${inline ? WIDE.side : ''}`}>
             {v ? (
               <div>
                 <Row k="model tier" v={<><TierBadge tier={v.focus_tier} />{data?.vlm_stale && <span className="ml-2 text-xs text-amber-300">stale · re-tag pending</span>}</>} tip={<>The vision model's own focus verdict, from the downscaled frame plus the native-resolution crop, with the local numbers passed as evidence. Tier {v.focus_tier} means {TIER_MEANING[v.focus_tier]}.</>} />

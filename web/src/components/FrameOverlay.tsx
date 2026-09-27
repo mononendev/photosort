@@ -161,11 +161,11 @@ export default function FrameOverlay({ id, l, onOpen, ...rest }: Omit<OverlayPro
   id: number; l: LocalResult | null | undefined; onOpen: () => void;
 }) {
   const [hover, setHover] = useState<Hover>(null);
-  if (!l) return <img src={frameUrl(id)} alt="" onClick={onOpen} className="w-full rounded-lg bg-gray-900 object-contain max-h-[60vh] cursor-zoom-in" />;
+  if (!l) return <img src={frameUrl(id)} alt="" onClick={onOpen} className="w-full rounded-lg bg-gray-900 object-contain max-h-[var(--frame-h,60vh)] cursor-zoom-in" />;
   return (
     <div className="space-y-1">
       <div onClick={onOpen} className="group relative mx-auto rounded-lg overflow-hidden bg-gray-900 cursor-zoom-in"
-        style={{ aspectRatio: `${l.width} / ${l.height}`, width: `min(100%, calc(60vh * ${l.width / l.height}))` }}>
+        style={{ aspectRatio: `${l.width} / ${l.height}`, width: `min(100%, calc(var(--frame-h, 60vh) * ${l.width / l.height}))` }}>
         <img src={frameUrl(id)} alt="" className="absolute inset-0 w-full h-full" />
         <OverlaySvg l={l} setHover={setHover} {...rest} />
         <span className="absolute right-2 top-2 rounded bg-black/60 px-1.5 text-xs text-gray-300 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 pointer-events-none">⛶ <span className="[@media(hover:none)]:hidden">click to </span>enlarge</span>

@@ -33,6 +33,7 @@ class OverrideIn(BaseModel):
     keeper: Optional[bool] = None
     note: Optional[str] = None
     clear: bool = False
+    clear_rating: bool = False    # drop just your rating (and the reviewed mark); keeps score, keeper and note
 
 
 class ConfigIn(BaseModel):
@@ -424,8 +425,11 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         cur = jcol(r, "override_json", {})
         if o.clear:
             cur = {}
+        elif o.clear_rating:
+            for k in ("rating", "focus_tier", "reviewed", "reviewed_at"):
+                cur.pop(k, None)
         else:
-            for k, v in o.model_dump(exclude={"clear"}, exclude_none=True).items():
+            for k, v in o.model_dump(exclude={"clear", "clear_rating"}, exclude_none=True).items():
                 cur[k] = v
             # A rating or a focus tier is your verdict on the photo: the two stay in step, and the photo counts as
             # reviewed. Only another rating or a reset changes it; jobs and rescans never write override_json.

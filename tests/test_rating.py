@@ -63,6 +63,15 @@ def test_reanalysis_does_not_touch_rating_but_reset_does(client):
     assert (d["rating"], d["reviewed"], d["focus_tier"]) == (None, False, 0)
 
 
+def test_clear_rating_keeps_other_overrides(client):
+    a, _ = ids(client)
+    client.patch(f"/api/images/{a}", json={"rating": 4, "keeper": True, "note": "x"})
+    d = client.patch(f"/api/images/{a}", json={"clear_rating": True}).json()
+    assert (d["rating"], d["reviewed"], d["focus_tier"], d["keeper"]) == (None, False, 0, True)
+    assert d["override"] == {"keeper": True, "note": "x"}
+    assert ids(client, reviewed=True) == []
+
+
 def test_lift_after_tagging_marks_verdict_stale_and_keeps_rating(client):
     a, _ = ids(client)
     client.patch(f"/api/images/{a}", json={"rating": 3})

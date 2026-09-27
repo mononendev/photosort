@@ -264,7 +264,7 @@ export const api = {
   images: (f: ImageFilters) => request<ImagesPage>(`/api/images${qs(f as Record<string, unknown>)}`),
   image: (id: number) => request<ImageDetail>(`/api/images/${id}`),
   focusDebug: (id: number) => request<FocusDebug>(`/api/images/${id}/focus-debug`),
-  override: (id: number, o: Override & { clear?: boolean }) =>
+  override: (id: number, o: Override & { clear?: boolean; clear_rating?: boolean }) =>
     request<ImageDetail>(`/api/images/${id}`, { method: 'PATCH', body: JSON.stringify(o) }),
   jobs: () => request<Job[]>('/api/jobs'),
   createJob: (paths: string[], options: JobOptions) =>

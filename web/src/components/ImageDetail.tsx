@@ -45,6 +45,8 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
   const layers = useMemo(() => new Set(layerList), [layerList]);
   const toggle = useStore((s) => s.toggleLayer);
   const [full, setFull] = useState(false);
+  const zoomRef = useRef(0);   // the fullscreen viewer's magnification, kept while stepping between photos
+  const openFull = useCallback((s: number) => { zoomRef.current = s; setFull(true); }, []);
   useEffect(() => {  // the gallery behind must not scroll while this is open (wheel over the backdrop, or past the end)
     if (inline) return;
     const html = document.documentElement;
@@ -145,12 +147,13 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
               Inline on a wide screen, people and focus math move to a left column and the frame grows. */}
           <div className={`space-y-3 min-w-0 md:col-start-1 md:row-start-1 ${inline ? WIDE.frame : ''}`}>
             {l && layerBar}
-            <FrameOverlay id={id} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} onOpen={() => setFull(true)} />
+            <FrameOverlay id={id} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} onOpen={() => openFull(0)} />
             {full && l && <FrameViewer id={id} name={data?.rel ?? String(id)} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} bar={layerBar}
-              ratings={data && <RatingsStrip d={data} cfg={cfg} localTip={localTip} />} onClose={closeFull} onNav={onNav} />}
+              ratings={data && <RatingsStrip d={data} cfg={cfg} localTip={localTip} />} zoomRef={zoomRef} onClose={closeFull} onNav={onNav} />}
             {data?.has_crop && (
               <div className="flex flex-col sm:flex-row gap-3 items-start">
-                <img src={cropUrl(id)} alt="head crop" className="w-full max-w-64 sm:w-64 shrink-0 rounded-lg bg-gray-900" />
+                <img src={cropUrl(id)} alt="head crop" onClick={l ? () => openFull(1) : undefined} title={l ? 'Open at 1:1 on the head' : undefined}
+                  className={`w-full max-w-64 sm:w-64 shrink-0 rounded-lg bg-gray-900 ${l ? 'cursor-zoom-in' : ''}`} />
                 <div className="text-xs text-gray-400 space-y-1 min-w-0 [overflow-wrap:anywhere]">
                   <div>Native-resolution crop of the primary subject's head and upper body (what the model judges focus from). Hover any number for what it means.</div>
                   {p && l && (

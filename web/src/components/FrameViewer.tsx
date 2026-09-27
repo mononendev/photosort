@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { frameUrl, fullUrl } from '../api/client';
 import type { FocusDebug, LocalResult } from '../api/client';
@@ -21,14 +21,23 @@ const fitOf = (w: number, h: number, W: number, H: number, top = INSET_T) => {
 
 type View = { zoom: number; ox: number; oy: number };   // zoom over fit-to-screen; image top-left in the stage, px
 
+/** Where to look on the new photo: the primary subject's head box, else the native crop, else the middle. */
+const subjectCenter = (l: LocalResult): [number, number] => {
+  const b = l.people?.[0]?.head ?? l.crop_box;
+  return b ? [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2] : [l.width / 2, l.height / 2];
+};
+
 /**
  * Fullscreen frame with the same overlay. Scroll zooms around the cursor, drag pans, double-click (or 0) resets,
  * + / − zoom around the center. Escape closes the viewer only; arrow keys still step through images.
  * On touch screens: pinch zooms around the fingers, one finger pans, double-tap zooms in (or back to fit).
+ * `zoomRef` holds the magnification (screen px per native px) while zoomed in, 0 at fit. Every photo opens at it,
+ * centered on the subject's head, so stepping on (or rating) keeps the zoom; it lives with the caller because the
+ * viewer remounts while the next photo loads. Set it to 1 before opening for 1:1 on the head.
  */
-export default function FrameViewer({ id, name, l, grades, layers, selected, onSelect, heat, bar, ratings, onClose, onNav }: {
+export default function FrameViewer({ id, name, l, grades, layers, selected, onSelect, heat, bar, ratings, zoomRef, onClose, onNav }: {
   id: number; name: string; l: LocalResult; grades: Grade[]; layers: Set<Layer>; selected: number; onSelect: (i: number) => void;
-  heat?: FocusDebug['heatmap']; bar: ReactNode; ratings?: ReactNode; onClose: () => void; onNav?: (dir: 1 | -1) => void;
+  heat?: FocusDebug['heatmap']; bar: ReactNode; ratings?: ReactNode; zoomRef: RefObject<number>; onClose: () => void; onNav?: (dir: 1 | -1) => void;
 }) {
   const W = l.width, H = l.height;
   const stage = useRef<HTMLDivElement>(null);
@@ -56,8 +65,27 @@ export default function FrameViewer({ id, name, l, grades, layers, selected, onS
     setView({ zoom: 1, ox, oy });
   }, [W, H]);
 
+  // Magnification `s` (screen px per native px, clamped to the zoom range) with native point (cx, cy) mid-stage.
+  const lookAt = useCallback((s: number, cx: number, cy: number) => {
+    const el = stage.current;
+    if (!el) return;
+    const w = el.clientWidth, h = el.clientHeight, t = insetT(), { f } = fitOf(w, h, W, H, t);
+    const zoom = Math.min(MAX_ZOOM, Math.max(1, s / f));
+    if (zoom === 1) { reset(); return; }
+    setBox({ w, h, t });
+    setView({ zoom, ox: w / 2 - cx * f * zoom, oy: (t + h - INSET_B) / 2 - cy * f * zoom });
+  }, [W, H, reset]);
+
+  // On open, and on every step to another photo: the remembered magnification, centered on the new subject.
+  const shownId = useRef<number | null>(null);
   useLayoutEffect(() => {
-    reset();
+    if (shownId.current === id) return;
+    shownId.current = id;
+    const s = zoomRef.current;
+    if (s > 0) lookAt(s, ...subjectCenter(l)); else reset();
+  }, [id, l, zoomRef, lookAt, reset]);
+
+  useLayoutEffect(() => {
     root.current?.focus();
     // A window resize keeps the zoom and the point at the center of the stage.
     let last = { w: stage.current?.clientWidth ?? 0, h: stage.current?.clientHeight ?? 0, t: insetT() };
@@ -112,6 +140,7 @@ export default function FrameViewer({ id, name, l, grades, layers, selected, onS
 
   const stageRect = () => stage.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
   const scale = fit * view.zoom;                        // screen px per original px
+  useEffect(() => { if (fit > 0 && shownId.current === id) zoomRef.current = view.zoom > 1 ? scale : 0; }, [fit, id, scale, view.zoom, zoomRef]);
   const wantFull = scale * Math.max(W, H) > FRAME_LONG_EDGE * 1.25;
   const [fullFor, setFullFor] = useState<number | null>(null);
   if (wantFull && fullFor !== id) setFullFor(id);       // once requested, keep it for this image

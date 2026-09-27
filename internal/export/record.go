@@ -147,7 +147,7 @@ func VLMStale(local, vlm any) bool {
 }
 
 func need(o *py.Object, name, key string) (any, error) {
-	v, ok := o.Get(key)
+	v, ok := o.Lookup(key)
 	if !ok {
 		return nil, fmt.Errorf("%s has no %q", name, key)
 	}
@@ -223,7 +223,7 @@ func FinalRecord(row Row, source string) (*Record, error) {
 	default:
 		tier = useVT
 	}
-	if ot, _ := ov.Get("focus_tier"); ot != nil {
+	if ot := ov.Get("focus_tier"); ot != nil {
 		if tier, err = pyInt(ot); err != nil {
 			return nil, err
 		}
@@ -233,10 +233,10 @@ func FinalRecord(row Row, source string) (*Record, error) {
 	if local != nil && py.Eq(nPeople, int64(0)) {
 		subjectDefault = "no_people"
 	}
-	rating, _ := ov.Get("rating")
-	reviewed, _ := ov.Get("reviewed")
-	note, _ := ov.Get("note")
-	group, _ := ov.Get("group")
+	rating := ov.Get("rating")
+	reviewed := ov.Get("reviewed")
+	note := ov.Get("note")
+	group := ov.Get("group")
 	rec := &Record{
 		Path:           row.Path,
 		FocusTier:      tier,

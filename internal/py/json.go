@@ -1,414 +1,380 @@
-// Package py reproduces the handful of Python standard-library behaviours whose exact output photosort's files and
-// responses depend on: json.loads/json.dumps with insertion-ordered objects and Python's int/float distinction,
-// str()/repr() of JSON values, pathlib's name/stem/suffix, str.strip/str.lower, and the csv module's excel dialect.
-// Everything here exists so a Go port writes the same bytes the Python did (results.jsonl, results.csv, stored JSON
-// columns), not as a general-purpose Python emulation.
+// Package py reproduces the Python standard-library behaviours whose exact output photosort's files, requests and
+// error strings depend on: json.loads/json.dumps with insertion-ordered objects and Python's int/float distinction,
+// str()/repr() of JSON values, exception text, pathlib's name/stem/suffix, str.strip/str.lower, and the csv module's
+// excel dialect. Everything here exists so a Go port writes the same bytes the Python did (results.jsonl,
+// results.csv, stored JSON columns, model request bodies), not as a general-purpose Python emulation.
 package py
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/big"
 	"sort"
 	"strconv"
 	"strings"
 	"unicode/utf16"
-	"unicode/utf8"
 )
 
-// Object is a JSON object that keeps its keys in insertion order, as a Python dict does. A key set twice keeps its
-// first position and its last value (dict semantics, and what json.loads does with duplicate keys). The zero value
-// and a nil *Object are empty objects.
-type Object struct {
-	keys []string
-	vals map[string]any
-}
+// Loads is json.loads for data photosort stored itself (JSON columns, results files): objects become *Object
+// (insertion-ordered), integer literals int64 (BigInt beyond int64), other numbers float64, arrays []any.
+//
+// All three loaders are one port of CPython 3.10's json scanner: they accept what Python accepts (NaN, Infinity and
+// -Infinity included, decoded to float64) and fail with an *Error reading exactly like Python's JSONDecodeError
+// ("JSONDecodeError: Expecting ',' delimiter: line 1 column 8 (char 7)"). One difference: a lone UTF-16 surrogate
+// escape (which Python keeps in its str) becomes U+FFFD, since a Go string can't hold it.
+func Loads(s string) (any, error) { return loads(s, true, pyNumber) }
 
-// NewObject builds an object from alternating key, value arguments.
-func NewObject(kv ...any) *Object {
-	o := &Object{}
-	for i := 0; i+1 < len(kv); i += 2 {
-		o.Set(kv[i].(string), kv[i+1])
-	}
-	return o
-}
+// LoadsNumber is json.loads for model answers and other text whose numbers must stay literal: objects decode to
+// pj.Obj (a repeated key keeps the last value, as in Python) and numbers to json.Number holding the literal, so an
+// int literal stays distinguishable from a float one (Python's str() of 3 is "3", of 3.0 is "3.0").
+func LoadsNumber(s string) (any, error) { return loads(s, false, jsonNumber) }
 
-// Set adds or replaces a key, keeping the position of an existing one.
-func (o *Object) Set(k string, v any) {
-	if o.vals == nil {
-		o.vals = map[string]any{}
-	}
-	if _, ok := o.vals[k]; !ok {
-		o.keys = append(o.keys, k)
-	}
-	o.vals[k] = v
-}
+// LoadsNumberOrdered is LoadsNumber with objects decoded to *Object, keeping key order (for text that is written
+// back out or repr()'d).
+func LoadsNumberOrdered(s string) (any, error) { return loads(s, true, jsonNumber) }
 
-// Get is dict.get with a presence flag: (value, true) for a present key even when its value is null.
-func (o *Object) Get(k string) (any, bool) {
-	if o == nil {
-		return nil, false
-	}
-	v, ok := o.vals[k]
-	return v, ok
-}
+func jsonNumber(lit string) any { return json.Number(lit) }
 
-// GetOr is dict.get(k, def): def only when the key is absent (a present null stays nil).
-func (o *Object) GetOr(k string, def any) any {
-	if v, ok := o.Get(k); ok {
-		return v
-	}
-	return def
-}
-
-// Keys returns the keys in insertion order.
-func (o *Object) Keys() []string {
-	if o == nil {
-		return nil
-	}
-	return o.keys
-}
-
-// Len is the number of keys.
-func (o *Object) Len() int {
-	if o == nil {
-		return 0
-	}
-	return len(o.keys)
-}
-
-// MarshalJSON writes compact JSON with the keys in order (for HTTP responses; Dumps is the Python-format writer).
-func (o *Object) MarshalJSON() ([]byte, error) {
-	var b bytes.Buffer
-	b.WriteByte('{')
-	for i, k := range o.Keys() {
-		if i > 0 {
-			b.WriteByte(',')
+// pyNumber is the Go value of a number literal as Python's json module types it: int64 (BigInt beyond) for an int
+// literal, float64 otherwise (overflowing to ±inf and underflowing to 0, as float() does).
+func pyNumber(lit string) any {
+	if IntLiteral(json.Number(lit)) {
+		if n, err := strconv.ParseInt(lit, 10, 64); err == nil {
+			return n
 		}
-		kb, _ := marshal(k)
-		b.Write(kb)
-		b.WriteByte(':')
-		vb, err := marshal(o.vals[k])
-		if err != nil {
-			return nil, err
+		return BigInt(lit)
+	}
+	f, _ := strconv.ParseFloat(lit, 64) // a scanned literal is always valid; out of range gives ±Inf or 0
+	return f
+}
+
+type scanner struct {
+	s       []rune
+	ordered bool             // objects as *Object, else pj.Obj
+	number  func(string) any // the value of a number literal
+}
+
+// decodeError positions are in characters (code points), like Python's.
+func (sc *scanner) decodeError(msg string, pos int) *Error {
+	line := 1
+	lastNL := -1
+	for i := 0; i < pos && i < len(sc.s); i++ {
+		if sc.s[i] == '\n' {
+			line++
+			lastNL = i
 		}
-		b.Write(vb)
 	}
-	b.WriteByte('}')
-	return b.Bytes(), nil
+	col := pos - lastNL
+	return Errorf("JSONDecodeError", "%s: line %d column %d (char %d)", msg, line, col, pos)
 }
 
-// marshal is json.Marshal without HTML escaping (<, >, & stay as they are, as in Python's output).
-func marshal(v any) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(v); err != nil {
-		return nil, err
+// stopIteration is the scanner's "no value starts here" signal; it turns into "Expecting value" at pos.
+type stopIteration struct{ pos int }
+
+func (e *stopIteration) Error() string { return "StopIteration" }
+
+func loads(str string, ordered bool, number func(string) any) (any, error) {
+	sc := &scanner{s: []rune(str), ordered: ordered, number: number}
+	if len(sc.s) > 0 && sc.s[0] == 0xfeff {
+		return nil, sc.decodeError("Unexpected UTF-8 BOM (decode using utf-8-sig)", 0)
 	}
-	return bytes.TrimRight(buf.Bytes(), "\n"), nil
-}
-
-// BigInt is an integer literal too large for int64, kept as its decimal text (Python ints are unbounded).
-type BigInt string
-
-// MarshalJSON writes the literal.
-func (n BigInt) MarshalJSON() ([]byte, error) { return []byte(n), nil }
-
-// Objecter is implemented by values that serialize as an ordered object (e.g. export.Record).
-type Objecter interface {
-	PyObject() *Object
-}
-
-// Lookup reads a key from an *Object, a map[string]any (pj.Obj) or an Objecter: dict.get with a presence flag.
-func Lookup(v any, k string) (any, bool) {
-	switch o := v.(type) {
-	case *Object:
-		return o.Get(k)
-	case map[string]any:
-		x, ok := o[k]
-		return x, ok
-	case Objecter:
-		return o.PyObject().Get(k)
-	}
-	return nil, false
-}
-
-// Loads is json.loads: objects become *Object (insertion-ordered), integer literals int64 (BigInt beyond int64),
-// other numbers float64, arrays []any. Like Python it accepts NaN, Infinity and -Infinity. One difference: a lone
-// UTF-16 surrogate escape (which Python keeps in its str) becomes U+FFFD, since a Go string can't hold it.
-func Loads(s string) (any, error) {
-	p := &parser{s: s}
-	p.ws()
-	v, err := p.value()
+	idx := sc.skipWS(0)
+	v, end, err := sc.scanOnce(idx)
 	if err != nil {
+		if si, ok := err.(*stopIteration); ok {
+			return nil, sc.decodeError("Expecting value", si.pos)
+		}
 		return nil, err
 	}
-	p.ws()
-	if p.i != len(p.s) {
-		return nil, p.errf("Extra data")
+	end = sc.skipWS(end)
+	if end != len(sc.s) {
+		return nil, sc.decodeError("Extra data", end)
 	}
 	return v, nil
 }
 
-type parser struct {
-	s string
-	i int
-}
-
-func (p *parser) errf(msg string) error {
-	return fmt.Errorf("json: %s at char %d", msg, p.i)
-}
-
-func (p *parser) ws() {
-	for p.i < len(p.s) {
-		switch p.s[p.i] {
+func (sc *scanner) skipWS(i int) int {
+	for i < len(sc.s) {
+		switch sc.s[i] {
 		case ' ', '\t', '\n', '\r':
-			p.i++
+			i++
 		default:
-			return
+			return i
 		}
 	}
+	return i
 }
 
-func (p *parser) lit(word string) bool {
-	if strings.HasPrefix(p.s[p.i:], word) {
-		p.i += len(word)
-		return true
+// hasPrefix reports whether the ASCII word p starts at i.
+func (sc *scanner) hasPrefix(i int, p string) bool {
+	if i+len(p) > len(sc.s) {
+		return false
 	}
-	return false
+	for j := 0; j < len(p); j++ {
+		if sc.s[i+j] != rune(p[j]) {
+			return false
+		}
+	}
+	return true
 }
 
-func (p *parser) value() (any, error) {
-	if p.i >= len(p.s) {
-		return nil, p.errf("Expecting value")
+func (sc *scanner) scanOnce(idx int) (any, int, error) {
+	if idx < 0 || idx >= len(sc.s) {
+		return nil, 0, &stopIteration{idx}
 	}
-	switch c := p.s[p.i]; {
-	case c == '{':
-		return p.object()
-	case c == '[':
-		return p.array()
-	case c == '"':
-		return p.str()
-	case p.lit("null"):
-		return nil, nil
-	case p.lit("true"):
-		return true, nil
-	case p.lit("false"):
-		return false, nil
-	case p.lit("NaN"):
-		return math.NaN(), nil
-	case p.lit("Infinity"):
-		return math.Inf(1), nil
-	case p.lit("-Infinity"):
-		return math.Inf(-1), nil
-	case c == '-' || (c >= '0' && c <= '9'):
-		return p.number()
+	switch sc.s[idx] {
+	case '"':
+		return sc.scanString(idx + 1)
+	case '{':
+		return sc.parseObject(idx + 1)
+	case '[':
+		return sc.parseArray(idx + 1)
+	case 'n':
+		if sc.hasPrefix(idx, "null") {
+			return nil, idx + 4, nil
+		}
+	case 't':
+		if sc.hasPrefix(idx, "true") {
+			return true, idx + 4, nil
+		}
+	case 'f':
+		if sc.hasPrefix(idx, "false") {
+			return false, idx + 5, nil
+		}
+	case 'N':
+		if sc.hasPrefix(idx, "NaN") {
+			return math.NaN(), idx + 3, nil
+		}
+	case 'I':
+		if sc.hasPrefix(idx, "Infinity") {
+			return math.Inf(1), idx + 8, nil
+		}
+	case '-':
+		if sc.hasPrefix(idx, "-Infinity") {
+			return math.Inf(-1), idx + 9, nil
+		}
 	}
-	return nil, p.errf("Expecting value")
+	return sc.matchNumber(idx)
 }
 
-func (p *parser) object() (any, error) {
-	p.i++
-	o := &Object{vals: map[string]any{}}
-	p.ws()
-	if p.i < len(p.s) && p.s[p.i] == '}' {
-		p.i++
-		return o, nil
+func isDigit(r rune) bool { return r >= '0' && r <= '9' }
+
+func (sc *scanner) matchNumber(start int) (any, int, error) {
+	s, idx, last := sc.s, start, len(sc.s)-1
+	if s[idx] == '-' {
+		idx++
+		if idx > last {
+			return nil, 0, &stopIteration{start}
+		}
 	}
-	for {
-		p.ws()
-		if p.i >= len(p.s) || p.s[p.i] != '"' {
-			return nil, p.errf("Expecting property name enclosed in double quotes")
+	switch {
+	case s[idx] >= '1' && s[idx] <= '9':
+		idx++
+		for idx <= last && isDigit(s[idx]) {
+			idx++
 		}
-		k, err := p.str()
-		if err != nil {
-			return nil, err
-		}
-		p.ws()
-		if p.i >= len(p.s) || p.s[p.i] != ':' {
-			return nil, p.errf("Expecting ':' delimiter")
-		}
-		p.i++
-		p.ws()
-		v, err := p.value()
-		if err != nil {
-			return nil, err
-		}
-		o.Set(k, v)
-		p.ws()
-		if p.i < len(p.s) && p.s[p.i] == ',' {
-			p.i++
-			continue
-		}
-		if p.i < len(p.s) && p.s[p.i] == '}' {
-			p.i++
-			return o, nil
-		}
-		return nil, p.errf("Expecting ',' delimiter")
+	case s[idx] == '0':
+		idx++
+	default:
+		return nil, 0, &stopIteration{start}
 	}
+	if idx < last && s[idx] == '.' && isDigit(s[idx+1]) {
+		idx += 2
+		for idx <= last && isDigit(s[idx]) {
+			idx++
+		}
+	}
+	if idx < last && (s[idx] == 'e' || s[idx] == 'E') {
+		eStart := idx
+		idx++
+		if idx < last && (s[idx] == '-' || s[idx] == '+') {
+			idx++
+		}
+		for idx <= last && isDigit(s[idx]) {
+			idx++
+		}
+		if !isDigit(s[idx-1]) {
+			idx = eStart
+		}
+	}
+	return sc.number(string(s[start:idx])), idx, nil
 }
 
-func (p *parser) array() (any, error) {
-	p.i++
-	out := []any{}
-	p.ws()
-	if p.i < len(p.s) && p.s[p.i] == ']' {
-		p.i++
-		return out, nil
-	}
-	for {
-		p.ws()
-		v, err := p.value()
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, v)
-		p.ws()
-		if p.i < len(p.s) && p.s[p.i] == ',' {
-			p.i++
-			continue
-		}
-		if p.i < len(p.s) && p.s[p.i] == ']' {
-			p.i++
-			return out, nil
-		}
-		return nil, p.errf("Expecting ',' delimiter")
-	}
-}
-
-func (p *parser) str() (string, error) {
-	p.i++ // opening quote
+// scanString follows CPython's scanstring_unicode, including its error positions. end is the index just after the
+// opening quote.
+func (sc *scanner) scanString(end int) (any, int, error) {
+	s, n := sc.s, len(sc.s)
+	begin := end - 1
 	var b strings.Builder
 	for {
-		if p.i >= len(p.s) {
-			return "", p.errf("Unterminated string")
+		var c rune
+		next := end
+		for ; next < n; next++ {
+			c = s[next]
+			if c == '"' || c == '\\' {
+				break
+			}
+			if c <= 0x1f {
+				return nil, 0, sc.decodeError("Invalid control character at", next)
+			}
 		}
-		c := p.s[p.i]
-		switch {
-		case c == '"':
-			p.i++
-			return b.String(), nil
-		case c < 0x20:
-			return "", p.errf("Invalid control character")
-		case c != '\\':
-			b.WriteByte(c)
-			p.i++
+		if next >= n {
+			c = 0
+		}
+		b.WriteString(string(s[end:next]))
+		if c == '"' {
+			return b.String(), next + 1, nil
+		}
+		if c != '\\' {
+			return nil, 0, sc.decodeError("Unterminated string starting at", begin)
+		}
+		next++ // skip the backslash
+		if next == n {
+			return nil, 0, sc.decodeError("Unterminated string starting at", begin)
+		}
+		c = s[next]
+		if c != 'u' {
+			end = next + 1
+			switch c {
+			case '"', '\\', '/':
+			case 'b':
+				c = '\b'
+			case 'f':
+				c = '\f'
+			case 'n':
+				c = '\n'
+			case 'r':
+				c = '\r'
+			case 't':
+				c = '\t'
+			default:
+				return nil, 0, sc.decodeError("Invalid \\escape", end-2)
+			}
+			b.WriteRune(c)
 			continue
 		}
-		p.i++
-		if p.i >= len(p.s) {
-			return "", p.errf("Unterminated string")
+		next++
+		end = next + 4
+		if end >= n {
+			return nil, 0, sc.decodeError("Invalid \\uXXXX escape", next-1)
 		}
-		e := p.s[p.i]
-		p.i++
-		switch e {
-		case '"', '\\', '/':
-			b.WriteByte(e)
-		case 'b':
-			b.WriteByte('\b')
-		case 'f':
-			b.WriteByte('\f')
-		case 'n':
-			b.WriteByte('\n')
-		case 'r':
-			b.WriteByte('\r')
-		case 't':
-			b.WriteByte('\t')
-		case 'u':
-			r, err := p.hex4()
-			if err != nil {
-				return "", err
+		cp, ok := hex4(s[next:end])
+		if !ok {
+			return nil, 0, sc.decodeError("Invalid \\uXXXX escape", end-5)
+		}
+		next = end
+		if utf16.IsSurrogate(cp) && cp < 0xdc00 && end+6 < n && s[next] == '\\' && s[next+1] == 'u' {
+			end += 6
+			c2, ok := hex4(s[next+2 : end])
+			if !ok {
+				return nil, 0, sc.decodeError("Invalid \\uXXXX escape", end-5)
 			}
-			if utf16.IsSurrogate(r) && strings.HasPrefix(p.s[p.i:], `\u`) {
-				save := p.i
-				p.i += 2
-				r2, err := p.hex4()
-				if err == nil && r2 >= 0xDC00 && r2 <= 0xDFFF && r < 0xDC00 {
-					r = utf16.DecodeRune(r, r2)
-				} else {
-					p.i = save
-				}
+			if c2 >= 0xdc00 && c2 <= 0xdfff {
+				cp = utf16.DecodeRune(cp, c2)
+			} else {
+				end -= 6
 			}
-			b.WriteRune(r) // a lone surrogate writes U+FFFD
+		}
+		b.WriteRune(cp) // a lone surrogate becomes U+FFFD (Python would keep it; Go strings can't)
+	}
+}
+
+func hex4(rs []rune) (rune, bool) {
+	var c rune
+	for _, d := range rs {
+		c <<= 4
+		switch {
+		case d >= '0' && d <= '9':
+			c |= d - '0'
+		case d >= 'a' && d <= 'f':
+			c |= d - 'a' + 10
+		case d >= 'A' && d <= 'F':
+			c |= d - 'A' + 10
 		default:
-			return "", p.errf("Invalid \\escape")
+			return 0, false
 		}
 	}
+	return c, true
 }
 
-func (p *parser) hex4() (rune, error) {
-	if p.i+4 > len(p.s) {
-		return 0, p.errf("Invalid \\uXXXX escape")
+func (sc *scanner) parseObject(idx int) (any, int, error) {
+	s, last := sc.s, len(sc.s)-1
+	var obj map[string]any
+	var om *Object
+	if sc.ordered {
+		om = NewObject()
+	} else {
+		obj = map[string]any{}
 	}
-	n, err := strconv.ParseUint(p.s[p.i:p.i+4], 16, 32)
-	if err != nil {
-		return 0, p.errf("Invalid \\uXXXX escape")
+	idx = sc.skipWS(idx)
+	if idx > last || s[idx] != '}' {
+		for {
+			if idx > last || s[idx] != '"' {
+				return nil, 0, sc.decodeError("Expecting property name enclosed in double quotes", idx)
+			}
+			k, next, err := sc.scanString(idx + 1)
+			if err != nil {
+				return nil, 0, err
+			}
+			idx = sc.skipWS(next)
+			if idx > last || s[idx] != ':' {
+				return nil, 0, sc.decodeError("Expecting ':' delimiter", idx)
+			}
+			idx = sc.skipWS(idx + 1)
+			v, next, err := sc.scanOnce(idx)
+			if err != nil {
+				return nil, 0, err
+			}
+			if om != nil {
+				om.Set(k.(string), v)
+			} else {
+				obj[k.(string)] = v
+			}
+			idx = sc.skipWS(next)
+			if idx <= last && s[idx] == '}' {
+				break
+			}
+			if idx > last || s[idx] != ',' {
+				return nil, 0, sc.decodeError("Expecting ',' delimiter", idx)
+			}
+			idx = sc.skipWS(idx + 1)
+		}
 	}
-	p.i += 4
-	return rune(n), nil
+	if om != nil {
+		return om, idx + 1, nil
+	}
+	return obj, idx + 1, nil
 }
 
-func (p *parser) number() (any, error) {
-	start := p.i
-	if p.s[p.i] == '-' {
-		p.i++
-	}
-	digits := func() int {
-		n := 0
-		for p.i < len(p.s) && p.s[p.i] >= '0' && p.s[p.i] <= '9' {
-			p.i++
-			n++
-		}
-		return n
-	}
-	if p.i < len(p.s) && p.s[p.i] == '0' {
-		p.i++
-	} else if digits() == 0 {
-		p.i = start
-		return nil, p.errf("Expecting value")
-	}
-	isFloat := false
-	if p.i+1 < len(p.s) && p.s[p.i] == '.' && p.s[p.i+1] >= '0' && p.s[p.i+1] <= '9' {
-		p.i++
-		digits()
-		isFloat = true
-	}
-	if p.i < len(p.s) && (p.s[p.i] == 'e' || p.s[p.i] == 'E') {
-		save := p.i
-		p.i++
-		if p.i < len(p.s) && (p.s[p.i] == '+' || p.s[p.i] == '-') {
-			p.i++
-		}
-		if digits() == 0 {
-			p.i = save
-		} else {
-			isFloat = true
+func (sc *scanner) parseArray(idx int) (any, int, error) {
+	s, last := sc.s, len(sc.s)-1
+	arr := []any{}
+	idx = sc.skipWS(idx)
+	if idx > last || s[idx] != ']' {
+		for {
+			v, next, err := sc.scanOnce(idx)
+			if err != nil {
+				return nil, 0, err
+			}
+			arr = append(arr, v)
+			idx = sc.skipWS(next)
+			if idx <= last && s[idx] == ']' {
+				break
+			}
+			if idx > last || s[idx] != ',' {
+				return nil, 0, sc.decodeError("Expecting ',' delimiter", idx)
+			}
+			idx = sc.skipWS(idx + 1)
 		}
 	}
-	text := p.s[start:p.i]
-	if isFloat {
-		f, err := strconv.ParseFloat(text, 64)
-		if err != nil && !isRangeErr(err) { // Python's float() gives inf/0 on overflow/underflow, as ParseFloat does
-			return nil, p.errf("bad number")
-		}
-		return f, nil
-	}
-	if n, err := strconv.ParseInt(text, 10, 64); err == nil {
-		return n, nil
-	}
-	return BigInt(text), nil
+	return arr, idx + 1, nil
 }
 
-func isRangeErr(err error) bool {
-	ne, ok := err.(*strconv.NumError)
-	return ok && ne.Err == strconv.ErrRange
-}
-
-// Dumps is json.dumps(v) with Python's defaults: ", " and ": " separators, ensure_ascii (every character outside
-// printable ASCII escaped as \uXXXX, surrogate pairs above the BMP), floats as repr() with NaN/Infinity, and objects
-// in insertion order. A plain map (pj.Obj) has no order and is written with sorted keys.
+// Dumps is json.dumps(v) with Python's default arguments, byte for byte: ", " and ": " separators, ensure_ascii
+// (every character outside printable ASCII escaped as \uXXXX, surrogate pairs above the BMP), floats as repr() with
+// NaN/Infinity, and objects in insertion order. A json.Number keeps its literal's int/float kind; a plain map
+// (pj.Obj) has no order and is written with sorted keys. Other Go values go through encoding/json first.
 func Dumps(v any) string {
 	var b strings.Builder
 	dump(&b, v)
@@ -431,19 +397,16 @@ func dump(b *strings.Builder, v any) {
 		b.WriteString(strconv.Itoa(x))
 	case int64:
 		b.WriteString(strconv.FormatInt(x, 10))
+	case int32:
+		b.WriteString(strconv.FormatInt(int64(x), 10))
 	case BigInt:
 		b.WriteString(string(x))
+	case json.Number:
+		b.WriteString(numberStr(x))
+	case float32:
+		dumpFloat(b, float64(x))
 	case float64:
-		switch {
-		case math.IsNaN(x):
-			b.WriteString("NaN")
-		case math.IsInf(x, 1):
-			b.WriteString("Infinity")
-		case math.IsInf(x, -1):
-			b.WriteString("-Infinity")
-		default:
-			b.WriteString(FloatRepr(x))
-		}
+		dumpFloat(b, x)
 	case []any:
 		b.WriteByte('[')
 		for i, e := range x {
@@ -476,22 +439,44 @@ func dump(b *strings.Builder, v any) {
 	case Objecter:
 		dump(b, x.PyObject())
 	case map[string]any:
-		keys := make([]string, 0, len(x))
-		for k := range x {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		o := &Object{}
-		for _, k := range keys {
-			o.Set(k, x[k])
-		}
-		dump(b, o)
+		dump(b, sortedObject(x))
 	default:
-		if f, ok := toFloat(v); ok {
-			dump(b, f)
-			return
+		raw, err := marshal(x)
+		if err != nil {
+			panic(fmt.Sprintf("py.Dumps: %T: %v", v, err))
 		}
-		panic(fmt.Sprintf("py.Dumps: unsupported type %T", v))
+		parsed, err := LoadsNumberOrdered(string(raw))
+		if err != nil {
+			panic(fmt.Sprintf("py.Dumps: %T: %v", v, err))
+		}
+		dump(b, parsed)
+	}
+}
+
+// sortedObject is m as an *Object with its keys sorted (how an unordered map is written).
+func sortedObject(m map[string]any) *Object {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	o := &Object{}
+	for _, k := range keys {
+		o.Set(k, m[k])
+	}
+	return o
+}
+
+func dumpFloat(b *strings.Builder, f float64) {
+	switch {
+	case math.IsNaN(f):
+		b.WriteString("NaN")
+	case math.IsInf(f, 1):
+		b.WriteString("Infinity")
+	case math.IsInf(f, -1):
+		b.WriteString("-Infinity")
+	default:
+		b.WriteString(FloatRepr(f))
 	}
 }
 
@@ -535,8 +520,8 @@ func u4(b *strings.Builder, r rune) {
 	}
 }
 
-// FloatRepr is Python's repr(float): the shortest round-tripping digits, in fixed notation when the decimal
-// exponent is in [-4, 16) (with ".0" on integral values), else d.ddde±XX. inf/nan print as "inf"/"nan".
+// FloatRepr is Python's repr()/str() of a float: the shortest string that round-trips, in fixed notation when the
+// decimal exponent is in [-4, 16) (with ".0" on integral values), else d.ddde±XX. inf/nan print as "inf"/"nan".
 func FloatRepr(f float64) string {
 	switch {
 	case math.IsNaN(f):
@@ -546,7 +531,7 @@ func FloatRepr(f float64) string {
 	case math.IsInf(f, -1):
 		return "-inf"
 	}
-	e := strconv.FormatFloat(f, 'e', -1, 64) // e.g. -1.2345e+06
+	e := strconv.FormatFloat(f, 'e', -1, 64) // e.g. -1.2345e+06 (zero is 0e+00, giving "0.0")
 	sign := ""
 	if e[0] == '-' {
 		sign, e = "-", e[1:]
@@ -578,6 +563,26 @@ func FloatRepr(f float64) string {
 	return fmt.Sprintf("%s%se%s%02d", sign, m, es, exp)
 }
 
+// IntLiteral reports whether n is an int literal, i.e. whether Python's json would have decoded it to an int.
+func IntLiteral(n json.Number) bool { return !strings.ContainsAny(string(n), ".eEnN") }
+
+// numberStr is str() of a JSON number literal as Python's json module would have parsed it: an int literal prints
+// as the (normalized) integer, anything with a fraction or exponent as a float.
+func numberStr(n json.Number) string {
+	s := string(n)
+	if IntLiteral(n) {
+		if b, ok := new(big.Int).SetString(s, 10); ok {
+			return b.String()
+		}
+		return s
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil && !isRangeErr(err) { // out of range is fine: Python's float() gives inf/0, as ParseFloat does
+		return s
+	}
+	return FloatRepr(f)
+}
+
 func toFloat(v any) (float64, bool) {
 	switch x := v.(type) {
 	case float64:
@@ -600,10 +605,7 @@ func toFloat(v any) (float64, bool) {
 	return 0, false
 }
 
-// validUTF8 drops invalid bytes, as bytes.decode("utf-8", "ignore") does.
-func validUTF8(s string) string {
-	if utf8.ValidString(s) {
-		return s
-	}
-	return strings.ToValidUTF8(s, "")
+func isRangeErr(err error) bool {
+	ne, ok := err.(*strconv.NumError)
+	return ok && ne.Err == strconv.ErrRange
 }

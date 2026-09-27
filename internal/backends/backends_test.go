@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/mononendev/photosort/internal/pj"
-	"github.com/mononendev/photosort/internal/schema"
+	"github.com/mononendev/photosort/internal/py"
 )
 
 // testdata/backends_golden.json is dumped from the Python implementation by a script run with the old interpreter
@@ -110,7 +110,7 @@ func TestRequestBodiesMatchPython(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", c.name, err)
 		}
-		if got := schema.PyDumps(req); got != want {
+		if got := py.Dumps(req); got != want {
 			t.Errorf("%s differs from Python:\n got %s\nwant %s", c.name, firstDiff(got, want), firstDiff(want, got))
 		}
 	}
@@ -216,9 +216,9 @@ func TestGetAndProperties(t *testing.T) {
 
 func TestRedact(t *testing.T) {
 	long := strings.Repeat("QUFB", 2000) // 8000 chars, no spaces
-	in := schema.NewMap("model", "m", "images", []any{long, "short"}, "raw", []byte(strings.Repeat("x", 3000)),
+	in := py.NewObject("model", "m", "images", []any{long, "short"}, "raw", []byte(strings.Repeat("x", 3000)),
 		"text", strings.Repeat("a b", 2000))
-	out := Redact(in).(*schema.Map)
+	out := Redact(in).(*py.Object)
 	if got := pj.Dumps(out); got != `{"model":"m","images":["<base64 image, 6 KB>","short"],"raw":"<3 KB image>","text":"`+strings.Repeat("a b", 2000)+`"}` {
 		t.Errorf("got %.200s", got)
 	}

@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"math"
 	"strconv"
+
+	"github.com/mononendev/photosort/internal/py"
 )
 
 // The Python read() fell back to Pillow's getexif() (with pillow_heif registered) when exifread found nothing or
@@ -147,13 +149,13 @@ func (d *pilDir) number(t pilTag, i int) (float64, string) {
 		if dd != 0 {
 			v = n / dd
 		}
-		return v, pyFloatRepr(v)
+		return v, py.FloatRepr(v)
 	case 11:
 		v := float64(math.Float32frombits(d.bo.Uint32(b)))
-		return v, pyFloatRepr(v)
+		return v, py.FloatRepr(v)
 	case 12:
 		v := math.Float64frombits(d.bo.Uint64(b))
-		return v, pyFloatRepr(v)
+		return v, py.FloatRepr(v)
 	case 16, 18:
 		v := d.bo.Uint64(b)
 		return float64(v), strconv.FormatUint(v, 10)

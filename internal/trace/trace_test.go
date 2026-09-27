@@ -233,19 +233,19 @@ func TestWalkMatchesLocalTier(t *testing.T) {
 			primary, others = people[0], people[1:]
 		}
 		st, check := localTierStage(local, cfg, people, primary, others)
-		traced, _ := check.Get("traced")
-		engine, _ := check.Get("engine")
+		traced := check.Get("traced")
+		engine := check.Get("engine")
 		if !py.Eq(traced, engine) {
 			t.Fatalf("case %d: walk says %s, LocalTier %s (people %s)", i, py.Repr(traced), py.Repr(engine), pj.Dumps(people))
 		}
-		nodes, _ := st.Get("nodes")
+		nodes := st.Get("nodes")
 		decided, soft := 0, false
 		for _, n := range nodes.([]any) {
 			o := n.(*py.Object)
-			if d, _ := o.Get("decided"); d == true {
+			if d := o.Get("decided"); d == true {
 				decided++
 			}
-			if q, _ := o.Get("q"); strings.Contains(q.(string), "soft person") {
+			if q := o.Get("q"); strings.Contains(q.(string), "soft person") {
 				soft = true
 			}
 		}

@@ -39,7 +39,7 @@ func decode(name string, s *string) (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", name, err)
 	}
-	return toPJ(v), nil
+	return py.Plain(v), nil
 }
 
 // decodeObj is decode for a column that must hold an object (or null).
@@ -53,25 +53,6 @@ func decodeObj(name string, s *string) (pj.Obj, error) {
 		return nil, fmt.Errorf("%s is not a JSON object", name)
 	}
 	return o, nil
-}
-
-func toPJ(v any) any {
-	switch x := v.(type) {
-	case *py.Object:
-		o := make(pj.Obj, x.Len())
-		for _, k := range x.Keys() {
-			e, _ := x.Get(k)
-			o[k] = toPJ(e)
-		}
-		return o
-	case []any:
-		out := make([]any, len(x))
-		for i, e := range x {
-			out[i] = toPJ(e)
-		}
-		return out
-	}
-	return v
 }
 
 // deepCopy is copy.deepcopy of a decoded value (pj.Clone would turn int64 into float64).
@@ -231,7 +212,7 @@ func (c *chain) ask(q string, result any, o opts) *py.Object {
 		if !c.decided {
 			why = s(o.gate)
 		}
-		if note, _ := n.Get("note"); pj.Truthy(note) {
+		if note := n.Get("note"); pj.Truthy(note) {
 			why += " · " + s(note)
 		}
 		n.Set("note", why)
@@ -970,7 +951,7 @@ func frontTests(primary pj.Obj, others []pj.Obj, people []pj.Obj, thr pj.Obj, si
 		)
 		ok := true
 		for _, k := range tests.Keys() {
-			v, _ := tests.Get(k)
+			v := tests.Get(k)
 			ok = ok && v.(bool)
 		}
 		out = append(out, py.NewObject("n", pid(people, o), "tests", tests, "ok", ok))
@@ -1004,7 +985,7 @@ func splitStage(local, cfg, primary pj.Obj) *py.Object {
 	}
 	inputs := make([]any, 0, grades.Len())
 	for _, k := range grades.Keys() {
-		g, _ := grades.Get(k)
+		g := grades.Get(k)
 		inputs = append(inputs, kv(k, g))
 	}
 	on := pj.Truthy(steps)

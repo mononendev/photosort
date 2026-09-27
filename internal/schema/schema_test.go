@@ -2,13 +2,11 @@ package schema
 
 import (
 	"encoding/json"
-	"math"
 	"os"
-	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/mononendev/photosort/internal/pj"
+	"github.com/mononendev/photosort/internal/py"
 )
 
 // golden is testdata/backends_golden.json, dumped from the Python code (see the script path in the backends
@@ -22,19 +20,6 @@ type golden struct {
 	Validate []struct {
 		Name, Input, Output, Error string
 	} `json:"validate"`
-	Loads []struct {
-		Input, Output, Error string
-	} `json:"loads"`
-	FloatRepr []struct {
-		Bits, Str string
-	} `json:"float_repr"`
-	StrRepr []struct {
-		S, Repr string
-	} `json:"str_repr"`
-	Dumps []struct {
-		Value json.RawMessage
-		Text  string
-	} `json:"dumps"`
 }
 
 func loadGolden(t *testing.T) golden {
@@ -59,7 +44,7 @@ func TestJSONSchemaMatchesPython(t *testing.T) {
 			if !ok {
 				t.Fatalf("golden lacks %s", key)
 			}
-			if got := PyDumps(JSONSchema(strict, ml)); got != want {
+			if got := py.Dumps(JSONSchema(strict, ml)); got != want {
 				t.Errorf("%s:\n got %s\nwant %s", key, got, want)
 			}
 		}
@@ -114,7 +99,7 @@ func TestContextTextMatchesPython(t *testing.T) {
 			c.Local = fixtureLocal(t, c.Fixture)
 		}
 		// Both decodings must give Python's text: json.Number (int/float per literal) and float64 (pj.Parse).
-		num, err := Loads(c.Local)
+		num, err := py.LoadsNumber(c.Local)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -186,80 +171,5 @@ func TestValidateMatchesPython(t *testing.T) {
 				t.Errorf("%s: %s left as json.Number", c.Name, k)
 			}
 		}
-	}
-}
-
-func TestLoadsMatchesPython(t *testing.T) {
-	g := loadGolden(t)
-	for _, c := range g.Loads {
-		v, err := LoadsOrdered(c.Input)
-		if c.Error != "" {
-			if err == nil || err.Error() != c.Error {
-				t.Errorf("%q: error %v, want %s", c.Input, err, c.Error)
-			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("%q: %v", c.Input, err)
-			continue
-		}
-		if got := PyDumps(v); got != c.Output {
-			t.Errorf("%q: got %s want %s", c.Input, got, c.Output)
-		}
-	}
-}
-
-func TestPythonFormatting(t *testing.T) {
-	g := loadGolden(t)
-	for _, c := range g.FloatRepr {
-		f, err := strconv.ParseFloat(pyHexToGo(c.Bits), 64)
-		if err != nil {
-			t.Fatalf("%s: %v", c.Bits, err)
-		}
-		if got := FloatRepr(f); got != c.Str {
-			t.Errorf("FloatRepr(%v) = %s, want %s", f, got, c.Str)
-		}
-	}
-	for _, c := range g.StrRepr {
-		if got := PyRepr(c.S); got != c.Repr {
-			t.Errorf("PyRepr(%q) = %s, want %s", c.S, got, c.Repr)
-		}
-	}
-	for _, c := range g.Dumps {
-		v, err := LoadsOrdered(string(c.Value))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := PyDumps(v); got != c.Text {
-			t.Errorf("PyDumps = %s, want %s", got, c.Text)
-		}
-	}
-	if FloatRepr(math.Inf(-1)) != "-inf" || PyStr(nil) != "None" || PyStr(json.Number("-0")) != "0" || PyStr(json.Number("1E5")) != "100000.0" {
-		t.Error("scalar str() mismatch")
-	}
-}
-
-// pyHexToGo turns float.hex() output ("0x1.8000000000000p+1", "-0x0.0p+0") into a Go hex float literal.
-func pyHexToGo(s string) string {
-	switch s {
-	case "0x0.0p+0":
-		return "0"
-	case "-0x0.0p+0":
-		return "-0"
-	}
-	return strings.TrimSpace(s)
-}
-
-func TestMapOrderAndJSON(t *testing.T) {
-	m := NewMap("b", 1, "a", NewMap("<", "x&y"))
-	m.Set("b", 2).Set("c", []any{1.5})
-	if b := pj.Dumps(m); b != `{"b":2,"a":{"<":"x&y"},"c":[1.5]}` {
-		t.Errorf("marshal: %s", b)
-	}
-	if PyRepr(m) != `{'b': 2, 'a': {'<': 'x&y'}, 'c': [1.5]}` {
-		t.Errorf("repr: %s", PyRepr(m))
-	}
-	if !pj.Equal(m.Obj(), pj.Obj{"b": 2, "a": pj.Obj{"<": "x&y"}, "c": []any{1.5}}) {
-		t.Error("Obj")
 	}
 }

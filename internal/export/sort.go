@@ -296,7 +296,7 @@ func CSV(records []*Record) (string, error) {
 		o.Set("adjectives", adj)
 		fields := make([]string, len(CSVColumns))
 		for i, c := range CSVColumns {
-			v, _ := o.Get(c)
+			v := o.Get(c)
 			fields[i] = py.CSVField(v)
 		}
 		py.WriteCSVRow(&b, fields)

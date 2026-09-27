@@ -20,6 +20,7 @@ import (
 	"golang.org/x/image/draw"
 
 	"github.com/mononendev/photosort/internal/pj"
+	"github.com/mononendev/photosort/internal/py"
 	"github.com/mononendev/photosort/internal/schema"
 )
 
@@ -65,7 +66,7 @@ func (o *Ollama) BaseURL() string      { return o.baseURL }
 func shrinkFrame(b []byte, longEdge int) ([]byte, error) {
 	cfg, _, err := image.DecodeConfig(bytes.NewReader(b))
 	if err != nil {
-		return nil, &schema.PyError{Type: "UnidentifiedImageError", Msg: "cannot identify image file <_io.BytesIO object>"}
+		return nil, &py.Error{Type: "UnidentifiedImageError", Msg: "cannot identify image file <_io.BytesIO object>"}
 	}
 	w, h := cfg.Width, cfg.Height
 	if max(w, h) <= longEdge {
@@ -73,7 +74,7 @@ func shrinkFrame(b []byte, longEdge int) ([]byte, error) {
 	}
 	src, _, err := image.Decode(bytes.NewReader(b))
 	if err != nil {
-		return nil, &schema.PyError{Type: "OSError", Msg: err.Error()}
+		return nil, &py.Error{Type: "OSError", Msg: err.Error()}
 	}
 	s := float64(longEdge) / float64(max(w, h))
 	nw, nh := max(1, pj.RoundInt(float64(w)*s)), max(1, pj.RoundInt(float64(h)*s))
@@ -101,18 +102,18 @@ func (o *Ollama) BuildRequest(item Item, model string, cfg pj.Obj) (any, error) 
 		text += "\n" + cropLabel
 	}
 	text += "\n\n" + userText(item)
-	return schema.NewMap(
+	return py.NewObject(
 		"model", model,
 		"messages", []any{
-			schema.NewMap("role", "system", "content", schema.SystemPrompt),
-			schema.NewMap("role", "user", "content", text, "images", images),
+			py.NewObject("role", "system", "content", schema.SystemPrompt),
+			py.NewObject("role", "user", "content", text, "images", images),
 		},
 		"format", schema.JSONSchema(false, pj.Truthy(cfgGet(cfg, "ollama_schema_max_lengths", true))),
 		"stream", false,
 		"think", false, // qwen3-vl defaults to thinking, which eats num_predict and leaves content empty
 		"keep_alive", "30m",
 		// Qwen3 instruct recommended sampling; greedy decoding makes small models loop in free-text fields.
-		"options", schema.NewMap("temperature", 0.7, "top_p", 0.8, "top_k", 20, "repeat_penalty", 1.1, "repeat_last_n", 128,
+		"options", py.NewObject("temperature", 0.7, "top_p", 0.8, "top_k", 20, "repeat_penalty", 1.1, "repeat_last_n", 128,
 			"num_predict", jsonInt(cfgGet(cfg, "ollama_num_predict", 1536)), "num_ctx", jsonInt(cfgGet(cfg, "ollama_num_ctx", 8192))),
 	), nil
 }
@@ -127,7 +128,7 @@ func (e *httpError) Error() string { return fmt.Sprintf("http %d", e.code) }
 
 // post sends body as Python's json.dumps text and decodes the answer the way json.loads did.
 func (o *Ollama) post(ctx context.Context, path string, body any) (pj.Obj, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, o.baseURL+path, strings.NewReader(schema.PyDumps(body)))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, o.baseURL+path, strings.NewReader(py.Dumps(body)))
 	if err != nil {
 		return nil, err
 	}
@@ -144,20 +145,20 @@ func (o *Ollama) post(ctx context.Context, path string, body any) (pj.Obj, error
 	if resp.StatusCode >= 400 {
 		return nil, &httpError{resp.StatusCode, string(raw)}
 	}
-	v, err := schema.Loads(string(raw))
+	v, err := py.LoadsNumber(string(raw))
 	if err != nil {
 		return nil, err
 	}
 	obj, ok := floatify(v).(pj.Obj) // numbers as float64, like the rest of the pj code
 	if !ok {
-		return nil, &schema.PyError{Type: "AttributeError", Msg: fmt.Sprintf("'%s' object has no attribute 'get'", schema.PyTypeName(v))}
+		return nil, &py.Error{Type: "AttributeError", Msg: fmt.Sprintf("'%s' object has no attribute 'get'", py.TypeName(v))}
 	}
 	return obj, nil
 }
 
 // transportError renders a Go transport error the way Python's urllib reported the equivalent one.
 func transportError(err error) string {
-	var pe *schema.PyError
+	var pe *py.Error
 	if errors.As(err, &pe) {
 		return pe.Error()
 	}
@@ -223,7 +224,7 @@ func truncRunes(s string, n int) string {
 
 // Submit is not available: Ollama is synchronous.
 func (o *Ollama) Submit(context.Context, []Item, string, pj.Obj, string) (string, error) {
-	return "", &schema.PyError{Type: "NotImplementedError", Msg: "ollama backend is synchronous; use classify()"}
+	return "", &py.Error{Type: "NotImplementedError", Msg: "ollama backend is synchronous; use classify()"}
 }
 
 // Status is always "ended" (there are no batches).

@@ -17,6 +17,7 @@ import (
 	"google.golang.org/genai"
 
 	"github.com/mononendev/photosort/internal/pj"
+	"github.com/mononendev/photosort/internal/py"
 	"github.com/mononendev/photosort/internal/schema"
 )
 
@@ -56,15 +57,15 @@ func (g *Gemini) getClient(ctx context.Context) (*genai.Client, error) {
 // default LOW); older models get thinking_budget 0.
 func (g *Gemini) BuildRequest(item Item, model string, cfg pj.Obj) (any, error) {
 	g3 := strings.HasPrefix(model, "gemini-3")
-	img := func(b []byte, level string) *schema.Map {
-		p := schema.NewMap()
+	img := func(b []byte, level string) *py.Object {
+		p := py.NewObject()
 		if g3 {
-			p.Set("media_resolution", schema.NewMap("level", level))
+			p.Set("media_resolution", py.NewObject("level", level))
 		}
 		// pydantic serializes bytes as URL-safe base64 (with padding).
-		return p.Set("inline_data", schema.NewMap("data", base64.URLEncoding.EncodeToString(b), "mime_type", "image/jpeg"))
+		return p.Set("inline_data", py.NewObject("data", base64.URLEncoding.EncodeToString(b), "mime_type", "image/jpeg"))
 	}
-	text := func(s string) *schema.Map { return schema.NewMap("text", s) }
+	text := func(s string) *py.Object { return py.NewObject("text", s) }
 	parts := []any{text(frameLabel), img(item.Frame, "MEDIA_RESOLUTION_HIGH")}
 	if len(item.Crop) > 0 {
 		parts = append(parts, text(cropLabel), img(item.Crop, "MEDIA_RESOLUTION_MEDIUM"))
@@ -75,21 +76,21 @@ func (g *Gemini) BuildRequest(item Item, model string, cfg pj.Obj) (any, error) 
 	if err != nil {
 		return nil, err
 	}
-	thinking := schema.NewMap("thinking_budget", 0)
+	thinking := py.NewObject("thinking_budget", 0)
 	if g3 {
-		thinking = schema.NewMap("thinking_level", cfgGet(cfg, "gemini_thinking_level", "LOW"))
+		thinking = py.NewObject("thinking_level", cfgGet(cfg, "gemini_thinking_level", "LOW"))
 	}
-	gen := schema.NewMap(
+	gen := py.NewObject(
 		"response_json_schema", schema.JSONSchema(false, false),
 		"max_output_tokens", maxOut,
 		"response_mime_type", "application/json",
 		"thinking_config", thinking,
 	)
-	return schema.NewMap(
+	return py.NewObject(
 		"key", item.Key,
-		"request", schema.NewMap(
-			"system_instruction", schema.NewMap("parts", []any{text(schema.SystemPrompt)}),
-			"contents", []any{schema.NewMap("parts", parts, "role", "user")},
+		"request", py.NewObject(
+			"system_instruction", py.NewObject("parts", []any{text(schema.SystemPrompt)}),
+			"contents", []any{py.NewObject("parts", parts, "role", "user")},
 			"generation_config", gen,
 		),
 	), nil
@@ -104,7 +105,7 @@ func (g *Gemini) WriteJSONL(items []Item, model string, cfg pj.Obj, path string)
 		if err != nil {
 			return err
 		}
-		b.WriteString(schema.PyDumps(r))
+		b.WriteString(py.Dumps(r))
 		b.WriteByte('\n')
 	}
 	return os.WriteFile(path, []byte(b.String()), 0o644)
@@ -180,12 +181,12 @@ func jobErrorStr(e *genai.JobError) string {
 	if e.Message != "" {
 		msg = e.Message
 	}
-	return fmt.Sprintf("details=%s code=%s message=%s", schema.PyRepr(details), schema.PyRepr(code), schema.PyRepr(msg))
+	return fmt.Sprintf("details=%s code=%s message=%s", py.Repr(details), py.Repr(code), py.Repr(msg))
 }
 
 // jobErrorDict is the Python SDK's JobError.to_json_dict() (None fields dropped, declaration order).
-func jobErrorDict(e *genai.JobError) *schema.Map {
-	m := schema.NewMap()
+func jobErrorDict(e *genai.JobError) *py.Object {
+	m := py.NewObject()
 	if e.Details != nil {
 		d := make([]any, len(e.Details))
 		for i, s := range e.Details {
@@ -212,7 +213,7 @@ func (g *Gemini) Fetch(ctx context.Context, batchID string) ([]Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	var lines []*schema.Map
+	var lines []*py.Object
 	switch {
 	case job.Dest != nil && job.Dest.FileName != "":
 		raw, err := c.Files.Download(ctx, genai.NewDownloadURIFromFile(&genai.File{DownloadURI: job.Dest.FileName}), nil)
@@ -241,19 +242,19 @@ func (g *Gemini) Fetch(ctx context.Context, batchID string) ([]Result, error) {
 }
 
 // parseJSONLLines decodes the non-blank lines of a result file, keeping key order (for error reprs).
-func parseJSONLLines(raw string) ([]*schema.Map, error) {
-	var lines []*schema.Map
+func parseJSONLLines(raw string) ([]*py.Object, error) {
+	var lines []*py.Object
 	for _, l := range splitLines(raw) {
 		if strings.TrimFunc(l, unicode.IsSpace) == "" {
 			continue
 		}
-		v, err := schema.LoadsOrdered(l)
+		v, err := py.LoadsNumberOrdered(l)
 		if err != nil {
 			return nil, err
 		}
-		m, ok := v.(*schema.Map)
+		m, ok := v.(*py.Object)
 		if !ok {
-			return nil, &schema.PyError{Type: "AttributeError", Msg: fmt.Sprintf("'%s' object has no attribute 'get'", schema.PyTypeName(v))}
+			return nil, &py.Error{Type: "AttributeError", Msg: fmt.Sprintf("'%s' object has no attribute 'get'", py.TypeName(v))}
 		}
 		lines = append(lines, m)
 	}
@@ -269,7 +270,7 @@ func splitLines(s string) []string {
 
 // inlinedLine turns an inlined response into the dict Python built from it: {key, response, error}, with the
 // response as the Python SDK's to_json_dict() (snake_case keys).
-func inlinedLine(r *genai.InlinedResponse) (*schema.Map, error) {
+func inlinedLine(r *genai.InlinedResponse) (*py.Object, error) {
 	var key any
 	if len(r.Metadata) > 0 {
 		if k, ok := r.Metadata["key"]; ok {
@@ -282,7 +283,7 @@ func inlinedLine(r *genai.InlinedResponse) (*schema.Map, error) {
 		if err != nil {
 			return nil, err
 		}
-		v, err := schema.LoadsOrdered(string(b))
+		v, err := py.LoadsNumberOrdered(string(b))
 		if err != nil {
 			return nil, err
 		}
@@ -291,14 +292,14 @@ func inlinedLine(r *genai.InlinedResponse) (*schema.Map, error) {
 	if r.Error != nil {
 		errDict = jobErrorDict(r.Error)
 	}
-	return schema.NewMap("key", key, "response", resp, "error", errDict), nil
+	return py.NewObject("key", key, "response", resp, "error", errDict), nil
 }
 
 // snakeKeys renames camelCase object keys to snake_case, recursively.
 func snakeKeys(v any) any {
 	switch x := v.(type) {
-	case *schema.Map:
-		out := schema.NewMap()
+	case *py.Object:
+		out := py.NewObject()
 		for _, k := range x.Keys() {
 			out.Set(snake(k), snakeKeys(x.Get(k)))
 		}
@@ -329,32 +330,32 @@ func snake(s string) string {
 }
 
 // geminiResult is Python's handling of one result line.
-func geminiResult(ln *schema.Map) Result {
+func geminiResult(ln *py.Object) Result {
 	key := ""
 	if k := ln.Get("key"); k != nil {
-		key = schema.PyStr(k)
+		key = py.Str(k)
 	}
-	if e := ln.Get("error"); pj.Truthy(schema.Plain(e)) {
-		return Result{Key: key, Error: "gemini: " + schema.PyStr(e)}
+	if e := ln.Get("error"); py.Truthy(e) {
+		return Result{Key: key, Error: "gemini: " + py.Str(e)}
 	}
-	resp, _ := ln.Get("response").(*schema.Map)
-	if !pj.Truthy(schema.Plain(ln.Get("response"))) {
-		resp = schema.NewMap()
+	resp, _ := ln.Get("response").(*py.Object)
+	if !py.Truthy(ln.Get("response")) {
+		resp = py.NewObject()
 	}
 	usage := resp.Get("usageMetadata")
-	if !pj.Truthy(schema.Plain(usage)) {
+	if !py.Truthy(usage) {
 		usage = resp.Get("usage_metadata")
 	}
-	um, _ := usage.(*schema.Map)
+	um, _ := usage.(*py.Object)
 	data, err := geminiAnswer(resp)
 	if err != nil {
 		var fr any
 		if cands, ok := resp.Get("candidates").([]any); ok && len(cands) > 0 {
-			if c0, ok := cands[0].(*schema.Map); ok {
+			if c0, ok := cands[0].(*py.Object); ok {
 				fr = c0.Get("finishReason")
 			}
 		}
-		return Result{Key: key, Error: fmt.Sprintf("gemini parse: %v (finish=%s)", err, schema.PyStr(fr))}
+		return Result{Key: key, Error: fmt.Sprintf("gemini parse: %v (finish=%s)", err, py.Str(fr))}
 	}
 	pick := func(camel, snakeK string) any {
 		if um.Has(camel) {
@@ -380,7 +381,7 @@ func jsonFloat(v any) any {
 
 // geminiAnswer is resp["candidates"][0]["content"]["parts"], joined text of the non-thought parts, validated —
 // failing with the Python exception text where it would have failed.
-func geminiAnswer(resp *schema.Map) (pj.Obj, error) {
+func geminiAnswer(resp *py.Object) (pj.Obj, error) {
 	cands, err := subscript(resp, "candidates")
 	if err != nil {
 		return nil, err
@@ -399,15 +400,15 @@ func geminiAnswer(resp *schema.Map) (pj.Obj, error) {
 	}
 	parts, ok := partsV.([]any)
 	if !ok {
-		return nil, &schema.PyError{Type: "TypeError", Msg: fmt.Sprintf("'%s' object is not iterable", schema.PyTypeName(partsV))}
+		return nil, &py.Error{Type: "TypeError", Msg: fmt.Sprintf("'%s' object is not iterable", py.TypeName(partsV))}
 	}
 	var b strings.Builder
 	for _, p := range parts {
-		pm, ok := p.(*schema.Map)
+		pm, ok := p.(*py.Object)
 		if !ok {
-			return nil, &schema.PyError{Type: "AttributeError", Msg: fmt.Sprintf("'%s' object has no attribute 'get'", schema.PyTypeName(p))}
+			return nil, &py.Error{Type: "AttributeError", Msg: fmt.Sprintf("'%s' object has no attribute 'get'", py.TypeName(p))}
 		}
-		if pj.Truthy(schema.Plain(pm.Get("thought"))) {
+		if py.Truthy(pm.Get("thought")) {
 			continue
 		}
 		t := pm.Get("text")
@@ -416,7 +417,7 @@ func geminiAnswer(resp *schema.Map) (pj.Obj, error) {
 		}
 		s, ok := t.(string)
 		if !ok {
-			return nil, &schema.PyError{Type: "TypeError", Msg: fmt.Sprintf("sequence item 0: expected str instance, %s found", schema.PyTypeName(t))}
+			return nil, &py.Error{Type: "TypeError", Msg: fmt.Sprintf("sequence item 0: expected str instance, %s found", py.TypeName(t))}
 		}
 		b.WriteString(s)
 	}
@@ -426,27 +427,27 @@ func geminiAnswer(resp *schema.Map) (pj.Obj, error) {
 // subscript is Python's v[k] on decoded JSON, with Python's exceptions.
 func subscript(v any, k any) (any, error) {
 	switch x := v.(type) {
-	case *schema.Map:
+	case *py.Object:
 		ks, ok := k.(string)
 		if !ok || !x.Has(ks) {
-			return nil, &schema.PyError{Type: "KeyError", Msg: schema.PyRepr(k)}
+			return nil, py.KeyError(k)
 		}
 		return x.Get(ks), nil
 	case []any:
 		i, ok := k.(int)
 		if !ok {
-			return nil, &schema.PyError{Type: "TypeError", Msg: "list indices must be integers or slices, not str"}
+			return nil, &py.Error{Type: "TypeError", Msg: "list indices must be integers or slices, not str"}
 		}
 		if i >= len(x) {
-			return nil, &schema.PyError{Type: "IndexError", Msg: "list index out of range"}
+			return nil, &py.Error{Type: "IndexError", Msg: "list index out of range"}
 		}
 		return x[i], nil
 	case string:
 		if _, ok := k.(string); ok {
-			return nil, &schema.PyError{Type: "TypeError", Msg: "string indices must be integers"}
+			return nil, &py.Error{Type: "TypeError", Msg: "string indices must be integers"}
 		}
 	}
-	return nil, &schema.PyError{Type: "TypeError", Msg: fmt.Sprintf("'%s' object is not subscriptable", schema.PyTypeName(v))}
+	return nil, &py.Error{Type: "TypeError", Msg: fmt.Sprintf("'%s' object is not subscriptable", py.TypeName(v))}
 }
 
 // Estimate is the cloud estimate with Gemini's image token rules.

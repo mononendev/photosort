@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/mononendev/photosort/internal/py"
 )
 
 // This file reproduces exifread.process_file(f, details=False) (exifread 3.5.1) closely enough that the tags read()
@@ -864,7 +866,7 @@ func pyRepr(v any) string {
 	case ratio:
 		return x.String()
 	case floatTuple:
-		return "(" + pyFloatRepr(float64(x)) + ",)"
+		return "(" + py.FloatRepr(float64(x)) + ",)"
 	}
 	return fmt.Sprint(v)
 }

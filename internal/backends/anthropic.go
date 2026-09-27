@@ -12,6 +12,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/packages/param"
 
 	"github.com/mononendev/photosort/internal/pj"
+	"github.com/mononendev/photosort/internal/py"
 	"github.com/mononendev/photosort/internal/schema"
 )
 
@@ -42,11 +43,11 @@ func (a *Anthropic) getClient() *anthropic.Client {
 // detector text; strict JSON-schema output; and output effort (cfg anthropic_effort, default "low") except on
 // Haiku, which does not accept it.
 func (a *Anthropic) BuildRequest(item Item, model string, cfg pj.Obj) (any, error) {
-	img := func(b []byte) *schema.Map {
-		return schema.NewMap("type", "image", "source", schema.NewMap("type", "base64", "media_type", "image/jpeg",
+	img := func(b []byte) *py.Object {
+		return py.NewObject("type", "image", "source", py.NewObject("type", "base64", "media_type", "image/jpeg",
 			"data", base64.StdEncoding.EncodeToString(b)))
 	}
-	text := func(s string) *schema.Map { return schema.NewMap("type", "text", "text", s) }
+	text := func(s string) *py.Object { return py.NewObject("type", "text", "text", s) }
 	content := []any{text(frameLabel), img(item.Frame)}
 	if len(item.Crop) > 0 {
 		content = append(content, text(cropLabel), img(item.Crop))
@@ -56,15 +57,15 @@ func (a *Anthropic) BuildRequest(item Item, model string, cfg pj.Obj) (any, erro
 	if err != nil {
 		return nil, err
 	}
-	outCfg := schema.NewMap("format", schema.NewMap("type", "json_schema", "schema", schema.JSONSchema(true, false)))
+	outCfg := py.NewObject("format", py.NewObject("type", "json_schema", "schema", schema.JSONSchema(true, false)))
 	if !strings.Contains(model, "haiku") { // effort is not accepted on Haiku 4.5
 		outCfg.Set("effort", cfgGet(cfg, "anthropic_effort", "low"))
 	}
-	return schema.NewMap(
+	return py.NewObject(
 		"model", model,
 		"max_tokens", maxTokens,
-		"system", []any{schema.NewMap("type", "text", "text", schema.SystemPrompt, "cache_control", schema.NewMap("type", "ephemeral"))},
-		"messages", []any{schema.NewMap("role", "user", "content", content)},
+		"system", []any{py.NewObject("type", "text", "text", schema.SystemPrompt, "cache_control", py.NewObject("type", "ephemeral"))},
+		"messages", []any{py.NewObject("role", "user", "content", content)},
 		"output_config", outCfg,
 	), nil
 }
@@ -143,8 +144,8 @@ func anthropicResult(r anthropic.MessageBatchIndividualResponse) Result {
 				return s
 			}
 			details = fmt.Sprintf("RefusalStopDetails(category=%s, explanation=%s, type=%s)",
-				schema.PyRepr(opt(string(sd.Category), sd.JSON.Category.Valid())),
-				schema.PyRepr(opt(sd.Explanation, sd.JSON.Explanation.Valid())), schema.PyRepr(string(sd.Type)))
+				py.Repr(opt(string(sd.Category), sd.JSON.Category.Valid())),
+				py.Repr(opt(sd.Explanation, sd.JSON.Explanation.Valid())), py.Repr(string(sd.Type)))
 		}
 		return Result{Key: key, Error: "anthropic refusal: " + details}
 	}
@@ -205,7 +206,7 @@ func errorResponseRepr(typ, message, requestID string, hasRequestID bool) string
 		rid = requestID
 	}
 	return fmt.Sprintf("ErrorResponse(error=%s(message=%s, type=%s), request_id=%s, type='error')",
-		cls, schema.PyRepr(message), schema.PyRepr(typ), schema.PyRepr(rid))
+		cls, py.Repr(message), py.Repr(typ), py.Repr(rid))
 }
 
 // Estimate is the cloud estimate with Claude's image token rules.

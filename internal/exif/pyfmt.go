@@ -5,21 +5,13 @@ import (
 	"math"
 	"strconv"
 	"strings"
-	"unicode"
+
+	"github.com/mononendev/photosort/internal/py"
 )
 
 // Python's str()/repr()/float() for the handful of value kinds a tag can hold, so a tag rendered or parsed here
-// reads exactly as exifread or Pillow rendered it in the Python this replaces.
-
-// pyIsSpace is str.isspace() for one rune: Unicode whitespace plus the \x1c-\x1f separators Python counts.
-func pyIsSpace(r rune) bool {
-	return unicode.IsSpace(r) || (r >= 0x1c && r <= 0x1f)
-}
-
-// pyStrip is str.strip().
-func pyStrip(s string) string {
-	return strings.TrimFunc(s, pyIsSpace)
-}
+// reads exactly as exifread or Pillow rendered it in the Python this replaces. The generic ones (str.strip,
+// repr(float)) are package py's.
 
 // pyG is f"{x:g}": 6 significant digits, trailing zeros dropped, exponent outside [-4, 6).
 func pyG(x float64) string {
@@ -32,41 +24,6 @@ func pyG(x float64) string {
 		return "nan"
 	}
 	return strconv.FormatFloat(x, 'g', 6, 64)
-}
-
-// pyFloatRepr is repr(float): the shortest round-tripping digits, fixed notation for exponents in [-4, 16).
-func pyFloatRepr(x float64) string {
-	switch {
-	case math.IsInf(x, 1):
-		return "inf"
-	case math.IsInf(x, -1):
-		return "-inf"
-	case math.IsNaN(x):
-		return "nan"
-	}
-	e := strconv.FormatFloat(x, 'e', -1, 64) // -d.ddde±XX
-	sign := ""
-	if e[0] == '-' {
-		sign, e = "-", e[1:]
-	}
-	mant, expStr, _ := strings.Cut(e, "e")
-	exp, _ := strconv.Atoi(expStr)
-	digits := strings.Replace(mant, ".", "", 1)
-	if exp < -4 || exp >= 16 {
-		m := digits[:1]
-		if len(digits) > 1 {
-			m += "." + digits[1:]
-		}
-		es := fmt.Sprintf("%+03d", exp)
-		return sign + m + "e" + es
-	}
-	if exp < 0 {
-		return sign + "0." + strings.Repeat("0", -exp-1) + digits
-	}
-	if len(digits) <= exp+1 {
-		return sign + digits + strings.Repeat("0", exp+1-len(digits)) + ".0"
-	}
-	return sign + digits[:exp+1] + "." + digits[exp+1:]
 }
 
 // pyBytesRepr is repr(bytes): b'...' with Python's quoting and escapes.
@@ -102,7 +59,7 @@ func pyBytesRepr(b []byte) string {
 // pyFloat is float(s) for a str: surrounding whitespace, a sign, digits with single underscores between them,
 // inf/infinity/nan. Hex and other Go-only spellings are rejected.
 func pyFloat(s string) (float64, bool) {
-	s = pyStrip(s)
+	s = py.Strip(s)
 	if s == "" {
 		return 0, false
 	}

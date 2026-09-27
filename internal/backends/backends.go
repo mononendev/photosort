@@ -2,7 +2,7 @@
 // (synchronous, local, free), and the Gemini and Anthropic batch APIs (submit now, poll, fetch later).
 //
 // It is a port of photosort/backends and must stay behaviour-identical: same prompts, same request bodies (key
-// order included; BuildRequest returns them as schema.Map for the UI's request view and the dry run), same
+// order included; BuildRequest returns them as py.Object for the UI's request view and the dry run), same
 // validation and the same error strings stored for failed images.
 package backends
 
@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/mononendev/photosort/internal/pj"
+	"github.com/mononendev/photosort/internal/py"
 	"github.com/mononendev/photosort/internal/schema"
 )
 
@@ -164,7 +165,7 @@ func LoadItem(cacheDir string, id int64, localJSON string) (Item, error) {
 	frame, err := os.ReadFile(fp)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return Item{}, &schema.PyError{Type: "FileNotFoundError", Msg: "[Errno 2] No such file or directory: " + schema.PyRepr(fp)}
+			return Item{}, &py.Error{Type: "FileNotFoundError", Msg: "[Errno 2] No such file or directory: " + py.Repr(fp)}
 		}
 		return Item{}, err
 	}
@@ -175,7 +176,7 @@ func LoadItem(cacheDir string, id int64, localJSON string) (Item, error) {
 			return Item{}, err
 		}
 	}
-	local, err := schema.Loads(localJSON)
+	local, err := py.LoadsNumber(localJSON)
 	if err != nil {
 		return Item{}, err
 	}
@@ -213,7 +214,7 @@ func floatify(v any) any {
 type UnknownBackendError struct{ Name string }
 
 func (e *UnknownBackendError) Error() string {
-	return fmt.Sprintf("unknown backend %s (gemini | anthropic | ollama)", schema.PyRepr(e.Name))
+	return fmt.Sprintf("unknown backend %s (gemini | anthropic | ollama)", py.Repr(e.Name))
 }
 
 // Get returns the backend called name. baseURL only applies to Ollama (empty: OLLAMA_HOST, then the default).
@@ -234,8 +235,8 @@ func Get(name, baseURL string) (Backend, error) {
 // vlm-request redaction.
 func Redact(v any) any {
 	switch x := v.(type) {
-	case *schema.Map:
-		out := schema.NewMap()
+	case *py.Object:
+		out := py.NewObject()
 		for _, k := range x.Keys() {
 			out.Set(k, Redact(x.Get(k)))
 		}
@@ -274,7 +275,7 @@ func cfgGet(cfg pj.Obj, k string, def any) any {
 func cfgNeed(cfg pj.Obj, k string) (any, error) {
 	v, ok := cfg[k]
 	if !ok {
-		return nil, &schema.PyError{Type: "KeyError", Msg: schema.PyRepr(k)}
+		return nil, py.KeyError(k)
 	}
 	return jsonInt(v), nil
 }

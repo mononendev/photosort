@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/mononendev/photosort/internal/pj"
-	"github.com/mononendev/photosort/internal/schema"
+	"github.com/mononendev/photosort/internal/py"
 )
 
 func TestOllamaBaseURL(t *testing.T) {
@@ -96,7 +96,7 @@ func ollamaServer(t *testing.T, status int, resp string) (*Ollama, *[]byte) {
 func TestOllamaClassify(t *testing.T) {
 	item := Item{Key: "5", Frame: tinyJPEG(t), Crop: []byte("crop"), Context: "ctx"}
 	cfg := pj.Obj{}
-	resp := schema.PyDumps(schema.NewMap("model", "qwen3-vl:4b-instruct", "message", schema.NewMap("role", "assistant", "content", goodAnswer),
+	resp := py.Dumps(py.NewObject("model", "qwen3-vl:4b-instruct", "message", py.NewObject("role", "assistant", "content", goodAnswer),
 		"prompt_eval_count", 1200, "eval_count", 180, "prompt_eval_duration", 400_000_000, "eval_duration", 1_234_000_000))
 	o, body := ollamaServer(t, 200, resp)
 	r := o.Classify(context.Background(), item, "qwen3-vl:4b-instruct", cfg)
@@ -112,7 +112,7 @@ func TestOllamaClassify(t *testing.T) {
 		t.Errorf("usage %v", u)
 	}
 	want, _ := o.BuildRequest(item, "qwen3-vl:4b-instruct", cfg)
-	if string(*body) != schema.PyDumps(want) {
+	if string(*body) != py.Dumps(want) {
 		t.Errorf("request body is not Python's json.dumps of the request")
 	}
 }

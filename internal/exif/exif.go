@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/mononendev/photosort/internal/pj"
+	"github.com/mononendev/photosort/internal/py"
 )
 
 // fields maps each output key to the exifread tag names tried in order. "MakerNote LensModel"/"MakerNote LensType"
@@ -63,7 +64,7 @@ func Read(path string) pj.Obj {
 					out[fd.key] = pj.Round(t.num, 6)
 					break
 				}
-			} else if s := pyStrip(t.str); s != "" {
+			} else if s := py.Strip(t.str); s != "" {
 				out[fd.key] = s
 				break
 			}

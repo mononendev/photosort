@@ -11,7 +11,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/option"
 
 	"github.com/mononendev/photosort/internal/pj"
-	"github.com/mononendev/photosort/internal/schema"
+	"github.com/mononendev/photosort/internal/py"
 )
 
 func msgJSON(stop, content, extra string) string {
@@ -65,15 +65,15 @@ func TestAnthropicBatchRoundTrip(t *testing.T) {
 		t.Fatalf("submit: %q %v", id, err)
 	}
 	// The params go out exactly as Python's build_params: same keys, same order.
-	body, err := schema.LoadsOrdered(submitted)
+	body, err := py.LoadsNumberOrdered(submitted)
 	if err != nil {
 		t.Fatal(err)
 	}
-	req := body.(*schema.Map).Get("requests").([]any)[0].(*schema.Map)
+	req := body.(*py.Object).Get("requests").([]any)[0].(*py.Object)
 	if req.Get("custom_id") != "42" {
 		t.Errorf("custom_id %v", req.Get("custom_id"))
 	}
-	if got := schema.PyDumps(req.Get("params")); got != g.Requests.Payloads["anthropic_opus"] {
+	if got := py.Dumps(req.Get("params")); got != g.Requests.Payloads["anthropic_opus"] {
 		t.Errorf("submitted params differ from Python's:\n%s", firstDiff(got, g.Requests.Payloads["anthropic_opus"]))
 	}
 

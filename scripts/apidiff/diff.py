@@ -40,6 +40,11 @@ KNOWN = [
     (r"/focus-debug", r"\.img: 'data:image/"),
     # Validation errors: a readable string instead of pydantic's error list (the UI shows either as text).
     (r"^PATCH \{'rating': 9\}", r"\.detail: "),
+    # Added with selectable pose models: the NMS overlap setting, the new default model, and the stats' detector
+    # fields. Additions only; nothing the Python server returned changed.
+    (r"/api/config", r"\.detect_iou: extra in go"),
+    (r"/api/config/defaults", r"\.detect_model: 'yolo11n-pose\.pt' vs 'yolo26s-pose'"),
+    (r"/api/stats", r"\.detector(_stale)?: extra in go"),
 ]
 
 

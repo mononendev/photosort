@@ -1,6 +1,8 @@
 package py
 
 import (
+	"encoding/json"
+	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -9,7 +11,8 @@ import (
 )
 
 // Str is Python's str() of a JSON value: None/True/False, ints in decimal, floats as repr, strings as is, and
-// lists/dicts as their repr.
+// lists/dicts as their repr. A json.Number keeps the int/float kind of its literal; a plain float64 is always a
+// Python float ("3.0"). pj.Obj keys print sorted (Go maps have no order); use *Object to keep one.
 func Str(v any) string {
 	if s, ok := v.(string); ok {
 		return s
@@ -17,7 +20,7 @@ func Str(v any) string {
 	return Repr(v)
 }
 
-// Repr is Python's repr() of a JSON value.
+// Repr is Python's repr() of a JSON value (strings quoted the way Python quotes them).
 func Repr(v any) string {
 	switch x := v.(type) {
 	case nil:
@@ -33,8 +36,14 @@ func Repr(v any) string {
 		return strconv.Itoa(x)
 	case int64:
 		return strconv.FormatInt(x, 10)
+	case int32:
+		return strconv.FormatInt(int64(x), 10)
 	case BigInt:
 		return string(x)
+	case json.Number:
+		return numberStr(x)
+	case float32:
+		return FloatRepr(float64(x))
 	case float64:
 		return FloatRepr(x)
 	case []string:
@@ -57,15 +66,15 @@ func Repr(v any) string {
 		return "{" + strings.Join(parts, ", ") + "}"
 	case Objecter:
 		return Repr(x.PyObject())
+	case map[string]any:
+		return Repr(sortedObject(x))
 	}
-	if f, ok := toFloat(v); ok {
-		return FloatRepr(f)
-	}
-	return "<?>"
+	return fmt.Sprint(v)
 }
 
 // reprStr is repr(str): single quotes unless the text has a ' and no ", escapes for \\ and the quote, \t \n \r,
-// \xNN / \uNNNN / \UNNNNNNNN for non-printable characters.
+// \xNN / \uNNNN / \UNNNNNNNN for non-printable characters (str.isprintable(), which for non-ASCII is exactly
+// Go's unicode.IsPrint: categories L, M, N, P and S).
 func reprStr(s string) string {
 	q := byte('\'')
 	if strings.IndexByte(s, '\'') >= 0 && strings.IndexByte(s, '"') < 0 {
@@ -167,7 +176,7 @@ func Eq(a, b any) bool {
 			return false
 		}
 		for _, k := range x.Keys() {
-			yv, ok := y.Get(k)
+			yv, ok := y.Lookup(k)
 			if !ok || !Eq(x.vals[k], yv) {
 				return false
 			}
@@ -389,7 +398,12 @@ func Int(s string) (int64, bool) {
 }
 
 // ValidUTF8 drops invalid UTF-8 bytes, as bytes.decode("utf-8", "ignore") does.
-func ValidUTF8(s string) string { return validUTF8(s) }
+func ValidUTF8(s string) string {
+	if utf8.ValidString(s) {
+		return s
+	}
+	return strings.ToValidUTF8(s, "")
+}
 
 // UniversalNewlines is what reading a file in text mode does to line endings: \r\n and lone \r become \n.
 func UniversalNewlines(s string) string {

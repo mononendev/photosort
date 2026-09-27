@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/mononendev/photosort/internal/pj"
+	"github.com/mononendev/photosort/internal/py"
 )
 
 const repoRoot = "../.."
@@ -214,8 +215,8 @@ func TestPyFormatting(t *testing.T) {
 	}
 	for x, want := range map[float64]string{1.5: "1.5", 1234567: "1234567.0", 1e16: "1e+16", 1.5e-05: "1.5e-05",
 		0.0001: "0.0001", -2: "-2.0", 0.1: "0.1"} {
-		if got := pyFloatRepr(x); got != want {
-			t.Errorf("pyFloatRepr(%v) = %q, want %q", x, got, want)
+		if got := py.FloatRepr(x); got != want {
+			t.Errorf("py.FloatRepr(%v) = %q, want %q", x, got, want)
 		}
 	}
 	if got := pyBytesRepr([]byte("Lens \xff\xfe'")); got != `b"Lens \xff\xfe'"` {

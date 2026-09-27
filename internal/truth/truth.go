@@ -126,7 +126,7 @@ func ParseCSV(text string) (map[string]Verdict, error) {
 			if k == "" {
 				continue
 			}
-			v, _ := zipped.Get(k)
+			v := zipped.Get(k)
 			row[py.Lower(py.Strip(k))] = py.Strip(v.(string))
 		}
 		name := firstNonEmpty(row["name"], row["file"], row["path"], row["filename"])

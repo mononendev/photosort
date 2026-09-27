@@ -383,5 +383,14 @@ func (s *Store) Update(source string, fn func(cfg pj.Obj) error) (pj.Obj, error)
 	return LogChange(s.workdir, Public(before), Public(after), source)
 }
 
+// Override sets values in memory only (deployment wiring such as OLLAMA_HOST); the next save writes them too.
+func (s *Store) Override(values pj.Obj) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for k, v := range values {
+		s.cfg[k] = v
+	}
+}
+
 // Workdir is where the config lives.
 func (s *Store) Workdir() string { return s.workdir }

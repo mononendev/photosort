@@ -126,6 +126,30 @@ func (d Dialect) Rebind(q string) string {
 	return b.String()
 }
 
+// EmptyObject is a condition: col holds an empty object ('' too, on SQLite, as the Python version could write).
+func (d Dialect) EmptyObject(col string) string {
+	if d.PG {
+		return fmt.Sprintf("%s = '{}'::jsonb", col)
+	}
+	return fmt.Sprintf("%s IN ('', '{}')", col)
+}
+
+// AsText is a JSON column as text, for LIKE.
+func (d Dialect) AsText(col string) string {
+	if d.PG {
+		return col + "::text"
+	}
+	return col
+}
+
+// Like is SQLite's LIKE: case-insensitive for ASCII.
+func (d Dialect) Like() string {
+	if d.PG {
+		return "ILIKE"
+	}
+	return "LIKE"
+}
+
 // Collate sorts and compares text byte-wise on both, as SQLite does by default (Postgres would use the locale).
 func (d Dialect) Collate(expr string) string {
 	if d.PG {

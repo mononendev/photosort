@@ -211,6 +211,28 @@ def test_runner_that_lost_its_job_writes_nothing(tmp_path, monkeypatch):
 
 
 
+def test_new_runner_waits_for_every_job_to_be_handed_back(tmp_path, monkeypatch):
+    """The old server's local-ahead lane hands its job back first; the new server must not start it in its main
+    lane while the job that was with the vision model is still on its way back."""
+    db = DB(tmp_path / "db.sqlite")
+    main, ahead = db.add_job([], {"vlm": True}), db.add_job([], {"vlm": False})
+    db.claim_job(main, "old", "main"); db.claim_job(ahead, "old", "ahead")
+    new = pipeline.JobRunner(db, json.loads(json.dumps(DEFAULTS)), tmp_path, tmp_path)
+    picked = []
+
+    def run_job(job):
+        picked.append(job["id"]); new.stop_event.set()
+    monkeypatch.setattr(new, "run_job", run_job)
+    monkeypatch.setattr(new.stop_event, "wait", lambda t=None: time.sleep(0.02) or new.stop_event.is_set())
+    db.update_job(ahead, state="queued", owner=None, lane=None)   # the lane lets go first
+    new.start()
+    time.sleep(0.2)
+    assert picked == []
+    db.update_job(main, state="queued", owner=None, lane=None)
+    new.join(5)
+    assert picked == [main]
+
+
 # ---- two lanes: local ahead while the model is busy; overrides ------------------------------------------
 
 def _other_folder(tmp_path):

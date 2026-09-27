@@ -7,7 +7,8 @@ An override puts a queued job first and pauses the running one, which goes back 
 
 Rolling restarts: for a while the old and new server share the database, each with a runner. A runner
 claims a job and holds it with a heartbeat; the other leaves it alone until it is handed back (the old
-server stopping cleanly) or the heartbeat goes stale (killed). Every write to the job row is fenced on
+server stopping cleanly) or the heartbeat goes stale (killed), and starts nothing until the old one holds
+no jobs, so they resume in queue order, each in its old lane. Every write to the job row is fenced on
 the claim, so a runner that lost its job can't overwrite the new one's progress. A job picked up again
 resumes: images it already finished count towards done/total and aren't redone.
 """
@@ -119,7 +120,10 @@ class JobRunner(threading.Thread):
         while not self.stop_event.is_set():
             for jid in self.db.requeue_stale(LEASE_TTL_S):
                 log.warning("job %s: its worker stopped responding; requeued", jid)
-            job = self.db.next_queued_job()
+            # Until the old server has handed back all its jobs, wait: they come back one lane at a time, and
+            # picking whichever is first (the local-ahead lane's, usually) would run it in the main lane and
+            # leave the job that was with the vision model queued behind it.
+            job = None if self.db.held_elsewhere(self.owner) else self.db.next_queued_job()
             if job is None:
                 self.stop_event.wait(2)
                 continue

@@ -382,6 +382,11 @@ class DB:
                       "finished = CASE state WHEN 'queued' THEN ? ELSE finished END "
                       "WHERE id=? AND state IN ('queued','running','preempting')", (time.time(), job_id))
 
+    def held_elsewhere(self, owner: str) -> bool:
+        """Another worker still holds a job (e.g. the old server in a rolling restart, handing its jobs back)."""
+        return self.conn.execute("SELECT 1 FROM jobs WHERE state IN ('running','preempting','cancelling') "
+                                 "AND owner IS NOT ? LIMIT 1", (owner,)).fetchone() is not None
+
     def running_job(self) -> Optional[int]:
         r = self.conn.execute("SELECT id FROM jobs WHERE state IN ('running','preempting','cancelling') "
                               "ORDER BY lane = 'ahead', id LIMIT 1").fetchone()

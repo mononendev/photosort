@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
-import { api, thumbUrl, BANGER, TIER_LABEL, TIERS } from '../api/client';
+import { api, thumbUrl, BANGER, SUBJECTS, TIER_LABEL, TIERS } from '../api/client';
 import type { ImageFilters } from '../api/client';
 import { TierBadge, Stars, StatusDot, LrBadge, RatingBadge } from '../components/TierBadge';
 import ImageDetail from '../components/ImageDetail';
@@ -10,7 +10,6 @@ import Tip from '../components/Tip';
 import { splitShort } from '../lib/explain';
 import { useBusy } from '../hooks/useJobs';
 
-const SUBJECTS = ['rider_action', 'rider_posed', 'group', 'crowd_spectators', 'gear_board', 'venue_scenery', 'other', 'no_people'];
 const PAGE = 60;
 
 export default function Photos() {

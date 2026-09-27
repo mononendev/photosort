@@ -319,6 +319,7 @@ export const RATINGS = [
 ] as const;
 export const BANGER = 4;
 /** The focus tiers, worst to best. */
+export const SUBJECTS = ['rider_action', 'rider_posed', 'group', 'crowd_spectators', 'gear_board', 'venue_scenery', 'other', 'no_people'];
 export const TIERS = [0, 1, 2, 3] as const;
 
 /** Focus tiers 0-3 share their label and colors with the matching cull rating. */

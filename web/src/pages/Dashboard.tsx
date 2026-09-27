@@ -22,7 +22,7 @@ export default function Dashboard() {
         <StatTile label="Soft" value={t?.tier2 ?? '–'} to="/photos?tier=2" />
         <StatTile label="Partial" value={t?.tier1 ?? '–'} to="/photos?tier=1" />
         <StatTile label="Missed" value={t?.tier0 ?? '–'} to="/photos?tier=0" />
-        <StatTile label="Needs review" value={stats?.review ?? '–'} to="/photos?review=1" sub="local ≠ model, or metrics split" tip="The local sharpness tier and the vision model's tier differ (the thresholds need calibrating or the model is being generous), or the local metrics disagree among themselves (a box likely landed wrong)." />
+        <StatTile label="Needs review" value={stats?.review ?? '–'} to="/photos?review=1" sub="local ≠ model" tip="The local sharpness tier and the vision model's tier differ (the thresholds need calibrating or the model is being generous)." />
       </div>
 
       <section>

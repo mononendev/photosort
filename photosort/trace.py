@@ -448,10 +448,10 @@ def _split(local, cfg, primary) -> dict:
                 grades[name] = next((lvl for lvl in (3, 2, 1) if v >= thr[f"{pre}tier{lvl}_min"]), 0)
     n = _node("One metric far from the others?", (sp is not None) if steps else None, rule=f"focus.split_steps = {steps}",
               inputs=[_kv(k, g) for k, g in grades.items()],
-              effect=f"needs review: {sp['odd']} is {sp['gap']} tiers off" if sp else None,
+              effect=f"{sp['odd']} is {sp['gap']} tiers off (a filter in Review; the tier is left alone)" if sp else None,
               note="off" if not steps else ("fewer than two metrics measured" if len(grades) < 2 else None))
     return _stage("split", "Metrics agree?", "done" if steps else "off", "split" if sp else "agree" if steps else "off",
-                  nodes=[n], outcome={"label": "split → review" if sp else "agree"})
+                  nodes=[n], outcome={"label": "split" if sp else "agree"})
 
 
 def _vlm(row, local, vlm, cfg) -> dict:
@@ -509,7 +509,6 @@ def _review(rec, ov) -> dict:
         _node("Local and model disagree?", rec["disagree"] if vt is not None else None,
               inputs=[_kv("local", lt), _kv("model", vt)], effect="needs review" if rec["disagree"] else None,
               note=None if vt is not None else "no model verdict (or a stale one) to compare"),
-        _node("Local metrics split?", rec["split"] is not None, effect="needs review" if rec["split"] else None),
         _node("You've rated it?", bool(rec["reviewed"]), effect="off the Review queue (it shows unrated photos)" if rec["reviewed"] else None),
     ]
     label = ("flagged" if rec["review"] else "not flagged") + (" · rated" if rec["reviewed"] else "")
@@ -524,7 +523,7 @@ def _export(rec, row) -> dict:
     unknown = rec["subject"] == "unknown" and rec["composition"] == "unknown"
     paths = [f"{tier_dir}/{name}" if unknown else f"{tier_dir}/{rec['subject']}/{rec['composition']}/{name}"]
     if rec["review"]:
-        why = f"local{rec['focus_tier_local']}_vlm{rec['focus_tier_vlm']}" if rec["disagree"] else "metrics_split"
+        why = f"local{rec['focus_tier_local']}_vlm{rec['focus_tier_vlm']}"
         paths.append(f"review/{why}/{name}")
     if rec.get("banger"):
         paths.append(f"bangers/{name}")

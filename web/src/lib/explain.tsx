@@ -175,7 +175,7 @@ export function explainSplit(s: MetricSplit, cfg: Cfg): ReactNode {
         (an eye band on a visor or hair, a head box full of background), so the tier can't be trusted either way.
         {steps != null && <> Flagged at a gap of {String(steps)} or more (split_steps).</>}
       </div>
-      <div className="text-gray-500">Flagged for review: it appears under “needs review” and in the export's review/metrics_split/ folder.</div>
+      <div className="text-gray-500">The tier is left alone and it doesn't count as needing review; Review's “local metrics disagree” filter finds these.</div>
     </div>
   );
 }

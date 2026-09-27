@@ -69,7 +69,7 @@ def final_record(row, source: str) -> dict:
         "local": {k: local.get(k) for k in ("n_people", "primary_head_sharp", "primary_body_sharp", "bg_sharp", "local_reason")} if local else None,
         "error": row["error"],
     }
-    rec["review"] = rec["disagree"] or rec["split"] is not None   # as REVIEW_SQL
+    rec["review"] = rec["disagree"]   # as REVIEW_SQL
     return rec
 
 
@@ -104,7 +104,7 @@ def build_tree(records: list[dict], out: Path, mode: str, groups: dict | None = 
         key = f"{gdir}/{tier_dir}" if gdir else tier_dir
         counts[key] = counts.get(key, 0) + 1
         if r["review"]:
-            why = f"local{r['focus_tier_local']}_vlm{r['focus_tier_vlm']}" if r["disagree"] else "metrics_split"
+            why = f"local{r['focus_tier_local']}_vlm{r['focus_tier_vlm']}"
             place(src, out / "review" / why / src.name, "symlink" if mode == "move" else mode)
             counts["review"] = counts.get("review", 0) + 1
         if r.get("banger"):

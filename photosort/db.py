@@ -98,11 +98,10 @@ def vlm_stale(local: Optional[dict], vlm: Optional[dict]) -> bool:
 # Images the vision model still has to (re)tag: never tagged, or tagged on a stale frame.
 VLM_TODO_SQL = f"(vlm_json IS NULL OR {VLM_STALE_SQL})"
 
-# Whether the two stages disagree (a stale verdict doesn't count: the model judged another frame), or the local
-# metrics disagree among themselves (local.metric_split).
-REVIEW_SQL = ("local_json IS NOT NULL AND (json_extract(local_json,'$.split') IS NOT NULL OR (vlm_json IS NOT NULL AND "
+# Whether the two stages disagree (a stale verdict doesn't count: the model judged another frame).
+REVIEW_SQL = ("local_json IS NOT NULL AND vlm_json IS NOT NULL AND "
               "json_extract(local_json,'$.local_tier') != json_extract(vlm_json,'$.focus_tier')"
-              f" AND NOT {VLM_STALE_SQL}))")
+              f" AND NOT {VLM_STALE_SQL}")
 
 
 def _four_tiers(c: sqlite3.Connection):

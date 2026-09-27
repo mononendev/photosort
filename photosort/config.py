@@ -99,7 +99,7 @@ DEFAULTS: dict = {
               # Below floor_tier, a frame where someone besides the primary (detector conf >= floor_conf) grades
               # floor_grade or better is raised to floor_tier: focus landed on a person (None = off).
               "floor_tier": 2, "floor_grade": 3, "floor_conf": 0.5,
-              # Needs review when one of the primary's metrics (eye band Laplacian, eye band FFT, head box Laplacian),
+              # Flags a metrics split when one of the primary's metrics (eye band Laplacian, eye band FFT, head box Laplacian),
               # each graded on its own thresholds, sits >= split_steps tiers from the nearest other (None = off).
               "split_steps": 2},
     # Camera-metadata prior: crop_factor converts focal length to 35mm-equivalent when EXIF lacks it;

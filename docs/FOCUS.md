@@ -87,8 +87,8 @@ subject at native resolution, and falls back to the head when the eyes can't be 
    on their own thresholds too. They measure overlapping parts of one head, so they should roughly agree. When
    one sits `split_steps` or more tiers from the nearest of the others (say the pose model put the eye band on a
    helmet visor, eyes 1 and FFT 0, while the head box is plainly sharp at 3), a region landed wrong and the tier
-   can't be trusted either way. The tier is left alone, but the frame is flagged for review (`split` in the
-   local result; the export's `review/metrics_split/` folder). A rescore applies it.
+   can't be trusted either way. The tier is left alone and it doesn't count toward needs review; it's recorded as
+   `split` in the local result, and Review's "local metrics disagree" filter finds these. A rescore applies it.
 8. **EXIF prior.** Aperture, shutter, focal length and ISO are read from EXIF. An entrance pupil ≥ 40 mm
    or f/2 and wider flags very shallow depth of field; a shutter at least a stop slower than 1/focal-length
    (35 mm equivalent) or slower than 1/60 s flags motion-blur risk. A tier 3 that clears its thresholds by
@@ -151,7 +151,7 @@ high is usually right: a false "sharp" costs more than a false "check this".
 | `front_edge` | 0.01 | Ignore people within this fraction of the frame edge |
 | `floor_tier` | 2 | Minimum tier when someone besides the primary grades sharp (`null` = off, a miss stays 0) |
 | `floor_grade`, `floor_conf` | 3, 0.5 | How sharp that person must grade, and the least detector confidence that counts |
-| `split_steps` | 2 | Needs review when one metric grades this many tiers from the nearest other (`null` = off) |
+| `split_steps` | 2 | Flags a metrics split when one metric grades this many tiers from the nearest other (`null` = off) |
 
 `exif`: `crop_factor` (for bodies that don't write a 35 mm-equivalent focal length), `wide_open_f`,
 `shake_margin`.

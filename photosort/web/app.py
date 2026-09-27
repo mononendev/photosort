@@ -369,7 +369,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             where.append("json_extract(vlm_json,'$.primary_subject') = ?"); params.append(subject)
         if review:
             where.append(REVIEW_SQL)
-        if split is not None:   # the local metrics disagree among themselves (a subset of review), or don't
+        if split is not None:   # the local metrics disagree among themselves, or don't
             where.append(f"json_extract(local_json,'$.split') IS {'NOT ' if split else ''}NULL")
         if lr_rating is not None:
             where.append("json_extract(lr_json,'$.rating') = ?"); params.append(lr_rating)

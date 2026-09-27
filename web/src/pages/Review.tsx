@@ -10,15 +10,14 @@ import SegButton from '../components/SegButton';
 import { RatingBadge, TierBadge } from '../components/TierBadge';
 import useHotkeys from '../hooks/useHotkeys';
 
-// Which photos the queue starts from: the needs-review flag, just its metrics-split half, or everything.
-// Ctrl/⌘-click on metrics split (or clicking it again) flips it to the needs-review photos *without* a metrics split.
-const QUEUES = [['', 'needs review'], ['split', 'metrics split'], ['all', 'all']] as const;
+// Which photos the queue starts from: the needs-review flag (local ≠ model), or everything.
+const QUEUES = [['', 'needs review'], ['all', 'all']] as const;
 const PAGE = 500;   // the API's per-request cap; stepping past either end loads the neighbouring page
 
 // URL params that go to the API as they are, by type. The queue/rated/folder/... ones above them are mapped by hand.
 const NUM_KEYS = ['local_tier', 'vlm_tier', 'rating', 'group', 'lr_rating', 'truth_tier', 'people_min', 'people_max', 'score_min', 'score_max',
   'eye_min', 'eye_max', 'iso_min', 'iso_max', 'f_min', 'f_max', 'focal_min', 'focal_max'] as const;
-const BOOL_KEYS = ['keeper', 'stale', 'lifted', 'overridden', 'noted', 'truth_mismatch'] as const;
+const BOOL_KEYS = ['keeper', 'stale', 'lifted', 'split', 'overridden', 'noted', 'truth_mismatch'] as const;
 const STR_KEYS = ['stages', 'composition', 'eye_src', 'primary_by', 'camera', 'lens', 'lr_label', 'taken_from', 'taken_to'] as const;
 
 const SORTS = [
@@ -73,8 +72,7 @@ export default function Review() {
   const [sp, setSp] = useSearchParams();
   const filters: ImageFilters = useMemo(() => {
     const f: Record<string, unknown> = {
-      review: !sp.get('queue') || sp.get('queue') === 'nosplit' || undefined,
-      split: sp.get('queue') === 'split' ? true : sp.get('queue') === 'nosplit' ? false : undefined,
+      review: sp.get('queue') !== 'all' || undefined,
       // asking for one of your ratings means showing rated photos
       reviewed: sp.get('rated') === 'all' || sp.get('rating') ? undefined : false,
       folder: sp.get('folder') ?? '',
@@ -214,16 +212,9 @@ export default function Review() {
     {
       key: 'queue', title: 'Queue', keys: ['queue', 'rated', 'folder', 'recursive', 'q'], body: () => <>
         <div className="flex gap-1">
-          {QUEUES.map(([v, label]) => {
-            const cur = sp.get('queue') ?? '';
-            if (v !== 'split') return <SegButton key={v} on={cur === v} onClick={() => set('queue', v)} className="flex-1 whitespace-nowrap text-xs px-1 py-1.5 sm:py-1">{label}</SegButton>;
-            const not = cur === 'nosplit';
-            return (
-              <SegButton key={v} on={cur === 'split' || not} title="ctrl/⌘-click (or click again): needs review, minus the metrics-split photos"
-                onClick={(e) => set('queue', e.ctrlKey || e.metaKey || cur === 'split' ? 'nosplit' : 'split')}
-                className="flex-1 whitespace-nowrap text-xs px-1 py-1.5 sm:py-1">{not ? 'review − split' : label}</SegButton>
-            );
-          })}
+          {QUEUES.map(([v, label]) => (
+            <SegButton key={v} on={(sp.get('queue') === 'all' ? 'all' : '') === v} onClick={() => set('queue', v)} className="flex-1 whitespace-nowrap text-xs px-1 py-1.5 sm:py-1">{label}</SegButton>
+          ))}
         </div>
         <label className={check}><input type="checkbox" checked={filters.reviewed === false} disabled={!!sp.get('rating')} onChange={(e) => set('rated', e.target.checked ? undefined : 'all')} /> hide photos you've rated</label>
         <DraftInput value={filters.folder ?? ''} onCommit={(v) => set('folder', v)} placeholder="folder (relative to photos root)" className={sel} />
@@ -232,11 +223,12 @@ export default function Review() {
       </>,
     },
     {
-      key: 'focus', title: 'Focus', keys: ['tier', 'local_tier', 'vlm_tier', 'stages', 'stale', 'eye_src', 'primary_by', 'eye_min', 'eye_max', 'lifted'], body: () => <>
+      key: 'focus', title: 'Focus', keys: ['tier', 'local_tier', 'vlm_tier', 'stages', 'stale', 'split', 'eye_src', 'primary_by', 'eye_min', 'eye_max', 'lifted'], body: () => <>
         {pick('tier', 'any final focus', tierOpts)}
         <div className="grid grid-cols-2 gap-1">{pick('local_tier', 'any local tier', tierOpts)}{pick('vlm_tier', 'any model tier', tierOpts)}</div>
         {pick('stages', 'local and model: either', [['disagree', 'local and model disagree'], ['agree', 'local and model agree']])}
         {tri('stale', 'model saw an older exposure', 'stale', 'current')}
+        {tri('split', 'local metrics disagree', 'split', 'agree')}
         {pick('eye_src', 'eyes found any way', [['face', 'eyes from face landmarks'], ['pose', 'eyes from pose keypoints'], ['none', 'eyes not located']])}
         {pick('primary_by', 'subject picked any way', [['af', 'subject picked by camera AF'], ['priority', 'subject picked by prominence']])}
         {range('eye sharpness', 'eye_min', 'eye_max', rg?.eye)}

@@ -186,6 +186,9 @@ def test_image_filters_extended(api):
     order = lambda s: [it["name"] for it in api.get("/api/images", params={"sort": s}).json()["items"]]
     assert order("taken")[:2] == ["sharp.jpg", "soft.jpg"] and order("iso")[0] == "soft.jpg"
     assert sorted(order("shuffle")) == sorted(ids) and order("name") == sorted(ids)
+    api.patch(f"/api/images/{ids['soft.jpg']}", json={"rating": 1})
+    api.patch(f"/api/images/{ids['sharp.jpg']}", json={"rating": 3})
+    assert order("rated")[:2] == ["sharp.jpg", "soft.jpg"]   # the one you rated last comes first
     f = api.get("/api/images/facets").json()
     assert {c["value"] for c in f["cameras"]} == {"R5", "R6"} and f["compositions"] == [{"value": "full_body", "n": 3}]
     assert f["ranges"]["iso"] == [100, 6400] and f["ranges"]["taken"][0].startswith("2024:05:01")

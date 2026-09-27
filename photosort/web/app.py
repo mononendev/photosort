@@ -427,7 +427,9 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
                  "people": f"{PEOPLE_SQL} DESC, path", "iso": "json_extract(local_json,'$.exif.iso') DESC, path",
                  "name": "substr(path, length(rtrim(path, replace(path, '/', ''))) + 1), path",
                  "shuffle": "(id * 2654435761) % 4294967291",   # a fixed scramble, so paging stays stable
-                 "lr": "json_extract(lr_json,'$.rating') DESC, path"}.get(sort, "path")
+                 "lr": "json_extract(lr_json,'$.rating') DESC, path",
+                 "rated": "json_extract(override_json,'$.reviewed_at') IS NULL, json_extract(override_json,'$.reviewed_at') DESC, id DESC",
+                 }.get(sort, "path")
         w = " AND ".join(where)
         total = db.count(w, params)
         rows = db.rows(w, params, order=order, limit=limit, offset=offset)

@@ -25,7 +25,8 @@ const SORTS = [
   ['path', 'by path'], ['name', 'by file name'], ['newest', 'newest added'], ['taken', 'capture time, oldest first'],
   ['taken_desc', 'capture time, newest first'], ['score', 'best score first'], ['score_low', 'worst score first'],
   ['eye_sharpness', 'sharpest eyes first'], ['eye_softest', 'softest eyes first'], ['sharpness', 'sharpest head first'],
-  ['people', 'most people first'], ['iso', 'highest ISO first'], ['lr', 'sidecar rating'], ['shuffle', 'shuffled'],
+  ['people', 'most people first'], ['iso', 'highest ISO first'], ['lr', 'sidecar rating'], ['rated', 'rated most recently first'],
+  ['shuffle', 'shuffled'],
 ] as const;
 const tierOpts = [...TIERS].reverse().map((t) => [String(t), `${t} · ${TIER_LABEL[t]}`] as [string, string]);
 
@@ -117,7 +118,10 @@ export default function Review() {
   const away = found < 0 && picked && 'id' in picked && picked.stay ? picked.id : null;   // revisited, out of the queue
   const id = away ?? items[i]?.id ?? null;
   // ← and → walk the history first (back to the photo you just rated, then forward again), and the queue after that.
+  // Past the start of this visit's history, ← carries on through what you rated before, newest first, from the server.
+  const seeding = useRef(false);
   const nav = useCallback((dir: 1 | -1) => {
+    if (seeding.current) return;
     const [from, to] = dir === -1 ? [hist.back, hist.fwd] : [hist.fwd, hist.back];
     if (from.length && id !== null) {
       const prev = from[from.length - 1];
@@ -130,11 +134,24 @@ export default function Review() {
       if (id !== null) setHist({ back: dir === 1 ? [...hist.back, id] : hist.back, fwd: [] });
       setPicked(p);
     };
-    const nx = away === null ? items[i + dir] : items[dir === 1 ? i : i - 1];
-    if (nx?.id) step({ id: nx.id });
-    else if (dir === 1 && offset + items.length < total) { setOffset(offset + PAGE); step({ edge: 'first' }); }
-    else if (dir === -1 && offset > 0) { setOffset(Math.max(0, offset - PAGE)); step({ edge: 'last' }); }
-  }, [hist, id, away, items, i, offset, total]);
+    const inQueue = () => {
+      const nx = away === null ? items[i + dir] : items[dir === 1 ? i : i - 1];
+      if (nx?.id) step({ id: nx.id });
+      else if (dir === 1 && offset + items.length < total) { setOffset(offset + PAGE); step({ edge: 'first' }); }
+      else if (dir === -1 && offset > 0) { setOffset(Math.max(0, offset - PAGE)); step({ edge: 'last' }); }
+    };
+    if (dir === 1 || id === null) return inQueue();
+    seeding.current = true;
+    const skip = new Set([id, ...hist.fwd]);
+    api.images({ ...filters, reviewed: true, sort: 'rated', offset: 0, limit: Math.min(PAGE, skip.size + 50) })
+      .then((r) => r.items.flatMap((x) => (x.id !== null && !skip.has(x.id) ? [x.id] : [])).reverse(), () => [])
+      .then((back) => {
+        seeding.current = false;
+        if (!back.length) return inQueue();
+        setHist({ back: back.slice(0, -1), fwd: [...hist.fwd, id] });
+        setPicked({ id: back[back.length - 1], stay: true });
+      });
+  }, [hist, id, away, items, i, offset, total, filters]);
 
   const [menu, setMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);

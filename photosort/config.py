@@ -67,7 +67,8 @@ DEFAULTS: dict = {
     "detect_model": "yolo11n-pose.pt",
     "min_person_frac": 0.0015,   # ignore boxes smaller than this fraction of the frame
     # Duplicate boxes on one person that survive YOLO's NMS: drop the weaker one at IoU >= dedup_iou, or at
-    # IoU >= dedup_head_iou when both put the head keypoints within dedup_head_tol * box size of each other.
+    # IoU >= dedup_head_iou when both put the head keypoints (shoulders + hips if one misses the head) within
+    # dedup_head_tol * box size of each other. A box that sees the head is kept over one that doesn't.
     "dedup_iou": 0.6,
     "dedup_head_iou": 0.25,
     "dedup_head_tol": 0.1,

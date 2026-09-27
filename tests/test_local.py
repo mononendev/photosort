@@ -276,3 +276,28 @@ def test_dedup_keeps_overlapping_people_with_distinct_heads():
     front = _det((400, 300, 900, 1500), 0.9, [(650, 400), (630, 390), (670, 390)])
     behind = _det((600, 250, 1100, 1300), 0.8, [(850, 330), (830, 320), (870, 320)])
     assert len(local.dedup_detections([front, behind], {})) == 2
+
+
+def _pose(box, conf, kps):
+    """Detection from full COCO-17 [x, y, conf] keypoints."""
+    return {"box": list(box), "conf": conf, "kp": [k[:2] for k in kps], "kpc": [k[2] for k in kps]}
+
+
+def test_dedup_merges_headless_box_into_the_whole_rider_and_keeps_the_head():
+    # IMG_1064: YOLO put one box on the rider from the shoulders down (no head keypoints, higher conf) and
+    # another over the whole rider, arms out (IoU 0.42). Hips agree within ~3% of the box size.
+    cut = _pose((1087, 1308, 2757, 4131), 0.74, [
+        [1763, 1369, .17], [1793, 1286, .07], [1691, 1317, .06], [1890, 1185, .02], [1572, 1263, .01],
+        [2151, 1347, .35], [1542, 1391, .34], [2255, 1711, .74], [1444, 1714, .75], [2172, 2001, .76],
+        [1461, 2011, .79], [2131, 2168, 1.0], [1695, 2191, 1.0], [2325, 2981, 1.0], [1626, 3037, 1.0],
+        [2496, 3711, .99], [1631, 3858, .99]])
+    whole = _pose((616, 568, 2996, 3287), 0.63, [
+        [1793, 1142, .99], [1827, 1048, .95], [1708, 1091, .97], [1913, 948, .57], [1605, 1052, .81],
+        [2184, 1080, .99], [1438, 1243, 1.0], [2536, 923, .82], [1006, 1284, .96], [2594, 776, .59],
+        [869, 1264, .87], [2212, 2175, 1.0], [1729, 2249, 1.0], [2290, 2799, .96], [1673, 2887, .98],
+        [2265, 3184, .63], [1655, 3315, .71]])
+    assert local.dedup_detections([cut, whole], {}) == [whole]
+    # A spectator beside him, overlapping the arm, stays.
+    side = _pose((2651, 1690, 3080, 2919), 0.83, [[2787, 1842, .9]] * 5 + [[2906, 1929, .99], [2744, 1934, .98]]
+                 + [[0, 0, 0]] * 4 + [[2950, 2280, .9], [2780, 2285, .9]] + [[0, 0, 0]] * 4)
+    assert len(local.dedup_detections([cut, whole, side], {})) == 2

@@ -18,6 +18,7 @@ from . import exif as X
 # COCO keypoint indices used by YOLO pose models
 NOSE, LEYE, REYE, LEAR, REAR, LSHO, RSHO, LHIP, RHIP = 0, 1, 2, 3, 4, 5, 6, 11, 12
 HEAD_KP = [NOSE, LEYE, REYE, LEAR, REAR]
+BODY_KP = [LSHO, RSHO, LHIP, RHIP]
 MIN_REGION_PX = 40
 EYE_MIN_PX = 24      # an eye band is small by nature; below this there is nothing to judge
 FACE_WEIGHTS = "face_detection_yunet_2023mar.onnx"
@@ -322,28 +323,44 @@ def _iou(a, b) -> float:
     return inter / union if union > 0 else 0.0
 
 
-def _same_head(a: dict, b: dict, tol: float) -> bool:
-    """Both detections put their confident head keypoints in the same place (within tol * sqrt of the
-    smaller box's area, averaged over the head keypoints both see)."""
-    if not (a.get("kp") and a.get("kpc") and b.get("kp") and b.get("kpc")):
-        return False
-    shared = [i for i in HEAD_KP if a["kpc"][i] >= 0.3 and b["kpc"][i] >= 0.3]
-    if not shared:
-        return False
+def _same_spot(a: dict, b: dict, idx: list[int], tol: float, min_conf: float, min_n: int) -> Optional[bool]:
+    """Whether both detections put the keypoints in idx (those both see at min_conf) in the same place, within
+    tol * sqrt of the smaller box's area on average. None when fewer than min_n are shared: nothing to compare."""
+    shared = [i for i in idx if a["kpc"][i] >= min_conf and b["kpc"][i] >= min_conf]
+    if len(shared) < min_n:
+        return None
     size = min(np.sqrt((d["box"][2] - d["box"][0]) * (d["box"][3] - d["box"][1])) for d in (a, b))
     dist = np.mean([np.hypot(a["kp"][i][0] - b["kp"][i][0], a["kp"][i][1] - b["kp"][i][1]) for i in shared])
-    return dist <= tol * size
+    return bool(dist <= tol * size)
+
+
+def _same_person(a: dict, b: dict, tol: float) -> bool:
+    """Both detections are one person: their confident head keypoints sit in the same spot, or, when one of
+    them doesn't see the head (a box cut off at the shoulders), their shoulders and hips do."""
+    if not (a.get("kp") and a.get("kpc") and b.get("kp") and b.get("kpc")):
+        return False
+    same = _same_spot(a, b, HEAD_KP, tol, 0.3, 1)
+    if same is None:
+        same = _same_spot(a, b, BODY_KP, tol, 0.5, 2)
+    return bool(same)
+
+
+def _sees_head(d: dict) -> bool:
+    return bool(d.get("kpc")) and any(d["kpc"][i] >= 0.5 for i in HEAD_KP)
 
 
 def dedup_detections(dets: list[dict], cfg: dict) -> list[dict]:
     """Drop duplicate detections of one person that slip past YOLO's NMS (its IoU cut is 0.7; a second,
-    shifted box with a hallucinated limb often lands at 0.5-0.7). A lower-confidence box is a duplicate when
-    it overlaps a kept one by dedup_iou, or by dedup_head_iou with the heads in the same spot. The head test
-    keeps two real people apart even when one stands in front of the other."""
+    shifted box with a hallucinated limb often lands at 0.5-0.7). A box is a duplicate when it overlaps a kept
+    one by dedup_iou, or by dedup_head_iou with the heads (or, if one misses the head, the torsos) in the same
+    spot. The keypoint test keeps two real people apart even when one stands in front of the other.
+
+    Boxes that see the head are kept first: a headless duplicate (one box from the shoulders down, another
+    over the whole rider) often scores higher, but the head is what focus is judged on."""
     d_iou, h_iou, h_tol = cfg.get("dedup_iou", 0.6), cfg.get("dedup_head_iou", 0.25), cfg.get("dedup_head_tol", 0.1)
     kept: list[dict] = []
-    for d in sorted(dets, key=lambda d: -d["conf"]):
-        if not any((o := _iou(d["box"], k["box"])) >= d_iou or (o >= h_iou and _same_head(d, k, h_tol)) for k in kept):
+    for d in sorted(dets, key=lambda d: (not _sees_head(d), -d["conf"])):
+        if not any((o := _iou(d["box"], k["box"])) >= d_iou or (o >= h_iou and _same_person(d, k, h_tol)) for k in kept):
             kept.append(d)
     return kept
 

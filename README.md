@@ -13,6 +13,10 @@ to check its work.
 It was built for a ~20,000-frame event shoot: 20 MP bodies, fast lenses near wide open, riders in helmets.
 At f/1.4-f/2 focus varies across a body, so the question that matters most is "did focus land on the eyes?"
 
+<a href="docs/media/photosort-demo.mp4"><img src="docs/media/photosort-demo.jpg" alt="photosort demo video: 21 seconds, click to play"></a>
+
+<sub>▶ <a href="docs/media/photosort-demo.mp4">Watch the 21-second demo</a> (MP4, 16 MB, with sound). Video: CC BY-SA 4.0, <a href="docs/media/CREDITS.md">photo credits</a>.</sub>
+
 ![Detail view: pose skeletons, head and torso boxes, eye band, and the focus measurements for the primary subject](docs/images/detail.jpg)
 
 ## What it does
@@ -282,3 +286,6 @@ docs/               CLI, focus scoring, deployment, dev log
 [GNU AGPL-3.0](LICENSE). If you run a modified version as a network service, you must offer its source to
 its users. The pose model comes from [Ultralytics](https://github.com/ultralytics/ultralytics), which is
 AGPL-3.0 as well.
+
+The demo video in `docs/media/` is CC BY-SA 4.0, since it adapts Creative Commons photos; see
+[docs/media/CREDITS.md](docs/media/CREDITS.md).

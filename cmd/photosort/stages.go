@@ -386,8 +386,8 @@ func (a *app) printUsage() error {
 	d := a.db.D
 	var n int
 	var in, out float64
-	err := a.db.QueryRow("SELECT COUNT(*), COALESCE(SUM(" + d.JNum("vlm_usage", "in") + "), 0), COALESCE(SUM(" +
-		d.JNum("vlm_usage", "out") + "), 0) FROM images WHERE vlm_usage IS NOT NULL").Scan(&n, &in, &out)
+	err := a.db.QueryRow("SELECT COUNT(*), COALESCE(SUM("+d.JNum("vlm_usage", "in")+"), 0), COALESCE(SUM("+
+		d.JNum("vlm_usage", "out")+"), 0) FROM images WHERE vlm_usage IS NOT NULL").Scan(&n, &in, &out)
 	if err != nil || n == 0 {
 		return err
 	}

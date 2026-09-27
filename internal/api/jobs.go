@@ -16,8 +16,8 @@ type jobIn struct {
 	Paths       []string `json:"paths"`
 	VLM         *bool    `json:"vlm"`
 	SkipTier0   bool     `json:"skip_tier0"`
-	Rescan      bool     `json:"rescan"`       // redo the local stage on images that already have it
-	Revlm       bool     `json:"revlm"`        // re-tag images that already have vision-model tags
+	Rescan      bool     `json:"rescan"` // redo the local stage on images that already have it
+	Revlm       bool     `json:"revlm"`  // re-tag images that already have vision-model tags
 	RetryErrors bool     `json:"retry_errors"`
 	Concurrency *int     `json:"concurrency"`
 	Model       *string  `json:"model"`

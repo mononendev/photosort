@@ -126,7 +126,7 @@ func (d Dialect) Rebind(q string) string {
 	return b.String()
 }
 
-// EmptyObject is a condition: col holds an empty object ('' too, on SQLite, as the Python version could write).
+// EmptyObject is a condition: col holds an empty object (” too, on SQLite, as the Python version could write).
 func (d Dialect) EmptyObject(col string) string {
 	if d.PG {
 		return fmt.Sprintf("%s = '{}'::jsonb", col)

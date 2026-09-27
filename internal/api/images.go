@@ -571,13 +571,13 @@ func (s *Server) facets(*http.Request) (any, error) {
 		{"focal", fmt.Sprintf("COALESCE(%s, %s)", d.JNum("local_json", "exif", "focal_35mm"), d.JNum("local_json", "exif", "focal_mm"))},
 		{"score", x.score}, {"eye", d.JNum("local_json", "primary_eye_sharp")}} {
 		var lo, hi sql.NullFloat64
-		if err := s.DB.QueryRow("SELECT MIN(" + kv[1] + "), MAX(" + kv[1] + ") FROM images").Scan(&lo, &hi); err != nil {
+		if err := s.DB.QueryRow("SELECT MIN("+kv[1]+"), MAX("+kv[1]+") FROM images").Scan(&lo, &hi); err != nil {
 			return nil, err
 		}
 		ranges[kv[0]] = []any{nullF(lo), nullF(hi)}
 	}
 	var lo, hi sql.NullString
-	if err := s.DB.QueryRow("SELECT MIN(" + d.Collate(x.taken) + "), MAX(" + d.Collate(x.taken) + ") FROM images").Scan(&lo, &hi); err != nil {
+	if err := s.DB.QueryRow("SELECT MIN("+d.Collate(x.taken)+"), MAX("+d.Collate(x.taken)+") FROM images").Scan(&lo, &hi); err != nil {
 		return nil, err
 	}
 	ranges["taken"] = []any{nullable(nullStr(lo)), nullable(nullStr(hi))}
@@ -648,7 +648,7 @@ func (s *Server) getImage(r *http.Request) (any, error) {
 
 // overrideIn is a manual correction from the UI.
 type overrideIn struct {
-	Rating       *int    `json:"rating"`        // your cull: 0-3 focus tier, 4 banger; marks the photo reviewed
+	Rating       *int    `json:"rating"` // your cull: 0-3 focus tier, 4 banger; marks the photo reviewed
 	FocusTier    *int    `json:"focus_tier"`
 	QualityScore *int    `json:"quality_score"` // your stars; beat the model's score and export as xmp:Rating
 	Group        *int    `json:"group"`         // your sort group (keys a s d f); see config "groups"

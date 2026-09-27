@@ -29,6 +29,12 @@ def _bad(_, e):
     return JSONResponse({"detail": str(e)}, status_code=400)
 
 
+@app.exception_handler(Exception)
+def _failed(_, e):
+    # The backend stores this as the image's error, so say what went wrong.
+    return JSONResponse({"detail": f"{type(e).__name__}: {e}"}, status_code=500)
+
+
 @app.get("/health")
 def health():
     return {"ok": True, "version": __version__, "python": platform.python_version(), "device": detectors.device(),

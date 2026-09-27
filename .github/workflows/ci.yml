@@ -8,25 +8,35 @@ env:
   REGISTRY: registry.adoah.dev
 
 jobs:
-  test-py:
+  test-go:
+    runs-on: [homelab]
+    env:
+      # Set the repository variable PHOTOSORT_TEST_PG (postgres://user:pass@host/db) to also run the database, job
+      # and API tests on Postgres; each test gets its own schema. Without it they run on SQLite only.
+      PHOTOSORT_TEST_PG: ${{ vars.PHOTOSORT_TEST_PG }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test -race ./...
+
+  test-analyzer:
     runs-on: [homelab]
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v10
         with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: requirements.lock.txt
-      - name: Install
-        # The tests stub the YOLO detector, so skip torch/ultralytics: on Linux, PyPI torch drags in
-        # ~3 GB of CUDA wheels. The lock is a full closure, so --no-deps installs exactly what it pins
-        # (and keeps ultralytics from pulling the GUI opencv-python back in).
-        run: |
-          grep -vE '^(torch|torchvision|ultralytics|ultralytics-thop|nvidia-ml-py|opencv-python)==' requirements.lock.txt > "$RUNNER_TEMP/requirements.test.txt"
-          pip install --no-deps -r "$RUNNER_TEMP/requirements.test.txt"
-          pip install pytest
+          working-directory: analyzer
+          enable-cache: true
       - name: Test
-        run: pytest -q tests
+        # The pose-model tests skip without models; the ONNX export is pinned against torch on a dev machine
+        # (analyzer/tests/test_detectors.py), torch never runs here.
+        working-directory: analyzer
+        run: uv run --frozen pytest -q
 
   test-web:
     runs-on: [homelab]
@@ -50,53 +60,29 @@ jobs:
         working-directory: web
         run: pnpm run lint
 
-  build-api:
-    needs: [test-py, test-web]
+  version:
     runs-on: [homelab]
     outputs:
-      version: ${{ steps.version.outputs.version }}
+      version: ${{ steps.v.outputs.version }}
     steps:
-      - uses: actions/checkout@v7
-      - name: Set version
-        id: version
+      - id: v
         run: echo "version=${{ github.ref_name }}-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
-      - name: Install buildctl
-        run: |
-          command -v buildctl && exit 0
-          BUILDKIT_VERSION=$(curl -s https://api.github.com/repos/moby/buildkit/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
-          curl -fsSL "https://github.com/moby/buildkit/releases/download/${BUILDKIT_VERSION}/buildkit-${BUILDKIT_VERSION}.linux-amd64.tar.gz" \
-            | sudo tar -xz -C /usr/local bin/buildctl
-      - name: Build and push API image
-        run: |
-          buildctl \
-            --tlscacert "$BUILDKIT_CLIENT_CA" --tlscert "$BUILDKIT_CLIENT_CERT" --tlskey "$BUILDKIT_CLIENT_KEY" \
-            --tlsservername buildkit.adoah.dev \
-          build \
-            --frontend dockerfile.v0 \
-            --local context=. --local dockerfile=docker \
-            --opt filename=api.Dockerfile --opt target=production \
-            --opt build-arg:VERSION=${{ steps.version.outputs.version }} \
-            --opt build-arg:GIT_SHA=${{ github.sha }} \
-            --opt build-arg:BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
-            --import-cache type=registry,ref=${{ env.REGISTRY }}/projects/photosort-api:buildcache \
-            --export-cache type=registry,ref=${{ env.REGISTRY }}/projects/photosort-api:buildcache,mode=max \
-            --output type=image,name=${{ env.REGISTRY }}/projects/photosort-api:${{ steps.version.outputs.version }},push=true
 
-  build-ui:
-    needs: [test-py, test-web]
+  build:
+    needs: [version, test-go, test-analyzer, test-web]
     runs-on: [homelab]
+    strategy:
+      matrix:
+        image: [api, analyzer, ui]
     steps:
       - uses: actions/checkout@v7
-      - name: Set version
-        id: version
-        run: echo "version=${{ github.ref_name }}-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
       - name: Install buildctl
         run: |
           command -v buildctl && exit 0
           BUILDKIT_VERSION=$(curl -s https://api.github.com/repos/moby/buildkit/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
           curl -fsSL "https://github.com/moby/buildkit/releases/download/${BUILDKIT_VERSION}/buildkit-${BUILDKIT_VERSION}.linux-amd64.tar.gz" \
             | sudo tar -xz -C /usr/local bin/buildctl
-      - name: Build and push UI image
+      - name: Build and push ${{ matrix.image }} image
         run: |
           buildctl \
             --tlscacert "$BUILDKIT_CLIENT_CA" --tlscert "$BUILDKIT_CLIENT_CERT" --tlskey "$BUILDKIT_CLIENT_KEY" \
@@ -104,16 +90,16 @@ jobs:
           build \
             --frontend dockerfile.v0 \
             --local context=. --local dockerfile=docker \
-            --opt filename=ui.Dockerfile --opt target=production \
-            --opt build-arg:VERSION=${{ steps.version.outputs.version }} \
+            --opt filename=${{ matrix.image }}.Dockerfile --opt target=production \
+            --opt build-arg:VERSION=${{ needs.version.outputs.version }} \
             --opt build-arg:GIT_SHA=${{ github.sha }} \
             --opt build-arg:BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
-            --import-cache type=registry,ref=${{ env.REGISTRY }}/projects/photosort-ui:buildcache \
-            --export-cache type=registry,ref=${{ env.REGISTRY }}/projects/photosort-ui:buildcache,mode=max \
-            --output type=image,name=${{ env.REGISTRY }}/projects/photosort-ui:${{ steps.version.outputs.version }},push=true
+            --import-cache type=registry,ref=${{ env.REGISTRY }}/projects/photosort-${{ matrix.image }}:buildcache \
+            --export-cache type=registry,ref=${{ env.REGISTRY }}/projects/photosort-${{ matrix.image }}:buildcache,mode=max \
+            --output type=image,name=${{ env.REGISTRY }}/projects/photosort-${{ matrix.image }}:${{ needs.version.outputs.version }},push=true
 
   deploy:
-    needs: [build-api, build-ui]
+    needs: [version, build]
     if: github.ref_name == 'master' || github.ref_name == 'main'
     runs-on: [homelab]
     steps:
@@ -127,4 +113,4 @@ jobs:
           helm dependency update .ci/chart
           helm upgrade --install photosort .ci/chart \
             --namespace production \
-            --set mononen-library-chart.global.imageDefaults.tag=${{ needs.build-api.outputs.version }}
+            --set mononen-library-chart.global.imageDefaults.tag=${{ needs.version.outputs.version }}

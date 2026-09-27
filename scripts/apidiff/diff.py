@@ -1,6 +1,9 @@
 """Serve one fixture workdir from the Python and the Go backend and diff every route the UI uses.
 
-  python3 scripts/apidiff/diff.py FIXTURE_DIR [--py PYTHON] [--pg postgres://...]
+  PHOTOSORT_LEGACY=../photosort-py python3 scripts/apidiff/diff.py FIXTURE_DIR [--py PYTHON] [--pg postgres://...]
+
+The old Python package isn't in this tree any more: point PHOTOSORT_LEGACY at a checkout that has it
+(git worktree add ../photosort-py a8ba797), and use that checkout's interpreter.
 
 FIXTURE_DIR comes from build.py. The Go server gets a copy of the workdir (or, with --pg, the same data copied into
 that Postgres database with `photosort db copy`). Mutations (PATCH, PUT config, rescore, export, truth) go to both,
@@ -107,7 +110,8 @@ def wait(base, proc, name):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("fixture", type=Path)
-    ap.add_argument("--py", default=str(Path("/Users/mononen/Programming/photosort/.venv/bin/python")))
+    legacy = Path(os.environ.get("PHOTOSORT_LEGACY", ROOT))
+    ap.add_argument("--py", default=str(legacy / ".venv/bin/python"), help="the old package's interpreter")
     ap.add_argument("--pg", help="run the Go server on this Postgres database (emptied first)")
     ap.add_argument("--no-mutate", action="store_true")
     a = ap.parse_args()
@@ -127,7 +131,7 @@ def main():
                        env=goenv, check=True)
     procs = [
         subprocess.Popen([a.py, "-m", "photosort", "--workdir", str(pywork), "web", "--photos", str(photos), "--port", "18080"],
-                         cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL),
+                         cwd=legacy, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL),
         subprocess.Popen([str(gobin), "--workdir", str(gowork), "web", "--photos", str(photos), "--port", "18081"],
                          cwd=ROOT, env=goenv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL),
     ]

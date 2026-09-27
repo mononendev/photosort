@@ -2,18 +2,21 @@
 Python local stage (real detector), plus vision verdicts, overrides, Lightroom sidecars, ground truth and jobs, so
 the API has something to say on every route.
 
-Run with the old Python package's interpreter from the repo root:
+Run with the old Python package's interpreter from the repo root.
+The old Python package isn't in this tree any more: point PHOTOSORT_LEGACY at a checkout that has it
+(git worktree add ../photosort-py a8ba797), and use that checkout's interpreter.
   .venv/bin/python scripts/apidiff/build.py OUT_DIR
 It writes OUT_DIR/photos (copies of the images, with sidecars) and OUT_DIR/work (the workdir).
 """
 import json
+import os
 import random
 import shutil
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, os.environ.get("PHOTOSORT_LEGACY", str(ROOT)))
 
 from photosort import config, pipeline, schema  # noqa: E402
 from photosort import backends  # noqa: E402

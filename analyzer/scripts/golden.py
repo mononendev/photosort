@@ -10,20 +10,24 @@ they see identical detections. Written per image to testdata/golden/<name>.json:
   order       the people order analyze() settled on, as indices into measure.people
   finalize    finalize() for that order
 
-Run from the repo root with an interpreter that has the old package's deps and ultralytics (e.g. the old .venv):
+Run from the repo root with an interpreter that has the old package's deps and ultralytics.
+The old Python package isn't in this tree any more: point PHOTOSORT_LEGACY at a checkout that has it
+(git worktree add ../photosort-py a8ba797), and use that checkout's interpreter.
 
   python analyzer/scripts/golden.py dev-data/*.jpg [--out testdata/golden] [--config config.json]
 """
 from __future__ import annotations
 import argparse
 import json
+import os
 import shutil
 import sys
 import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path[:0] = [str(ROOT), str(ROOT / "analyzer")]
+LEGACY = Path(os.environ.get("PHOTOSORT_LEGACY", ROOT))
+sys.path[:0] = [str(LEGACY), str(ROOT / "analyzer")]
 
 from photosort import config as C, local as L  # noqa: E402  the old stage
 from photosort_analyzer import measure as MS  # noqa: E402

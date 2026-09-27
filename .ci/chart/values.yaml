@@ -1,5 +1,5 @@
-# Chart-managed volume for model weights and the API's Python deps (see templates/pvc-models.yaml).
-# Deps are ~1.4 GB per lock (CPU torch), up to 3 kept, plus the pip wheel cache (~0.4 GB).
+# Chart-managed volume for model weights (see templates/pvc-models.yaml): the face model and pose models beyond
+# the ones the analyzer image seeds (~10-180 MB each). The Python deps that used to live here are in the image now.
 modelsVolume:
   name: photosort-models
   storageClass: csi-rbd-sc
@@ -58,18 +58,15 @@ mononen-library-chart:
               hosts:
                 - photosort.adoah.dev
 
-    # API + job worker. Pinned next to Ollama on the GPU node (nodeAffinity) and set up to share the
-    # RTX 4000 cooperatively (runtimeClassName + NVIDIA_VISIBLE_DEVICES, NO nvidia.com/gpu request)
-    # like the stasharr transcoder. Detection runs on CPU torch for now; the GPU wiring stays so
-    # switching TORCH_INDEX in docker/api.Dockerfile (and growing modelsVolume) is all it takes.
-    # k8s-5's root disk is only 48 GB, so nothing big lives in the image or in ephemeral storage:
-    # torch and the other deps install onto the models volume (PHOTOSORT_PYDEPS, docker/pydeps.sh)
-    # the first time a pod starts with a new requirements.lock.txt; that start takes a few minutes
-    # and needs egress to PyPI and download.pytorch.org.
+    # API + job runner (Go) with the analyzer (Python: decoding, pose detection, focus metrics) as a sidecar that
+    # only listens on the pod's loopback. Pinned next to Ollama on the GPU node (nodeAffinity) and set up to share the
+    # RTX 4000 cooperatively (runtimeClassName + NVIDIA_VISIBLE_DEVICES on the analyzer, NO nvidia.com/gpu request).
+    # Detection runs on CPU ONNX Runtime; building the analyzer with --build-arg ORT=onnxruntime-gpu moves it to the
+    # GPU. Both images are small (~50 MB and ~250 MB compressed), so nothing big lands on k8s-5's root disk.
     api:
       enabled: true
       fullnameOverride: photosort-api
-      replicaCount: 1           # single SQLite state on an RWO volume: never scale this
+      replicaCount: 1           # the /data volume (cache, exports, SQLite) is RWO: never scale this
       security:
         enabled: true
         podSecurityContext:
@@ -103,34 +100,30 @@ mononen-library-chart:
               value: "/data"
             - name: PHOTOSORT_PHOTOS
               value: "/photos"
-            - name: OLLAMA_HOST
-              value: "http://ollama.production.svc.cluster.local:11434"
-            # Weights + torch/ultralytics caches live on the models volume; the image only seeds it.
             - name: PHOTOSORT_MODELS
               value: "/models"
-            - name: YOLO_CONFIG_DIR
-              value: "/models/.yolo"
-            - name: TORCH_HOME
-              value: "/models/torch"
-            # Python deps (torch, ultralytics, ...): one venv per lock hash, plus the pip cache.
-            - name: PHOTOSORT_PYDEPS
-              value: "/models/pydeps"
-            - name: NVIDIA_VISIBLE_DEVICES
-              value: "all"
-            - name: NVIDIA_DRIVER_CAPABILITIES
-              value: "compute,utility"
+            - name: PHOTOSORT_ANALYZER
+              value: "http://127.0.0.1:8090"
+            - name: OLLAMA_HOST
+              value: "http://ollama.production.svc.cluster.local:11434"
+            # State in Postgres instead of /data/photosort.db (copy it over first with `photosort db copy`):
+            # - name: PHOTOSORT_DB
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: photosort-db
+            #       key: url
           resources:
             requests:
-              cpu: 500m
-              memory: 2Gi
+              cpu: 50m
+              memory: 64Mi
             limits:
-              cpu: 8000m
-              memory: 12Gi
+              cpu: 2000m
+              memory: 1Gi
           readinessProbe:
             httpGet:
               path: /api/health
               port: 8080
-            initialDelaySeconds: 10
+            initialDelaySeconds: 3
             periodSeconds: 15
           volumeMounts:
             # Photos are read-only (photos-ro-claim is a ROX CephFS volume of /photos).
@@ -138,6 +131,39 @@ mononen-library-chart:
               mountPath: /photos
               readOnly: true
             # State, frame/crop/thumb cache (~0.5 MB per image) and exports.
+            - name: data
+              mountPath: /data
+            - name: models
+              mountPath: /models
+        - name: photosort-analyzer
+          image:
+            repository: registry.adoah.dev/projects/photosort-analyzer
+          env:
+            - name: PHOTOSORT_MODELS
+              value: "/models"
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "all"
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: "compute,utility"
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 8000m
+              memory: 12Gi
+          # It listens on loopback only (it reads any path it is given), so the probe runs inside the container.
+          readinessProbe:
+            exec:
+              command: ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health', timeout=5)"]
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 10
+          volumeMounts:
+            - name: photos
+              mountPath: /photos
+              readOnly: true
+            # It writes each image's frame, thumbnail and crop into /data/cache.
             - name: data
               mountPath: /data
             - name: models

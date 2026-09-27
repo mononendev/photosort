@@ -1,5 +1,6 @@
 """Job counters: a local re-analysis whose vision stage has nothing new must keep its local done/total."""
 import json
+import time
 
 from photosort import backends, local, pipeline, schema
 from photosort.config import DEFAULTS
@@ -184,6 +185,108 @@ def test_runner_that_lost_its_job_writes_nothing(tmp_path, monkeypatch):
     old._stopped(jid); old._finish(jid, "done")
     assert db.job_lease(jid) == ("running", "new-server")
 
+
+
+# ---- two lanes: local ahead while the model is busy; overrides ------------------------------------------
+
+def _other_folder(tmp_path):
+    other = tmp_path / "other"; other.mkdir()
+    (other / "c.jpg").write_bytes(b"\xff\xd8\xff")
+    return other
+
+
+def _count_local(monkeypatch):
+    calls, orig = [], local.run_local
+
+    def counted(db_, cfg, cache, ids_paths, *a):
+        calls.append([i for i, _ in ids_paths])
+        return orig(db_, cfg, cache, ids_paths, *a)
+    monkeypatch.setattr(local, "run_local", counted)
+    return calls
+
+
+def _on_first_classify(monkeypatch, hook):
+    classify = backends.get().classify
+    seen = []
+
+    def wrapped(item, model, cfg):
+        if not seen:
+            hook()
+        seen.append(item.key)
+        return classify(item, model, cfg)
+    monkeypatch.setattr(backends, "get", lambda *a, **k: type("B", (), {"sync": True, "default_model": "fake",
+                                                                        "classify": staticmethod(wrapped)})())
+    return seen
+
+
+def test_local_stage_runs_ahead_while_the_model_is_busy(tmp_path, monkeypatch):
+    db, r, photos = _runner(tmp_path, monkeypatch, vlm_rows_done=False)
+    other = _other_folder(tmp_path)
+    a, b = db.add_job([str(photos)], {"vlm": True}), db.add_job([str(other)], {"vlm": True})
+    c = db.add_job([str(other)], {"vlm": False})
+    calls = _count_local(monkeypatch)
+
+    def wait_for_queue():   # the model is busy with a's first image until the lane has done b's and c's local
+        deadline = time.time() + 10
+        while db.job(c)["state"] != "done" and time.time() < deadline:
+            time.sleep(0.02)
+    _on_first_classify(monkeypatch, wait_for_queue)
+    r.run_job(db.job(a))
+
+    jb = db.job(b)
+    assert (jb["state"], jb["lane"], jb["owner"], jb["done"], jb["total"]) == ("queued", None, None, 1, 1)
+    assert jb["message"].endswith("waiting for the vision model")
+    assert "finished" in json.loads(jb["stages_json"])["local"]
+    assert db.job(c)["state"] == "done"                          # local-only: the lane finished it
+    assert db.next_local_ahead_job() is None and db.next_queued_job()["id"] == b
+
+    for row in db.rows("1"):
+        (tmp_path / "cache" / f"{row['id']}.jpg").write_bytes(b"x")
+    n_local = len(calls)
+    r.run_job(db.job(b))
+    jb = db.job(b)
+    assert (jb["state"], jb["stage"], jb["done"], jb["total"]) == ("done", "done", 1, 1)
+    assert len(calls) == n_local and db.job_item_count(b, "vlm") == 1   # local wasn't redone
+    assert r.held == set()
+
+
+def test_local_ahead_can_be_turned_off(tmp_path, monkeypatch):
+    db, r, photos = _runner(tmp_path, monkeypatch, vlm_rows_done=False)
+    r.cfg["local_ahead"] = False
+    a, b = db.add_job([str(photos)], {"vlm": True}), db.add_job([str(_other_folder(tmp_path))], {"vlm": False})
+    r.run_job(db.job(a))
+    assert (db.job(b)["state"], db.job(b)["started"]) == ("queued", None)
+
+
+def test_override_pauses_the_running_job_and_it_resumes_after(tmp_path, monkeypatch):
+    db, r, photos = _runner(tmp_path, monkeypatch, vlm_rows_done=False)
+    r.cfg["local_ahead"] = False
+    a, b = db.add_job([str(photos)], {"vlm": True}), db.add_job([str(_other_folder(tmp_path))], {"vlm": False})
+    seen = _on_first_classify(monkeypatch, lambda: db.override_job(b))   # clicked while a's first image is out
+    r.run_job(db.job(a))
+    ja = db.job(a)
+    assert (ja["state"], ja["owner"], ja["done"], ja["total"]) == ("queued", None, 1, 2) and "overrode" in ja["message"]
+    assert db.next_queued_job()["id"] == b
+
+    r.run_job(db.job(b))
+    assert db.job(b)["state"] == "done"
+    r.run_job(db.job(a))
+    ja = db.job(a)
+    assert (ja["state"], ja["done"], ja["total"]) == ("done", 2, 2) and len(seen) == 2 and len(set(seen)) == 2
+    assert not db.override_job(a)                                 # finished jobs can't override
+
+
+def test_override_while_the_lane_holds_the_job(tmp_path):
+    db = DB(tmp_path / "db.sqlite")
+    main, ahead, other = db.add_job([], {}), db.add_job([], {}), db.add_job([], {})
+    db.claim_job(main, "me", "main"); db.claim_job(ahead, "me", "ahead")
+    assert db.override_job(ahead)
+    assert db.job_lease(main) == ("preempting", "me") and db.job_lease(ahead) == ("running", "me")
+    assert db.running_job() == main
+    db.update_job(main, heartbeat=0.0)
+    assert db.requeue_stale(pipeline.LEASE_TTL_S) == [main] and db.job_lease(main) == ("queued", None)
+    db.update_job(ahead, state="queued", owner=None)
+    assert db.next_queued_job()["id"] == ahead and db.job(other)["priority"] == 0
 
 def test_old_database_is_migrated_and_indexed(tmp_path):
     import sqlite3

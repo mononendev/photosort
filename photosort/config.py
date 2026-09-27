@@ -64,6 +64,7 @@ DEFAULTS: dict = {
     "dedup_head_iou": 0.25,
     "dedup_head_tol": 0.1,
     "workers": 4,
+    "local_ahead": True,         # while a job waits on the vision model, run the local stage of the jobs queued behind it
     "face_model": "face_detection_yunet_2023mar.onnx",   # OpenCV YuNet: locates the eyes inside the head box
     "face_conf": 0.6,
     "eye_max_people": 4,         # eye bands for the N most prominent people

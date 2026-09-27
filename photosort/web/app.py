@@ -292,6 +292,15 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         db.cancel_job(job_id)
         return job_out(db.job(job_id))
 
+    @app.post("/api/jobs/{job_id}/override")
+    def override_job(job_id: int):
+        """Run this job next: the running job pauses, goes back in the queue and resumes after it."""
+        if not db.job(job_id):
+            raise HTTPException(404)
+        if not db.override_job(job_id):
+            raise HTTPException(409, "only a queued job can override the running one")
+        return job_out(db.job(job_id))
+
     # ---- images -------------------------------------------------------------------
     @app.get("/api/images")
     def list_images(folder: str = "", recursive: bool = True, tier: Optional[int] = None, keeper: Optional[bool] = None,

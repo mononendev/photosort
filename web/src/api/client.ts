@@ -136,11 +136,13 @@ export interface TreeDir {
 }
 export interface Tree { path: string; dirs: TreeDir[]; files: ImageSummary[] }
 
-export type JobState = 'queued' | 'running' | 'cancelling' | 'done' | 'cancelled' | 'failed';
+export type JobState = 'queued' | 'running' | 'preempting' | 'cancelling' | 'done' | 'cancelled' | 'failed';
 export interface Job {
   id: number; created: number; started: number | null; finished: number | null;
   state: JobState; stage: string; paths: string[]; options: JobOptions;
   total: number; done: number; errors: number; message: string | null; rate?: number | null; eta_s?: number | null;
+  /** While running: main runs the whole job; ahead runs its local stage while the main job waits on the vision model */
+  lane: 'main' | 'ahead' | null; priority: number;
   /** Per-stage timings and settings, filled in as the job reaches each stage (empty for jobs from before this was recorded) */
   stages: Partial<Record<'scan' | 'local' | 'vlm', JobStage>>;
 }
@@ -269,6 +271,7 @@ export const api = {
   vlmRequest: (id: number, backend?: string, model?: string) =>
     request<VlmRequest>(`/api/images/${id}/vlm-request${qs({ backend, model })}`),
   cancelJob: (id: number) => request<Job>(`/api/jobs/${id}/cancel`, { method: 'POST' }),
+  overrideJob: (id: number) => request<Job>(`/api/jobs/${id}/override`, { method: 'POST' }),
   config: () => request<Record<string, unknown>>('/api/config'),
   putConfig: (values: Record<string, unknown>) =>
     request<Record<string, unknown>>('/api/config', { method: 'PUT', body: JSON.stringify({ values }) }),
@@ -315,7 +318,7 @@ export const TIER_CLASS: Record<number, string> = Object.fromEntries(RATINGS.sli
 export const TIER_COLOR: Record<string, string> = { ...Object.fromEntries(RATINGS.slice(0, BANGER).map((r) => [r.value, r.hex])), none: '#9ca3af' };
 
 /** A job a worker holds right now. */
-export const isLive = (j: Pick<Job, 'state'> | undefined) => !!j && (j.state === 'running' || j.state === 'cancelling');
+export const isLive = (j: Pick<Job, 'state'> | undefined) => !!j && (j.state === 'running' || j.state === 'preempting' || j.state === 'cancelling');
 /** A job that will still change: live or waiting in the queue. */
 export const isBusy = (j: Pick<Job, 'state'>) => isLive(j) || j.state === 'queued';
 export const isFinished = (j: Pick<Job, 'state'>) => j.state === 'done' || j.state === 'cancelled' || j.state === 'failed';

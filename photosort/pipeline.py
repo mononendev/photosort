@@ -1,6 +1,9 @@
 """Job runner: scan -> local -> vlm for a set of paths, with progress in the jobs table.
 
-One worker thread runs jobs sequentially (the GPU and the local model server are shared).
+One worker thread runs jobs one after another (the GPU and the local model server are shared). While that job
+waits on the vision model, a second lane runs the scan and local stages of the jobs queued behind it, so the GPU
+isn't idle; they go back in the queue with their local work done and the main lane only has the model left to do.
+An override puts a queued job first and pauses the running one, which goes back in the queue and resumes after it.
 
 Rolling restarts: for a while the old and new server share the database, each with a runner. A runner
 claims a job and holds it with a heartbeat; the other leaves it alone until it is handed back (the old
@@ -68,10 +71,11 @@ class JobRunner(threading.Thread):
         self.db, self.cfg, self.workdir, self.photos_root, self.device = db, cfg, workdir, photos_root, device
         self.cache_dir = workdir / "cache"
         self._detector = None
-        self.current: Optional[int] = None
+        self.held: set[int] = set()              # jobs this runner has claimed: the main lane's and the local-ahead one
         self.owner = f"{socket.gethostname()}/{os.getpid()}/{uuid.uuid4().hex[:6]}"
-        self._stages: dict[str, dict] = {}      # the current job's stages_json
+        self._stages: dict[int, dict] = {}      # each held job's stages_json
         self.stop_event = threading.Event()
+        self._ahead_stop = threading.Event()     # the main lane left the vlm stage: the local-ahead lane stops
         self.reload_config = threading.Event()
 
     # -- helpers --------------------------------------------------------------
@@ -95,13 +99,13 @@ class JobRunner(threading.Thread):
     def _stage(self, jid: int, name: str, **info):
         """Record a stage starting (first call) or its settings/outcome (later calls) in stages_json.
         Starting a stage closes the one before it."""
-        now = time.time()
-        if name not in self._stages:
-            for st in self._stages.values():
+        now, stages = time.time(), self._stages[jid]
+        if name not in stages:
+            for st in stages.values():
                 st.setdefault("finished", now)
-            self._stages[name] = {"started": now}
-        self._stages[name].update(info)
-        self._job(jid, stages_json=json.dumps(self._stages))
+            stages[name] = {"started": now}
+        stages[name].update(info)
+        self._job(jid, stages_json=json.dumps(stages))
 
     def detector(self):
         if self._detector is None:
@@ -119,19 +123,19 @@ class JobRunner(threading.Thread):
             if job is None:
                 self.stop_event.wait(2)
                 continue
-            self.current = job["id"]
-            try:
-                self.run_job(job)
-            except Exception as e:
-                log.exception("job %s failed", job["id"])
-                self._job(job["id"], state="failed", finished=time.time(), owner=None, heartbeat=None,
-                          message=f"{type(e).__name__}: {e}")
-            self.current = None
+            self._guarded(self.run_job, job)
+
+    def _guarded(self, fn, job):
+        try:
+            fn(job)
+        except Exception as e:
+            log.exception("job %s failed", job["id"])
+            self._job(job["id"], state="failed", finished=time.time(), owner=None, heartbeat=None, lane=None,
+                      message=f"{type(e).__name__}: {e}")
 
     def _heartbeat(self):
         while not self.stop_event.wait(HEARTBEAT_S):
-            jid = self.current
-            if jid is not None:
+            for jid in list(self.held):
                 self.db.heartbeat(jid, self.owner)
 
     def shutdown(self, timeout: float = DRAIN_S):
@@ -141,40 +145,114 @@ class JobRunner(threading.Thread):
         self.stop_event.set()
         if self.is_alive():
             self.join(timeout)
-        jid = self.current
-        if jid is not None and self._release(jid, save_stages=False):
-            log.info("job %s: still busy after %.0fs; handed back anyway", jid, timeout)
+        for jid in list(self.held):
+            if self._release(jid, save_stages=False):
+                log.info("job %s: still busy after %.0fs; handed back anyway", jid, timeout)
 
-    def _stopped(self, jid: int):
+    def _stopped(self, jid: int, message: Optional[str] = None):
         state, owner = self.db.job_lease(jid)
         if owner != self.owner:
             return  # another runner has it now; leave its progress alone
         if state == "cancelling":
             return self._finish(jid, "cancelled")
-        self._release(jid)
+        if state == "preempting":
+            message = "paused: another job overrode it; resumes after that one"
+        self._release(jid, message=message or "handed back to the queue: server restarting")
 
-    def _release(self, jid: int, save_stages: bool = True) -> bool:
-        extra = {"stages_json": json.dumps(self._stages)} if save_stages else {}
-        return self._job(jid, state="queued", stage="queued", owner=None, heartbeat=None,
-                         message="handed back to the queue: server restarting", **extra)
+    def _release(self, jid: int, save_stages: bool = True, message: str = "handed back to the queue: server restarting") -> bool:
+        extra = {"stages_json": json.dumps(self._stages[jid])} if save_stages and jid in self._stages else {}
+        return self._job(jid, state="queued", stage="queued", owner=None, heartbeat=None, lane=None, message=message, **extra)
+
+    def _claim(self, job, lane: str) -> bool:
+        """Claim a queued job and pick up where it left off: a job that was handed back, requeued, paused by an
+        override or run ahead keeps its start time, stage history and finished images."""
+        jid = job["id"]
+        if not self.db.claim_job(jid, self.owner, lane):
+            return False  # another runner got it first
+        self.held.add(jid)
+        resumed = job["started"] is not None
+        self._stages[jid] = json.loads(job["stages_json"] or "{}") if resumed else {}
+        if resumed:
+            self._job(jid, stage="scan", message="resumed")
+        else:
+            self._job(jid, stage="scan", started=time.time(), message=None, done=0, errors=0)
+        return True
 
     def run_job(self, job):
         jid = job["id"]
-        if not self.db.claim_job(jid, self.owner):
-            return  # another runner got it first
-        opts = json.loads(job["options_json"] or "{}")
-        paths = [self._resolve(p) for p in json.loads(job["paths_json"])]
         if self.reload_config.is_set():
             from . import config
             self.cfg.update(config.load(self.workdir))
             self.reload_config.clear()
-        # a job that was handed back or requeued keeps its start time, stage history and finished images
-        resumed = job["started"] is not None
-        self._stages = json.loads(job["stages_json"] or "{}") if resumed else {}
-        if resumed:
-            self._job(jid, stage="scan", message="resumed after restart")
-        else:
-            self._job(jid, stage="scan", started=time.time(), message=None, done=0, errors=0)
+        if not self._claim(job, "main"):
+            return
+        try:
+            opts = json.loads(job["options_json"] or "{}")
+            paths = [self._resolve(p) for p in json.loads(job["paths_json"])]
+            done = self._scan_local(jid, paths, opts, lambda: self._cancelled(jid))
+            if done is None:
+                return self._stopped(jid)
+            local_err, local_note = done
+
+            # 3) vlm stage
+            if opts.get("vlm", True):
+                self.run_vlm(jid, paths, opts, local_err, local_note)
+                if self._cancelled(jid):
+                    return self._stopped(jid)
+            self._finish(jid, "done")
+        finally:
+            self._unhold(jid)
+
+    def _unhold(self, jid: int):
+        self.held.discard(jid)
+        self._stages.pop(jid, None)
+
+    def _run_ahead(self, job):
+        """The local-ahead lane's share of a job: scan and local, then back in the queue for the vision model
+        (or done, for a local-only job). Stopped early, it goes back with what it finished."""
+        jid = job["id"]
+        if not self._claim(job, "ahead"):
+            return
+        try:
+            opts = json.loads(job["options_json"] or "{}")
+            paths = [self._resolve(p) for p in json.loads(job["paths_json"])]
+            done = self._scan_local(jid, paths, opts, lambda: self._ahead_stop.is_set() or self._cancelled(jid))
+            if done is None:
+                return self._stopped(jid, None if self.stop_event.is_set() else "local stage started ahead; waiting its turn")
+            self._stage(jid, "local", finished=time.time())
+            if not opts.get("vlm", True):
+                return self._finish(jid, "done")
+            self._release(jid, message=f"{done[1]} · waiting for the vision model")
+        finally:
+            self._unhold(jid)
+
+    def _local_ahead(self):
+        """While the main lane is in the vlm stage, work through the queue's local stages in queue order."""
+        tried: set[int] = set()
+        while not (self._ahead_stop.is_set() or self.stop_event.is_set()):
+            job = self.db.next_local_ahead_job(tried)
+            if job is None:
+                self._ahead_stop.wait(2)
+                continue
+            tried.add(job["id"])
+            self._guarded(self._run_ahead, job)
+
+    def _start_ahead(self) -> Optional[threading.Thread]:
+        if not self.cfg.get("local_ahead", True):
+            return None
+        self._ahead_stop.clear()
+        t = threading.Thread(target=self._local_ahead, daemon=True, name="photosort-local-ahead")
+        t.start()
+        return t
+
+    def _stop_ahead(self, t: Optional[threading.Thread]):
+        """Before the main lane moves on: it may need the local stage (and the job the lane holds) itself."""
+        if t is not None:
+            self._ahead_stop.set()
+            t.join()
+
+    def _scan_local(self, jid: int, paths: list[Path], opts: dict, should_stop) -> Optional[tuple[int, str]]:
+        """Scan and local stages. Returns (local errors, local summary), or None when should_stop() says so."""
         self._stage(jid, "scan")
 
         # 1) scan
@@ -184,8 +262,8 @@ class JobRunner(threading.Thread):
         if paths:
             sidecar.ingest(self.db, self.db.rows_under(paths, "lr_json IS NULL"))
         self._stage(jid, "scan", files=len(files))
-        if self._cancelled(jid):
-            return self._stopped(jid)
+        if should_stop():
+            return None
 
         # 2) local stage
         cond = "local_json IS NULL" if not opts.get("rescan") else "1"
@@ -199,22 +277,16 @@ class JobRunner(threading.Thread):
             from .local import run_local
             prog = self._progress(jid, "local", len(prior))
             ok, n_err = run_local(self.db, self.cfg, self.cache_dir, [(r["id"], r["path"]) for r in rows],
-                                  self.device, prog, lambda: self._cancelled(jid), self.detector())
+                                  self.device, prog, should_stop, self.detector())
             local_err += n_err
             self._job(jid, done=prog.n, errors=local_err)
             local_note = f"local {prog.n}/{total}"
             self._stage(jid, "local", done=prog.n, errors=local_err,
                         device=getattr(self._detector, "device", None) or self.device)
         self._job(jid, message=local_note)
-        if self._cancelled(jid):
-            return self._stopped(jid)
-
-        # 3) vlm stage
-        if opts.get("vlm", True):
-            self.run_vlm(jid, paths, opts, local_err, local_note)
-            if self._cancelled(jid):
-                return self._stopped(jid)
-        self._finish(jid, "done")
+        if should_stop():
+            return None
+        return local_err, local_note
 
     def run_vlm(self, jid: int, paths: list[Path], opts: dict, local_err: int = 0, local_note: str = ""):
         """Counters switch to the vlm stage only when it has work, so a local-only re-analysis keeps its
@@ -262,22 +334,26 @@ class JobRunner(threading.Thread):
                 prog.finish(r["id"], f"{type(e).__name__}: {e}")
                 raise
 
-        with ThreadPoolExecutor(max_workers=conc) as ex:
-            futs = [ex.submit(one, r) for r in rows]
-            for f in as_completed(futs):
-                res = f.result()
-                if res is None:
-                    continue
-                if not self.db.set_vlm_result(res):
-                    errors += 1
-                prog.finish(int(res.key), res.error, res.usage)
-                prog.update(1)
+        ahead = self._start_ahead()
+        try:
+            with ThreadPoolExecutor(max_workers=conc) as ex:
+                futs = [ex.submit(one, r) for r in rows]
+                for f in as_completed(futs):
+                    res = f.result()
+                    if res is None:
+                        continue
+                    if not self.db.set_vlm_result(res):
+                        errors += 1
+                    prog.finish(int(res.key), res.error, res.usage)
+                    prog.update(1)
+        finally:
+            self._stop_ahead(ahead)
         self._job(jid, done=prog.n, errors=local_err + errors)
         self._stage(jid, "vlm", done=prog.n, errors=errors)
 
     def _finish(self, jid: int, state: str):
-        now = time.time()
-        for st in self._stages.values():
+        now, stages = time.time(), self._stages.get(jid, {})
+        for st in stages.values():
             st.setdefault("finished", now)
-        self._job(jid, state=state, stage="done", finished=now, owner=None, heartbeat=None,
-                  stages_json=json.dumps(self._stages))
+        self._job(jid, state=state, stage="done", finished=now, owner=None, heartbeat=None, lane=None,
+                  stages_json=json.dumps(stages))

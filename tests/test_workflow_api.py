@@ -145,7 +145,7 @@ def test_image_filters_and_sorting(api):
     assert by_name(api, split=True) == {}
     api.db.conn.execute("UPDATE images SET local_json=json_set(local_json,'$.split',json('{\"odd\":\"head\",\"gap\":2}')) WHERE id=?", (ids["soft.jpg"],))
     api.db.conn.commit()
-    assert set(by_name(api, split=True)) == {"soft.jpg"}
+    assert set(by_name(api, split=True)) == {"soft.jpg"} and set(by_name(api, split=False)) == {"sharp.jpg", "empty.jpg"}
     assert set(by_name(api, lr_rating=3)) == {"sharp.jpg"} and set(by_name(api, lr_label="Green")) == {"sharp.jpg"}
     assert set(by_name(api, q="day_2")) == {"empty.jpg"} and set(by_name(api, q="onewheel")) == set(ids)
     assert set(by_name(api, keeper=True)) == set(ids)

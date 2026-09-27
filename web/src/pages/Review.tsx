@@ -9,6 +9,7 @@ import { RatingBadge, TierBadge } from '../components/TierBadge';
 import useHotkeys from '../hooks/useHotkeys';
 
 // Which photos the queue starts from: the needs-review flag, just its metrics-split half, or everything.
+// Ctrl/⌘-click on metrics split (or clicking it again) flips it to everything *but* the metrics-split photos.
 const QUEUES = [['', 'needs review'], ['split', 'metrics split'], ['all', 'all']] as const;
 const PAGE = 500;   // the API's per-request cap; stepping past either end loads the neighbouring page
 
@@ -31,7 +32,7 @@ export default function Review() {
   const [sp, setSp] = useSearchParams();
   const filters: ImageFilters = useMemo(() => ({
     review: sp.get('queue') ? undefined : true,
-    split: sp.get('queue') === 'split' || undefined,
+    split: sp.get('queue') === 'split' ? true : sp.get('queue') === 'nosplit' ? false : undefined,
     reviewed: sp.get('rated') === 'all' ? undefined : false,
     folder: sp.get('folder') ?? '',
     recursive: sp.get('recursive') !== 'false',
@@ -95,7 +96,16 @@ export default function Review() {
           <div className="absolute right-0 top-full mt-1 z-20 w-[min(56rem,calc(100vw-1.5rem))] rounded-lg border border-gray-700 bg-gray-900 shadow-xl p-3 flex flex-col md:flex-row gap-3 animate-[menu-in_120ms_ease-out]">
             <div className="md:w-64 shrink-0 space-y-2">
             <div className="flex gap-1">
-              {QUEUES.map(([v, label]) => <SegButton key={v} on={(sp.get('queue') ?? '') === v} onClick={() => set('queue', v)} className="flex-1 whitespace-nowrap text-xs px-1 py-1.5 sm:py-1">{label}</SegButton>)}
+              {QUEUES.map(([v, label]) => {
+                const cur = sp.get('queue') ?? '';
+                if (v !== 'split') return <SegButton key={v} on={cur === v} onClick={() => set('queue', v)} className="flex-1 whitespace-nowrap text-xs px-1 py-1.5 sm:py-1">{label}</SegButton>;
+                const not = cur === 'nosplit';
+                return (
+                  <SegButton key={v} on={cur === 'split' || not} title="ctrl/⌘-click (or click again): everything but the metrics-split photos"
+                    onClick={(e) => set('queue', e.ctrlKey || e.metaKey || cur === 'split' ? 'nosplit' : 'split')}
+                    className="flex-1 whitespace-nowrap text-xs px-1 py-1.5 sm:py-1">{not ? 'all but split' : label}</SegButton>
+                );
+              })}
             </div>
             <label className={check}><input type="checkbox" checked={filters.reviewed === false} onChange={(e) => set('rated', e.target.checked ? undefined : 'all')} /> hide photos you've rated</label>
             <DraftInput value={filters.folder ?? ''} onCommit={(v) => set('folder', v)} placeholder="folder (relative to photos root)" className={sel} />

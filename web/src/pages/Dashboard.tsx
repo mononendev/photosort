@@ -24,6 +24,13 @@ export default function Dashboard() {
         <StatTile label="Missed" value={t?.tier0 ?? '–'} to="/photos?tier=0" />
         <StatTile label="Needs review" value={stats?.review ?? '–'} to="/photos?review=1" sub="local ≠ model" tip="The local sharpness tier and the vision model's tier differ (the thresholds need calibrating or the model is being generous)." />
       </div>
+      {!!stats?.detector_stale && (
+        <p className="text-sm text-amber-300">
+          <Link to="/photos?stale_detector=1" className="hover:underline">{stats.detector_stale} analyzed photo{stats.detector_stale === 1 ? '' : 's'}</Link>{' '}
+          had their people found by another pose model than the current one ({stats.detector}).{' '}
+          <Link to="/calibrate" className="text-blue-400 hover:underline">Re-analyze them →</Link>
+        </p>
+      )}
 
       <section>
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-2">

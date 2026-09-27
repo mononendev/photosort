@@ -48,9 +48,9 @@ func Defaults() pj.Obj {
 		"detect_conf":      0.25,
 		// Pose model (see `photosort models list`): yolo11/yolo26 n-s-m-l-x, rtmo-s/m/l. Configs from before the
 		// ONNX move say "yolo11n-pose.pt", which runs as its ONNX export with the same numbers.
-		"detect_model": "yolo26s-pose",
-		"detect_iou":   0.7, // NMS overlap for the YOLO11 family (YOLO26 and RTMO don't need NMS)
-		"min_person_frac":  0.0015, // ignore boxes smaller than this fraction of the frame
+		"detect_model":    "yolo26s-pose",
+		"detect_iou":      0.7,    // NMS overlap for the YOLO11 family (YOLO26 and RTMO don't need NMS)
+		"min_person_frac": 0.0015, // ignore boxes smaller than this fraction of the frame
 		// Duplicate boxes on one person that survive the detector's NMS: drop the weaker one at IoU >= dedup_iou, or
 		// at IoU >= dedup_head_iou when both put the head keypoints (shoulders + hips if one misses the head) within
 		// dedup_head_tol * box size of each other. A box that sees the head is kept over one that doesn't.

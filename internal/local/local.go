@@ -38,6 +38,15 @@ func Detector(cfg pj.Obj) pj.Obj {
 	return d
 }
 
+// ModelName is the pose model a row analyzed under cfg records (its "detector"): the configured name, with the
+// ".pt" of pre-ONNX configs dropped, since those run as their ONNX export.
+func ModelName(cfg pj.Obj) string {
+	return strings.TrimSuffix(pj.Str(Detector(cfg)["model"]), ".pt")
+}
+
+// LegacyModel is the model behind rows analyzed before local_json recorded one.
+const LegacyModel = "yolo11n-pose"
+
 // MeasureRequest is the analyzer request for one image under cfg.
 func MeasureRequest(cfg pj.Obj, id int64, path, cacheDir string) pj.Obj {
 	dedup := pj.Obj{}

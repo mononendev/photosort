@@ -7,6 +7,7 @@ import ConfigHistory from '../components/ConfigHistory';
 import FocusThresholds from '../components/FocusThresholds';
 import SegButton from '../components/SegButton';
 import TuningPanel from '../components/TuningPanel';
+import PoseModelPanel from '../components/PoseModelPanel';
 import Tip from '../components/Tip';
 import { errMsg } from '../lib/format';
 
@@ -113,6 +114,7 @@ export default function Calibrate() {
       <GroundTruth onApply={(values) => save.mutate({ values, source: 'auto-calibrate' })} applying={save.isPending} />
       <FocusThresholds onSave={(values) => save.mutate({ values, source: 'focus cuts' })} saving={save.isPending} saved={save.data} error={save.error} />
       <TuningPanel />
+      <PoseModelPanel />
       <ConfigHistory />
     </div>
   );

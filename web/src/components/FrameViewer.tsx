@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { ReactNode, RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { frameUrl, fullUrl } from '../api/client';
-import type { FocusDebug, LocalResult } from '../api/client';
+import type { DetectResult, FocusDebug, LocalResult } from '../api/client';
 import type { Grade, Layer } from '../lib/pose';
 import useHotkeys from '../hooks/useHotkeys';
 import { HoverBar, OverlaySvg } from './FrameOverlay';
@@ -35,9 +35,9 @@ const subjectCenter = (l: LocalResult): [number, number] => {
  * centered on the subject's head, so stepping on (or rating) keeps the zoom; it lives with the caller because the
  * viewer remounts while the next photo loads. Set it to 1 before opening for 1:1 on the head.
  */
-export default function FrameViewer({ id, name, l, grades, layers, selected, onSelect, heat, bar, ratings, zoomRef, onClose, onNav }: {
+export default function FrameViewer({ id, name, l, grades, layers, selected, onSelect, heat, bar, ratings, zoomRef, onClose, onNav, compare }: {
   id: number; name: string; l: LocalResult; grades: Grade[]; layers: Set<Layer>; selected: number; onSelect: (i: number) => void;
-  heat?: FocusDebug['heatmap']; bar: ReactNode; ratings?: ReactNode; zoomRef: RefObject<number>; onClose: () => void; onNav?: (dir: 1 | -1) => void;
+  heat?: FocusDebug['heatmap']; compare?: DetectResult | null; bar: ReactNode; ratings?: ReactNode; zoomRef: RefObject<number>; onClose: () => void; onNav?: (dir: 1 | -1) => void;
 }) {
   const W = l.width, H = l.height;
   const stage = useRef<HTMLDivElement>(null);
@@ -213,7 +213,7 @@ export default function FrameViewer({ id, name, l, grades, layers, selected, onS
             <img src={frameUrl(id)} alt="" draggable={false} className="absolute inset-0 w-full h-full" />
             {showFull && <img src={fullUrl(id)} alt="" draggable={false} onLoad={() => setLoadedFor(id)}
               className={`absolute inset-0 w-full h-full ${fullLoaded ? '' : 'opacity-0'}`} style={{ imageRendering: scale > 2 ? 'pixelated' : 'auto' }} />}
-            <OverlaySvg l={l} grades={grades} layers={layers} selected={selected} heat={heat} setHover={setHover}
+            <OverlaySvg l={l} grades={grades} layers={layers} selected={selected} heat={heat} setHover={setHover} compare={compare}
               zoom={0.4 + 0.6 * view.zoom} onSelect={selectUnlessDragged} />
           </div>
         )}

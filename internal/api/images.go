@@ -131,8 +131,22 @@ func (s *Server) stats(*http.Request) (any, error) {
 		}
 		byTier = append(byTier, pj.Obj{"tier": nullF(t), "rating": nullF(rt), "n": n})
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	model := local.ModelName(cfg)
+	stale, err := s.DB.Count(s.staleDetector(), model)
+	if err != nil {
+		return nil, err
+	}
 	return pj.Obj{"tracked": tracked, "analyzed": analyzed, "tagged": tagged, "errors": errs, "review": review,
-		"keepers": keepers, "lr_rated": lrRated, "tiers": tiers, "lr_by_tier": byTier}, rows.Err()
+		"keepers": keepers, "lr_rated": lrRated, "tiers": tiers, "lr_by_tier": byTier,
+		"detector": model, "detector_stale": stale}, nil
+}
+
+// staleDetector is a condition (one argument: the current model): the row's people were found by another pose model.
+func (s *Server) staleDetector() string {
+	return "local_json IS NOT NULL AND COALESCE(" + s.DB.D.JText("local_json", "detector") + ", '" + local.LegacyModel + "') != ?"
 }
 
 func nullF(v sql.NullFloat64) any {
@@ -297,7 +311,7 @@ func (s *Server) listImages(r *http.Request) (any, error) {
 		}
 	}
 	bools := map[string]*bool{}
-	for _, k := range []string{"recursive", "keeper", "review", "split", "truth_mismatch", "reviewed", "stale", "lifted", "overridden", "noted"} {
+	for _, k := range []string{"recursive", "keeper", "review", "split", "truth_mismatch", "reviewed", "stale", "lifted", "overridden", "noted", "stale_detector"} {
 		if bools[k], err = qBool(r, k); err != nil {
 			return nil, err
 		}
@@ -410,8 +424,11 @@ func (s *Server) listImages(r *http.Request) (any, error) {
 	if v := q.Get("primary_by"); v != "" {
 		f.add(d.JText("local_json", "primary_by")+" = ?", v)
 	}
-	if v := q.Get("detector"); v != "" {
-		f.add(d.JText("local_json", "detector")+" = ?", v)
+	if v := q.Get("detector"); v != "" { // which pose model found the people
+		f.add("COALESCE("+d.JText("local_json", "detector")+", '"+local.LegacyModel+"') = ?", v)
+	}
+	if v := bools["stale_detector"]; v != nil && *v { // found by another model than the configured one
+		f.add(s.staleDetector(), local.ModelName(cfg))
 	}
 	if v := bools["lifted"]; v != nil {
 		not := ""

@@ -28,6 +28,8 @@ export default function Photos() {
     reviewed: sp.get('reviewed') ? sp.get('reviewed') === 'true' : undefined,
     rating: sp.get('rating') ? Number(sp.get('rating')) : undefined,
     group: sp.get('group') ? Number(sp.get('group')) : undefined,
+    detector: sp.get('detector') ?? undefined,
+    stale_detector: sp.get('stale_detector') ? true : undefined,
     q: sp.get('q') ?? undefined,
     sort: sp.get('sort') ?? 'path',
     offset: Number(sp.get('offset') ?? 0),

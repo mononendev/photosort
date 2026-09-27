@@ -7,6 +7,7 @@ import Tip from './Tip';
 import FrameOverlay from './FrameOverlay';
 import FrameViewer from './FrameViewer';
 import LayerBar from './LayerBar';
+import CompareBar from './CompareBar';
 import RatingsStrip from './RatingsStrip';
 import { FocusMath, PersonInspector } from './PersonInspector';
 import { gradePerson } from '../lib/pose';
@@ -121,7 +122,12 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
     const dx = t.clientX - s0.x, dy = t.clientY - s0.y;
     if (Math.abs(dx) > 70 && Math.abs(dx) > 2 * Math.abs(dy)) onNav(dx < 0 ? 1 : -1);
   };
-  const layerBar = <LayerBar layers={layers} toggle={toggle} heat={heat} heatLoading={dbg.isFetching} />;
+  const compareModel = useStore((s) => s.compareModel);
+  const cmp = useQuery({ queryKey: ['detect', id, compareModel], queryFn: () => api.detect(id, compareModel!),
+    enabled: !!compareModel && !!l, staleTime: Infinity, retry: false });
+  const compare = compareModel ? cmp.data ?? null : null;
+  const layerBar = <div className="space-y-1"><LayerBar layers={layers} toggle={toggle} heat={heat} heatLoading={dbg.isFetching} />
+    {l && <CompareBar l={l} result={compare} loading={cmp.isFetching} error={cmp.error ? String(cmp.error.message) : undefined} />}</div>;
   return (
     <div className={inline ? '' : 'fixed inset-0 z-50 flex'}>
       {!inline && <div className="absolute inset-0 bg-black/70 animate-[fade-in_150ms_ease-out]" onClick={onClose} />}
@@ -156,8 +162,8 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
               Inline on a wide screen, people and focus math move to a left column and the frame grows. */}
           <div className={`space-y-3 min-w-0 md:col-start-1 md:row-start-1 ${inline ? WIDE.frame : ''}`}>
             {l && layerBar}
-            <FrameOverlay id={id} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} onOpen={() => openFull(0)} />
-            {full && l && <FrameViewer id={id} name={data?.rel ?? String(id)} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} bar={layerBar}
+            <FrameOverlay id={id} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} compare={compare} onOpen={() => openFull(0)} />
+            {full && l && <FrameViewer id={id} name={data?.rel ?? String(id)} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} compare={compare} bar={layerBar}
               ratings={ratings} zoomRef={zoomRef} onClose={closeFull} onNav={onNav} />}
             {data?.has_crop && (
               <div className="flex flex-col sm:flex-row gap-3 items-start">

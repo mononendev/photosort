@@ -21,7 +21,9 @@ function Row({ k, v, tip }: { k: string; v: React.ReactNode; tip?: React.ReactNo
   );
 }
 
-export default function ImageDetail({ id, onClose, onNav }: { id: number; onClose: () => void; onNav?: (dir: 1 | -1) => void }) {
+/** A modal over the gallery; without `onClose` it renders inline as the page itself (the Review tab). */
+export default function ImageDetail({ id, onClose, onNav }: { id: number; onClose?: () => void; onNav?: (dir: 1 | -1) => void }) {
+  const inline = !onClose;
   const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ['image', id], queryFn: () => api.image(id) });
   const { data: cfg } = useQuery({ queryKey: ['config'], queryFn: api.config, staleTime: 30_000 });
@@ -31,12 +33,13 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
   const toggle = useStore((s) => s.toggleLayer);
   const [full, setFull] = useState(false);
   useEffect(() => {  // the gallery behind must not scroll while this is open (wheel over the backdrop, or past the end)
+    if (inline) return;
     const html = document.documentElement;
     const prev = { overflow: html.style.overflow, gutter: html.style.scrollbarGutter };
     html.style.scrollbarGutter = 'stable';   // keep the scrollbar's space so the gallery doesn't shift sideways
     html.style.overflow = 'hidden';
     return () => { html.style.overflow = prev.overflow; html.style.scrollbarGutter = prev.gutter; };
-  }, []);
+  }, [inline]);
   const closeFull = useCallback(() => setFull(false), []);
   const showMath = useStore((s) => s.showMath);
   const setShowMath = useStore((s) => s.setShowMath);
@@ -61,7 +64,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
   // Backspace takes your rating back off (the photo is unreviewed again) and stays put.
   const unrate = useCallback(() => save({ id, o: { clear_rating: true } }), [save, id]);
   useHotkeys({
-    Escape: onClose,
+    ...(onClose && { Escape: onClose }),
     ...(onNav && { ArrowRight: () => onNav(1), ArrowLeft: () => onNav(-1) }),
     ...Object.fromEntries(RATINGS.map((r) => [r.key, (e: KeyboardEvent) => { if (!e.repeat) rate(r.value); }])),
     Backspace: (e) => { if (!e.repeat && data?.reviewed) unrate(); },
@@ -89,11 +92,12 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
   };
   const layerBar = <LayerBar layers={layers} toggle={toggle} heat={heat} heatLoading={dbg.isFetching} />;
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="absolute inset-0 bg-black/70 animate-[fade-in_150ms_ease-out]" onClick={onClose} />
+    <div className={inline ? '' : 'fixed inset-0 z-50 flex'}>
+      {!inline && <div className="absolute inset-0 bg-black/70 animate-[fade-in_150ms_ease-out]" onClick={onClose} />}
       <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
-        className="relative sm:m-auto w-full h-[100dvh] sm:h-auto sm:w-[min(1200px,96vw)] sm:max-h-[94vh] overflow-auto overscroll-contain sm:rounded-xl sm:border border-gray-700 bg-gray-950 shadow-2xl animate-[sheet-in_180ms_ease-out]">
-        <div className="flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1 px-3 sm:px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:pt-2 border-b border-gray-800 sticky top-0 z-10 bg-gray-950/95 backdrop-blur">
+        className={inline ? 'relative sm:rounded-xl sm:border border-gray-700 bg-gray-950'
+          : 'relative sm:m-auto w-full h-[100dvh] sm:h-auto sm:w-[min(1200px,96vw)] sm:max-h-[94vh] overflow-auto overscroll-contain sm:rounded-xl sm:border border-gray-700 bg-gray-950 shadow-2xl animate-[sheet-in_180ms_ease-out]'}>
+        <div className={`flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1 px-3 sm:px-4 py-2 border-b border-gray-800 sticky z-10 bg-gray-950/95 backdrop-blur ${inline ? 'top-[calc(3.5rem+env(safe-area-inset-top))]' : 'top-0 pt-[max(0.5rem,env(safe-area-inset-top))] sm:pt-2'}`}>
           <span className="font-mono text-sm text-gray-300 truncate min-w-0 flex-1 sm:flex-none">{data?.rel ?? id}</span>
           <span className="order-last basis-full sm:basis-auto sm:order-none flex flex-wrap items-center gap-x-3 gap-y-1">
           {data && <Tip plain tip={explainFinal(data, cfg)}><TierBadge tier={data.focus_tier} /></Tip>}
@@ -118,7 +122,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
           <span className="sm:ml-auto flex gap-1 sm:gap-2">
             {onNav && <button onClick={() => onNav(-1)} aria-label="Previous photo" className="px-3 py-1.5 sm:px-2 sm:py-0 rounded text-gray-400 hover:text-white active:bg-gray-800">←</button>}
             {onNav && <button onClick={() => onNav(1)} aria-label="Next photo" className="px-3 py-1.5 sm:px-2 sm:py-0 rounded text-gray-400 hover:text-white active:bg-gray-800">→</button>}
-            <button onClick={onClose} aria-label="Close" className="px-3 py-1.5 sm:px-2 sm:py-0 rounded text-gray-400 hover:text-white active:bg-gray-800">✕</button>
+            {onClose && <button onClick={onClose} aria-label="Close" className="px-3 py-1.5 sm:px-2 sm:py-0 rounded text-gray-400 hover:text-white active:bg-gray-800">✕</button>}
           </span>
         </div>
         <div className="grid md:grid-cols-[minmax(0,1fr)_380px] gap-4 p-3 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">

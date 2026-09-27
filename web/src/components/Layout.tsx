@@ -9,6 +9,7 @@ const NAV = [
   { label: 'Dashboard', to: '/', end: true },
   { label: 'Browse', to: '/browse' },
   { label: 'Photos', to: '/photos' },
+  { label: 'Review', to: '/review' },
   { label: 'Jobs', to: '/jobs' },
   { label: 'Calibrate', to: '/calibrate' },
   { label: 'Export', to: '/export' },

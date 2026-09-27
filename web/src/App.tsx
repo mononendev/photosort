@@ -8,6 +8,7 @@ import Jobs from './pages/Jobs';
 import JobDetail from './pages/JobDetail';
 import Export from './pages/Export';
 import Calibrate from './pages/Calibrate';
+import Review from './pages/Review';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false } } });
 
@@ -20,6 +21,7 @@ export default function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/browse/*" element={<Browse />} />
             <Route path="/photos" element={<Photos />} />
+            <Route path="/review" element={<Review />} />
             <Route path="/jobs" element={<Jobs />} />
             <Route path="/jobs/:id" element={<JobDetail />} />
             <Route path="/export" element={<Export />} />

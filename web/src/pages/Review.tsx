@@ -91,7 +91,10 @@ export default function Review() {
     return f as ImageFilters;
   }, [sp]);
   const [offset, setOffset] = useState(0);
-  const [picked, setPicked] = useState<{ id: number } | { edge: 'first' | 'last' } | null>(null);
+  // stay: a photo reached through the history, shown even when it's no longer in the queue (you've rated it).
+  const [picked, setPicked] = useState<{ id: number; stay?: boolean } | { edge: 'first' | 'last' } | null>(null);
+  // The photos you've stepped away from (back) and backed out of (fwd), so ← undoes a rating's advance.
+  const [hist, setHist] = useState<{ back: number[]; fwd: number[] }>({ back: [], fwd: [] });
   const { data, isLoading, isFetching, isError, error } = useQuery({
     queryKey: ['images', 'review-queue', filters, offset],
     queryFn: () => api.images({ ...filters, offset, limit: PAGE }),
@@ -99,11 +102,11 @@ export default function Review() {
   });
   const set = useCallback((k: string, v: string | undefined) => {
     setSp((cur) => { const n = new URLSearchParams(cur); if (v === undefined || v === '') n.delete(k); else n.set(k, v); return n; }, { replace: true });
-    setOffset(0); setPicked(null);
+    setOffset(0); setPicked(null); setHist({ back: [], fwd: [] });
   }, [setSp]);
   const clear = useCallback((keys: readonly string[]) => {
     setSp((cur) => { const n = new URLSearchParams(cur); keys.forEach((k) => n.delete(k)); return n; }, { replace: true });
-    setOffset(0); setPicked(null);
+    setOffset(0); setPicked(null); setHist({ back: [], fwd: [] });
   }, [setSp]);
 
   const items = useMemo(() => (data?.items ?? []).filter((x) => x.id !== null), [data]);
@@ -111,13 +114,27 @@ export default function Review() {
   // Follow the pick while it's still in the queue; once it's rated and gone, fall back to the first one left.
   const found = picked && 'id' in picked ? items.findIndex((x) => x.id === picked.id) : -1;
   const i = found >= 0 ? found : picked && 'edge' in picked && picked.edge === 'last' ? items.length - 1 : 0;
-  const id = items[i]?.id ?? null;
+  const away = found < 0 && picked && 'id' in picked && picked.stay ? picked.id : null;   // revisited, out of the queue
+  const id = away ?? items[i]?.id ?? null;
+  // ← and → walk the history first (back to the photo you just rated, then forward again), and the queue after that.
   const nav = useCallback((dir: 1 | -1) => {
-    const nx = items[i + dir];
-    if (nx?.id) setPicked({ id: nx.id });
-    else if (dir === 1 && offset + items.length < total) { setOffset(offset + PAGE); setPicked({ edge: 'first' }); }
-    else if (dir === -1 && offset > 0) { setOffset(Math.max(0, offset - PAGE)); setPicked({ edge: 'last' }); }
-  }, [items, i, offset, total]);
+    const [from, to] = dir === -1 ? [hist.back, hist.fwd] : [hist.fwd, hist.back];
+    if (from.length && id !== null) {
+      const prev = from[from.length - 1];
+      const moved = { from: from.slice(0, -1), to: [...to, id] };
+      setHist(dir === -1 ? { back: moved.from, fwd: moved.to } : { back: moved.to, fwd: moved.from });
+      setPicked({ id: prev, stay: true });
+      return;
+    }
+    const step = (p: NonNullable<typeof picked>) => {
+      if (id !== null) setHist({ back: dir === 1 ? [...hist.back, id] : hist.back, fwd: [] });
+      setPicked(p);
+    };
+    const nx = away === null ? items[i + dir] : items[dir === 1 ? i : i - 1];
+    if (nx?.id) step({ id: nx.id });
+    else if (dir === 1 && offset + items.length < total) { setOffset(offset + PAGE); step({ edge: 'first' }); }
+    else if (dir === -1 && offset > 0) { setOffset(Math.max(0, offset - PAGE)); step({ edge: 'last' }); }
+  }, [hist, id, away, items, i, offset, total]);
 
   const [menu, setMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -262,7 +279,7 @@ export default function Review() {
     <>
       <span className="text-xs text-gray-500 tabular-nums whitespace-nowrap flex items-center gap-1.5">
         {isFetching && <span className="inline-block w-3 h-3 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" aria-label="updating" />}
-        {id === null ? 0 : offset + i + 1} / {total}
+        {id === null ? 0 : away !== null ? '–' : offset + i + 1} / {total}
       </span>
       <div ref={menuRef} className="relative" onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setMenu(false); } }}>
         <button onClick={() => setMenu(!menu)} aria-label="Filters" aria-expanded={menu} title="Filters (f)"
@@ -288,7 +305,7 @@ export default function Review() {
                 <select value={filters.sort} onChange={(e) => set('sort', e.target.value === 'path' ? undefined : e.target.value)} className={sel}>
                   {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
-                {nActive > 0 && <button onClick={() => { setSp({}, { replace: true }); setOffset(0); setPicked(null); }} className="text-xs text-gray-400 hover:text-white">reset everything to defaults</button>}
+                {nActive > 0 && <button onClick={() => { setSp({}, { replace: true }); setOffset(0); setPicked(null); setHist({ back: [], fwd: [] }); }} className="text-xs text-gray-400 hover:text-white">reset everything to defaults</button>}
               </div>
             </div>
             {/* This page of the queue: click one to jump to it. */}
@@ -296,10 +313,10 @@ export default function Review() {
               <div className="text-xs text-gray-500 tabular-nums">{isFetching ? 'updating…' : `${total} photo${total === 1 ? '' : 's'} match`}</div>
               <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-1 content-start transition-opacity ${isFetching ? 'opacity-50' : ''}`}>
                 {items.map((it, j) => (
-                  <button key={it.id} data-current={j === i || undefined}
-                    onClick={() => { setPicked({ id: it.id! }); setMenu(false); }} title={it.rel}
-                    className={`relative aspect-[3/2] rounded overflow-hidden bg-gray-950 border-2 ${j === i ? 'border-blue-400' : 'border-transparent hover:border-gray-500'}`}>
-                    <img src={thumbUrl(it.id!)} alt="" loading="lazy" className={`w-full h-full object-cover ${it.reviewed && j !== i ? 'opacity-50' : ''}`} />
+                  <button key={it.id} data-current={(away === null && j === i) || undefined}
+                    onClick={() => { if (id !== null && it.id !== id) setHist({ back: [...hist.back, id], fwd: [] }); setPicked({ id: it.id! }); setMenu(false); }} title={it.rel}
+                    className={`relative aspect-[3/2] rounded overflow-hidden bg-gray-950 border-2 ${away === null && j === i ? 'border-blue-400' : 'border-transparent hover:border-gray-500'}`}>
+                    <img src={thumbUrl(it.id!)} alt="" loading="lazy" className={`w-full h-full object-cover ${it.reviewed && (away !== null || j !== i) ? 'opacity-50' : ''}`} />
                     <span className="absolute top-0.5 left-0.5 flex gap-0.5"><TierBadge tier={it.focus_tier} small />{it.reviewed && <RatingBadge rating={it.rating} />}</span>
                   </button>
                 ))}

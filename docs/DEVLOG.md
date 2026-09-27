@@ -251,3 +251,19 @@ treat subject/composition as hints until calibrated; keywords/remarks are usable
 - Sim on that folder (889 rows, 25 in-app ratings, via the API): 110 tiers change, agreement with VLM 453 -> 530,
   with ratings 17 -> 18 (IMG_1055), none worse. The rejected alternative (cap at 1 when the AF point sits beside a
   sharp non-primary) mostly hit VLM-3 frames. Applies on rescore.
+
+### Noise prior: effective ISO, measured sigma, borderline tier 3 demoted (2026-09-27, pho-nkaw)
+- ISO was read but unused. Noise biases the metrics both ways: grain survives the Laplacian's sigma=1 pre-blur and
+  reads as detail, camera NR smears detail. Dev-data with 6 levels of added noise: bus_allblur tier 0 -> 2,
+  zidane_bgblur 0 -> 1.
+- `exif.noise_prior`: eff_iso = ISO x 2^lift; `noise.high_iso` 6400 / `noisy_iso` 1600. High noise: a tier 3 must
+  clear `noise.margin` (1.5) x the cuts or drops to 2 (`borderline_sharp_noisy`). Summary goes into the VLM context.
+- `local.noise_sigma`: Immerkær (difference-of-Laplacians kernel, sigma = sqrt(pi/2)/6 x mean |r|) over the
+  flattest 50% of unclipped pixels, native res, stats on every other row/col: ~0.1 s at 20 MP. Recovers added
+  Gaussian noise within 20% on 1/f test scenes; 6 levels added to dev-data JPEGs reads 6.5.
+- Stored as `noise.sigma` but the sigma cuts ship null (ISO decides): on Capture One exports it doesn't track ISO
+  across pipelines (C1 ISO 100 ~0.05, FLF ISO 1250-1600 ~1.0, 2026-04 ISO 250-500 1.35-1.5, near-flat across
+  flat-fraction choices, so likely export grain/NR). No camera originals on hand to calibrate; set
+  `medium_sigma`/`high_sigma` from the Trace page's noise stage on real camera files.
+- The margin only guards tier 3. Noise lifting a blurred frame into tier 1-2 (above) is the metric-correction
+  option (subtract the noise's predicted Laplacian variance), not done.

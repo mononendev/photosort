@@ -36,7 +36,9 @@ def test_walk_matches_local_tier():
         f["front_min_height"] = rng.choice([0.5, 1.0])
         people = [_person(rng, rng.uniform(0, 1500)) for _ in range(rng.randint(0, 4))]
         local = {"width": 2000, "height": 1300, "n_people": len(people), "people": people,
-                 "exif_prior": {"motion_risk": rng.choice([None, "low", "high"])}, "local_tier": None, "local_reason": None}
+                 "exif_prior": {"motion_risk": rng.choice([None, "low", "high"])}, "local_tier": None, "local_reason": None,
+                 "exif": {"iso": rng.choice([None, 400, 6400])}, "exposure": rng.choice([None, {"ev": 2.0}]),
+                 "noise": rng.choice([None, {"sigma": rng.uniform(0, 6)}])}
         primary, others = (people[0], people[1:]) if people else (None, [])
         stage, check = T._local_tier(local, cfg, people, primary, others)
         assert check["traced"] == check["engine"], (check, people)

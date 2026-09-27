@@ -74,6 +74,8 @@ def context_text(local: dict) -> str:
     if (local.get("exposure") or {}).get("ev"):
         lines.append(f"The original was underexposed; these images were brightened by {local['exposure']['ev']:.1f} stops "
                      f"for review, so judge exposure as dark and expect lifted shadow noise.")
+    if (local.get("noise") or {}).get("summary"):
+        lines.append(local["noise"]["summary"])
     if n and local.get("people"):
         p = local["people"][0]
         af = local.get("af") or {}

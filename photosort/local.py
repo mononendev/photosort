@@ -95,6 +95,31 @@ def hf_ratio(gray: np.ndarray, band=(0.25, 0.75), floor: float = 0.03, min_px: i
     return None if t is None else t["band_e"] / t["total_e"]
 
 
+NOISE_K = np.array([[1, -2, 1], [-2, 4, -2], [1, -2, 1]], np.float32)
+
+
+def noise_sigma(gray: np.ndarray, flat_q: float = 50) -> Optional[float]:
+    """Sensor noise sigma of a float32 grayscale image in [0,1], in 8-bit levels, or None when there's too little to read.
+
+    Immerkær's fast estimate: the kernel is the difference of two Laplacians, which cancels edges and smooth
+    gradients, so what it leaves on a flat patch is noise, and sigma = sqrt(pi/2) / 6 x mean |response|. Texture still
+    leaks through, so only the flattest flat_q percent of pixels count (by gradient magnitude), and near-clipped
+    pixels, where the noise is cut off, are left out. Filtered at native resolution (downscaling averages noise away);
+    the statistics then read every other row and column, which is plenty and keeps a 20 MP frame near 0.1 s."""
+    if gray is None or min(gray.shape[:2]) < 16:
+        return None
+    s = (slice(1, -1, 2), slice(1, -1, 2))   # the border rows and columns see the filters' padding
+    r = cv2.filter2D(gray, cv2.CV_32F, NOISE_K)[s]
+    b = cv2.GaussianBlur(gray, (0, 0), 1.0)
+    grad = (np.abs(cv2.Sobel(b, cv2.CV_32F, 1, 0, ksize=3)) + np.abs(cv2.Sobel(b, cv2.CV_32F, 0, 1, ksize=3)))[s]
+    g = gray[s]
+    ok = (g > 0.02) & (g < 0.98)
+    if ok.sum() < 250:
+        return None
+    ok &= grad <= np.percentile(grad[ok][::8], flat_q)   # a sample sets the cut as well as every pixel would
+    return float(np.sqrt(np.pi / 2) / 6 * np.abs(r[ok]).mean() * 255) if ok.any() else None
+
+
 PLANE_PRE = 1.0      # denoise blur before the edge-width estimate; subtracted back out in quadrature
 PLANE_MIN_STEP = 0.12
 PLANE_MIN_EDGES = 40
@@ -470,9 +495,11 @@ def metric_split(p: Optional[dict], thr: dict) -> Optional[dict]:
 
 
 def local_tier(primary: Optional[dict], others: list[dict], thr: dict, prior: Optional[dict] = None,
-               shake_margin: float = 1.5, size: Optional[tuple[int, int]] = None) -> tuple[int, str]:
+               shake_margin: float = 1.5, size: Optional[tuple[int, int]] = None, noise: Optional[dict] = None,
+               noise_margin: float = 1.5) -> tuple[int, str]:
     """Tier from measured sharpness (3 sharp, 2 slightly soft, 1 soft, 0 miss); the EXIF prior only demotes a
-    *borderline* tier 3 shot at a slow shutter (a clearly sharp subject wins, e.g. a well-panned rider). A tier 3
+    *borderline* tier 3 shot at a slow shutter (a clearly sharp subject wins, e.g. a well-panned rider), and the noise
+    prior (exif.noise_prior) one at high noise, where grain or noise reduction make a near pass unreliable. A tier 3
     whose surroundings (or, when plane_body_max_extra is set, torso) are clearly sharper than the head
     (focus_plane) is only slightly soft: focus landed just off the face. So is one with a soft person standing
     clearly in front of it (soft_in_front): focus went past the subject onto someone behind. Below floor_tier,
@@ -488,7 +515,9 @@ def local_tier(primary: Optional[dict], others: list[dict], thr: dict, prior: Op
     if g == 3:
         if prior and prior.get("motion_risk") == "high" and _grade(primary, thr, shake_margin) < 3:
             return 2, "borderline_sharp_slow_shutter"
-        pl = primary.get("plane") or {}
+        if noise and noise.get("risk") == "high" and _grade(primary, thr, noise_margin) < 3:
+            return 2, "borderline_sharp_noisy"
+        pl =primary.get("plane") or {}
         if thr.get("use_plane", True):
             cut, body_cut = thr.get("plane_max_extra"), thr.get("plane_body_max_extra")
             if cut and (pl.get("head_vs_near") or 0) >= cut:
@@ -507,6 +536,12 @@ def local_tier(primary: Optional[dict], others: list[dict], thr: dict, prior: Op
     if any(_grade(o, thr) == 3 for o in others):
         return 0, "secondary_person_sharp"
     return 0, "nothing_sharp"
+
+
+def margins(cfg: dict) -> dict:
+    """local_tier's shake_margin and noise_margin from the config."""
+    return {"shake_margin": (cfg.get("exif") or {}).get("shake_margin", 1.5),
+            "noise_margin": (cfg.get("noise") or {}).get("margin", 1.5)}
 
 
 THUMB_LONG_EDGE = 400
@@ -629,7 +664,8 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
         primary["plane"] = focus_plane(gray, primary, W, H)
     exif = X.read(path)
     prior = X.prior(exif, cfg.get("exif"))
-    tier, reason = local_tier(primary, people[1:], cfg["focus"], prior, cfg.get("exif", {}).get("shake_margin", 1.5), (W, H))
+    noise = X.noise_prior(exif, (exposure or {}).get("ev"), _rnd(noise_sigma(gray)), cfg.get("noise"))
+    tier, reason = local_tier(primary, people[1:], cfg["focus"], prior, size=(W, H), noise=noise, **margins(cfg))
 
     frame_im = I.resize_long_edge(im, cfg["frame_long_edge"])
     frame = I.to_jpeg(frame_im, cfg["frame_quality"])
@@ -649,7 +685,7 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
         **_primary_fields(primary),
         "af": af, "af_note": af_note, "primary_by": primary_by,
         "crop_box": crop_used,
-        "exif": exif, "exif_prior": prior, "exposure": exposure,
+        "exif": exif, "exif_prior": prior, "exposure": exposure, "noise": noise,
         "local_tier": tier, "local_reason": reason, "split": metric_split(primary, cfg["focus"]),
     }
     return LocalResult(data, frame, crop_jpeg, thumb)
@@ -674,6 +710,10 @@ def rescore(db, cfg: dict, backfill_exif: bool = True) -> dict:
                 dirty = True
             if "exif" in d:
                 d["exif_prior"] = X.prior(d["exif"], cfg.get("exif"))
+            noise = X.noise_prior(d.get("exif") or {}, (d.get("exposure") or {}).get("ev"),
+                                  (d.get("noise") or {}).get("sigma"), cfg.get("noise"))
+            dirty |= noise != d.get("noise")
+            d["noise"] = noise
             people = d.get("people") or []
             if backfill_exif and d.get("af") is None and d.get("width"):
                 # Also retries rows whose earlier read came back empty (the first reader missed Canon 0x0026).
@@ -692,8 +732,8 @@ def rescore(db, cfg: dict, backfill_exif: bool = True) -> dict:
                 reordered += 1
                 dirty = True
             tier, reason = local_tier(people[0] if people else None, people[1:], cfg["focus"], d.get("exif_prior"),
-                                      cfg.get("exif", {}).get("shake_margin", 1.5),
-                                      (d["width"], d["height"]) if d.get("width") else None)
+                                      size=(d["width"], d["height"]) if d.get("width") else None, noise=noise,
+                                      **margins(cfg))
             split = metric_split(people[0] if people else None, cfg["focus"])
             if tier != d.get("local_tier") or split != d.get("split") or dirty:
                 if tier != d.get("local_tier"):

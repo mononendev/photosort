@@ -94,6 +94,16 @@ subject at native resolution, and falls back to the head when the eyes can't be 
    (35 mm equivalent) or slower than 1/60 s flags motion-blur risk. A tier 3 that clears its thresholds by
    less than 1.5× at a risky shutter speed is demoted to tier 2 (`borderline_sharp_slow_shutter`). A clearly
    sharp subject, such as a well-panned rider, keeps tier 3.
+9. **Noise.** Grain that survives the Laplacian's pre-blur reads as detail (on the upscaled dev-data, six levels
+   of added noise lift an all-blur frame from tier 0 to 2), and the camera's noise reduction at high ISO smears
+   real detail away. So high noise gets the same treatment as a slow shutter: a tier 3 that clears its thresholds
+   by less than `noise.margin` (1.5×) drops to tier 2 (`borderline_sharp_noisy`). Noise is judged on effective
+   ISO, ISO × 2^lift, since lifting a frame by the exposure step amplifies its noise as shooting that much
+   higher would have: `noise.high_iso` (6400) and up is high, `noisy_iso` (1600) and up moderate. The noise is
+   also measured on every frame after the lift (Immerkær's estimate over the flattest half of the pixels, in
+   8-bit levels) and stored. Set `noise.medium_sigma` and `high_sigma` to judge on it instead, which accounts for
+   the sensor and in-camera noise reduction; its level depends on how the file was processed, so the cuts ship
+   unset. Moderate and high noise are also described in the vision prompt.
 
 ## Calibrating
 
@@ -145,3 +155,6 @@ high is usually right: a false "sharp" costs more than a false "check this".
 
 `exif`: `crop_factor` (for bodies that don't write a 35 mm-equivalent focal length), `wide_open_f`,
 `shake_margin`.
+
+`noise`: `noisy_iso`, `high_iso` (effective ISO cuts), `medium_sigma`, `high_sigma` (measured-noise cuts, `null` =
+judge on ISO), `margin` (1 = off).

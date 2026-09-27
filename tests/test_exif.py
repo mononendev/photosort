@@ -43,6 +43,20 @@ def test_prior_rules():
     assert exif.prior({"shutter_s": 1 / 80, "focal_mm": 50}, {"crop_factor": 1.6})["shake_stops"] == 0.0
 
 
+def test_noise_prior_measured_wins_over_iso():
+    cfg = {"medium_sigma": 2.0, "high_sigma": 3.5, "noisy_iso": 1600, "high_iso": 6400}
+    # ISO 1600 lifted 2 stops is ISO 6400's noise
+    lifted = exif.noise_prior({"iso": 1600}, 2.0, None, cfg)
+    assert lifted["eff_iso"] == 6400 and lifted["risk"] == "high" and lifted["by"] == "iso"
+    assert "about ISO 6400" in lifted["summary"]
+    assert exif.noise_prior({"iso": 1600}, None, None, cfg)["risk"] == "medium"
+    assert exif.noise_prior({"iso": 400}, None, None, cfg)["summary"] is None
+    # a clean measurement overrides a scary ISO (the camera's noise reduction did its job), and vice versa
+    assert exif.noise_prior({"iso": 12800}, None, 1.2, cfg)[("risk")] == "low"
+    assert exif.noise_prior({"iso": 200}, None, 4.0, cfg)["risk"] == "high"
+    assert exif.noise_prior({}, None, None, cfg)["by"] is None
+
+
 def test_slow_shutter_demotes_only_borderline_tier3():
     thr = {"tier3_min": 0.03, "tier2_min": 0.017, "tier1_min": 0.01}
     risky = {"motion_risk": "high"}

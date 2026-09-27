@@ -12,7 +12,7 @@ import { FocusMath, PersonInspector } from './PersonInspector';
 import { gradePerson } from '../lib/pose';
 import useHotkeys from '../hooks/useHotkeys';
 import useStore from '../hooks/useStore';
-import { METRIC_TIPS, TIER_MEANING, explainDisagree, explainLocal, explainPrior, explainSplit, splitShort } from '../lib/explain';
+import { METRIC_TIPS, TIER_MEANING, explainDisagree, explainLocal, explainNoise, explainPrior, explainSplit, splitShort } from '../lib/explain';
 
 const STARS = [1, 2, 3, 4, 5];
 /** Star n lit amber up to your stars; without yours, dimly up to the model's score. */
@@ -218,9 +218,10 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
             )}
             {l?.exif_prior?.summary && (
               <div className="text-xs text-gray-400">
-                <Tip tip="Read from the file's EXIF. The camera summary goes into the model's context. Motion risk can also demote a borderline local tier 3 to 2."><span className="text-gray-500">camera:</span></Tip> {l.exif_prior.summary}
+                <Tip tip="Read from the file's EXIF. The camera summary goes into the model's context. Motion risk and high noise (effective ISO, or measured) can also demote a borderline local tier 3 to 2."><span className="text-gray-500">camera:</span></Tip> {l.exif_prior.summary}
                 {l.exif_prior.motion_risk === 'high' && <Tip plain tip={explainPrior(l.exif_prior, cfg).motion}><span className="ml-1 rounded bg-amber-900/60 px-1 text-amber-200 cursor-help">motion risk</span></Tip>}
                 {l.exif_prior.dof_risk === 'high' && <Tip plain tip={explainPrior(l.exif_prior, cfg).dof}><span className="ml-1 rounded bg-sky-900/60 px-1 text-sky-200 cursor-help">shallow DOF</span></Tip>}
+                {l.noise?.risk === 'high' && <Tip plain tip={explainNoise(l.noise, cfg)}><span className="ml-1 rounded bg-violet-900/60 px-1 text-violet-200 cursor-help">high noise</span></Tip>}
               </div>
             )}
             {data?.local && (

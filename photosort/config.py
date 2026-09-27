@@ -106,6 +106,11 @@ DEFAULTS: dict = {
     # f-number <= wide_open_f or entrance pupil >= 40mm = "very shallow DOF"; a tier-3 sharpness below tier3_min*shake_margin is
     # demoted to tier 2 when the shutter was slow enough that motion blur is likely.
     "exif": {"crop_factor": 1.0, "wide_open_f": 2.0, "action_shutter": 1 / 500, "shake_margin": 1.5},
+    # Noise: judged on effective ISO, ISO x 2^lift (noisy_iso / high_iso). The noise sigma measured on the frame after
+    # any lift (8-bit levels) is always stored; set medium_sigma / high_sigma to judge on it instead. Its level depends
+    # on the processing (Capture One exports read ~0.05 at ISO 100 and ~1 at ISO 1600), so calibrate the cuts on your
+    # own camera files first. At high noise a tier-3 sharpness below tier3_min*margin is demoted to tier 2 (1 = off).
+    "noise": {"noisy_iso": 1600, "high_iso": 6400, "medium_sigma": None, "high_sigma": None, "margin": 1.5},
     # Camera AF points (Canon maker notes): the person the active points land on becomes the primary subject,
     # whatever their size or sharpness, when their score (head hit 2, torso 1.5, body 1 per point) >= min_score.
     # A point beside a region earns up to half its weight, falling to 0 at `near` point-widths away (0 = off).

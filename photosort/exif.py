@@ -146,3 +146,35 @@ def prior(exif: dict, cfg: Optional[dict] = None) -> dict:
         notes.append("fast shutter: motion blur unlikely")
     out["summary"] = " · ".join(parts) + (". " + "; ".join(notes) + "." if notes else "")
     return out
+
+
+def noise_prior(exif: dict, ev: Optional[float] = None, sigma: Optional[float] = None, cfg: Optional[dict] = None) -> dict:
+    """Noise risk from the noise measured on the frame, or from the ISO and the exposure lift when it wasn't measured.
+
+    Noise cuts both ways on the focus metrics: grain that survives the Laplacian's pre-blur reads as detail, while the
+    camera's noise reduction at high ISO smears real detail away. Either way a borderline sharpness score means less.
+
+    eff_iso: ISO x 2^ev. Lifting a frame by ev stops amplifies its noise as shooting that much higher would have.
+    sigma: noise measured on the (lifted) frame, in 8-bit levels (local.noise_sigma). It already accounts for the
+    sensor, the lift and in-camera noise reduction, so it decides when it was measured and medium_sigma/high_sigma
+    are set. Its level depends on the processing (camera JPEG, RAW converter, noise reduction), so those cuts ship
+    unset; until they're calibrated, and for rows analyzed before it was measured, eff_iso decides."""
+    cfg = cfg or {}
+    iso, ev = (exif or {}).get("iso"), ev or 0.0
+    eff = iso * 2 ** ev if iso else None
+    out: dict = {"iso": iso, "ev": ev or None, "eff_iso": round(eff) if eff else None, "sigma": sigma,
+                 "risk": None, "by": None, "summary": None}
+
+    def rank(v, med, high):
+        return None if v is None or med is None or high is None else "high" if v >= high else "medium" if v >= med else "low"
+
+    if sigma is not None and cfg.get("medium_sigma") is not None and cfg.get("high_sigma") is not None:
+        out["risk"], out["by"] =rank(sigma, cfg.get("medium_sigma"), cfg.get("high_sigma")), "measured"
+    elif eff:
+        out["risk"], out["by"] = rank(eff, cfg.get("noisy_iso"), cfg.get("high_iso")), "iso"
+    if out["risk"] in ("medium", "high"):
+        what = [(f"ISO {iso:g}" + (f" lifted +{ev:g} EV, about ISO {eff:.0f}" if ev else "")) if iso else None,
+                f"measured noise {sigma:.1f} levels" if sigma is not None else None]
+        out["summary"] = (f"{'High' if out['risk'] == 'high' else 'Moderate'} noise ({'; '.join(w for w in what if w)}): "
+                          f"don't read grain as detail, or noise-reduction smear as missed focus.")
+    return out

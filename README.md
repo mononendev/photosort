@@ -36,7 +36,8 @@ At f/1.4-f/2 focus varies across a body, so the question that matters most is "d
 - **Export where you already work.** XMP sidecars (keywords, caption, rating, `PhotoSort|…` hierarchy),
   CSV/JSONL, and a `focus_N/<subject>/<composition>/` folder tree.
 - **Reads what cameras write.** JPEG, HEIC, and RAW (CR2, NEF, ARW, …) via the embedded preview. EXIF
-  aperture and shutter speed feed a depth-of-field / motion-blur prior, and on Canon bodies the AF points
+  aperture and shutter speed feed a depth-of-field / motion-blur prior, ISO (times any exposure lift) a noise
+  prior, and on Canon bodies the AF points
   from the maker notes pick which person the photographer meant as the subject.
 
 ## How it works

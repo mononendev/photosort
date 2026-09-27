@@ -106,6 +106,26 @@ def test_local_tier_slow_shutter_demotes_borderline_eyes_only():
     assert local.local_tier({"sharp_eye": 0.2, "hf_eye": 0.05}, [], THR, slow)[0] == 3
 
 
+def test_local_tier_high_noise_demotes_borderline_only():
+    noisy = {"risk": "high"}
+    assert local.local_tier({"sharp_eye": 0.07, "hf_eye": 0.05}, [], THR, noise=noisy) == (2, "borderline_sharp_noisy")
+    assert local.local_tier({"sharp_eye": 0.2, "hf_eye": 0.05}, [], THR, noise=noisy)[0] == 3
+    assert local.local_tier({"sharp_eye": 0.07, "hf_eye": 0.05}, [], THR, noise={"risk": "medium"})[0] == 3
+    assert local.local_tier({"sharp_eye": 0.07, "hf_eye": 0.05}, [], THR, noise=noisy, noise_margin=1.0)[0] == 3
+
+
+def test_noise_sigma_reads_added_noise():
+    """On a textured scene (1/f spectrum, 0.2-0.8), the estimate tracks the Gaussian noise added, whatever the texture."""
+    rng = np.random.default_rng(1)
+    scene = 0.2 + 0.6 * cv2.resize(_natural(0.0), (1024, 1024), interpolation=cv2.INTER_CUBIC)
+    clean = local.noise_sigma(scene)
+    assert clean < 0.5
+    for lv in (2.0, 4.0, 8.0):
+        est = local.noise_sigma(scene + rng.normal(0, lv / 255, scene.shape).astype(np.float32))
+        assert abs(est - lv) < 0.2 * lv, (lv, est)
+    assert local.noise_sigma(np.zeros((8, 8), np.float32)) is None
+
+
 def test_eyewear_band_needs_the_head_too():
     thr = {**THR, "eyewear_ratio": 3.0}
     shades = {"sharp_eye": 0.5, "hf_eye": 0.07, "sharp_head": 0.02}   # frame edges: band 25x the head

@@ -365,7 +365,7 @@ def test_stats_keepers_follow_overrides(api):
 def test_trace(api):
     api.run([""])
     imgs = by_name(api)
-    keys = ["scan", "exposure", "exif", "detect", "primary", "eyes", "grade", "local", "split", "vlm", "final", "review", "export"]
+    keys = ["scan", "exposure", "noise", "exif", "detect", "primary", "eyes", "grade", "local", "split", "vlm", "final", "review", "export"]
     for name, it in imgs.items():
         t = api.get(f"/api/images/{it['id']}/trace").json()
         assert [s["key"] for s in t["stages"]] == keys

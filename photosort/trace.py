@@ -115,6 +115,39 @@ def _exposure(local, cfg) -> dict:
     return _stage("exposure", "Exposure lift", "skipped", "not lifted", nodes=ch.nodes, outcome={"label": "as shot"})
 
 
+def _noise_now(local: dict, cfg: dict) -> dict:
+    """exif.noise_prior on the stored measurement under the current config, as a rescore computes it."""
+    return X.noise_prior(local.get("exif") or {}, (local.get("exposure") or {}).get("ev"),
+                         (local.get("noise") or {}).get("sigma"), cfg.get("noise"))
+
+
+def _noise(local, cfg) -> dict:
+    """exif.noise_prior: measured noise decides, effective ISO stands in for rows analyzed before it was measured.
+    High risk makes a tier 3 clear the cuts by noise.margin (the noisy rule in the local tier)."""
+    if local is None:
+        return _stage("noise", "Noise", "pending", "measured with the local stage")
+    nc = cfg.get("noise") or {}
+    nz = _noise_now(local, cfg)
+    if nz["by"] is None:
+        return _stage("noise", "Noise", "skipped", "no measurement and no ISO", outcome={"label": "unknown"})
+    measured = nz["by"] == "measured"
+    iso_in = [_kv("ISO", nz["iso"]), _kv("lift", f"+{nz['ev']} EV" if nz["ev"] else None),
+              _kv("effective ISO", nz["eff_iso"], "ISO × 2^lift")]
+    ch = _Chain()
+    ch.ask("Measured noise high?" if measured else "Effective ISO high?", nz["risk"] == "high", decides=True, value="high",
+           rule=f"noise.high_sigma = {nc.get('high_sigma')} levels" if measured else f"noise.high_iso = {nc.get('high_iso')}",
+           inputs=[_kv("noise sigma", nz["sigma"], "8-bit levels, flattest half of the frame, after any lift")] if measured else iso_in,
+           effect="a tier 3 must clear the cuts by noise.margin")
+    ch.ask("Measured noise medium?" if measured else "Effective ISO medium?", nz["risk"] == "medium", decides=True, value="medium",
+           rule=f"noise.medium_sigma = {nc.get('medium_sigma')} levels" if measured else f"noise.noisy_iso = {nc.get('noisy_iso')}",
+           effect="noted for the model; no tier change")
+    facts = iso_in if measured else [*iso_in, _kv("noise sigma", nz["sigma"], "8-bit levels; set noise.medium_sigma and "
+                                                  "high_sigma to judge on it" if nz["sigma"] is not None else
+                                                  "not measured: analyzed before noise was; re-run the local stage")]
+    return _stage("noise", "Noise", "done", f"{nz['risk']} ({'measured' if measured else 'from ISO'})", facts=facts,
+                  nodes=ch.nodes, outcome={"label": f"noise {nz['risk'] or '–'}"})
+
+
 def _exif(local, cfg) -> dict:
     """exif.prior: motion-blur and depth-of-field risk from the exposure settings. Only high motion risk can move a
     tier (the slow-shutter rule in the local tier); the rest is context for the notes and the vision prompt."""
@@ -275,7 +308,8 @@ def _local_tier(local, cfg, people, primary, others) -> tuple[dict, dict]:
     thr = cfg["focus"]
     prior = local.get("exif_prior") or {}
     margin = (cfg.get("exif") or {}).get("shake_margin", 1.5)
-    size = (local["width"], local["height"]) if local.get("width") else None
+    noise = _noise_now(local, cfg)
+    size =(local["width"], local["height"]) if local.get("width") else None
     g = L._grade(primary, thr) if primary is not None else None
     on_eyes = primary is not None and thr.get("use_eyes", True) and primary.get("sharp_eye") is not None and "eye_tier3_min" in thr
     ch = _Chain()
@@ -312,7 +346,15 @@ def _local_tier(local, cfg, people, primary, others) -> tuple[dict, dict]:
            rule=f"exif.shake_margin = {margin}",
            inputs=[_kv("motion risk", prior.get("motion_risk"), prior.get("summary")),
                    _kv(f"grade at {margin}× the cuts", gm)])
-    pl = (primary or {}).get("plane") or {}
+    nmargin = (cfg.get("noise") or {}).get("margin", 1.5)
+    gn = L._grade(primary, thr, nmargin) if primary is not None else None
+    noisy = noise.get("risk") == "high"
+    ch.ask("High noise, and not sharp by the margin?", noisy and gn is not None and gn < 3, decides=True, gate=not3,
+           value=(2, "borderline_sharp_noisy"), effect=tag(2, "borderline_sharp_noisy"),
+           rule=f"noise.margin = {nmargin}",
+           inputs=[_kv("noise risk", noise.get("risk"), f"by {noise['by']}" if noise.get("by") else None),
+                   _kv(f"grade at {nmargin}× the cuts", gn)])
+    pl =(primary or {}).get("plane") or {}
     use_plane = thr.get("use_plane", True)
     cut, body_cut = thr.get("plane_max_extra"), thr.get("plane_body_max_extra")
     no_plane = "no plane measurement (head under 40 px, or analyzed before the check existed)" if primary is not None and not pl else None
@@ -352,7 +394,7 @@ def _local_tier(local, cfg, people, primary, others) -> tuple[dict, dict]:
            note="the tier grades the primary, so a sharp bystander (with the floor off) keeps it a miss; the reason says so" if bystander else None)
 
     traced = list(ch.value) if ch.value else [None, None]
-    engine = list(L.local_tier(primary, others, thr, prior, margin, size))
+    engine = list(L.local_tier(primary, others, thr, prior, size=size, noise=noise, **L.margins(cfg)))
     stored = [local.get("local_tier"), local.get("local_reason")]
     facts = []
     if traced != engine:
@@ -511,6 +553,7 @@ def trace(row, cfg: dict, rel: str) -> dict:
     stages = [
         _scan(row, local, rel),
         _exposure(local, cfg),
+        _noise(local, cfg),
         _exif(local, cfg),
         _detect(local, cfg),
         _primary(local, cfg, people, picked, by),

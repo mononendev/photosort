@@ -26,6 +26,7 @@ const REASON_TEXT: Record<string, string> = {
   primary_eyes_sharp: "the primary subject's eye band cleared both tier-3 thresholds",
   primary_head_sharp: "no eyes were located, and the primary subject's head box cleared the tier-3 threshold",
   borderline_sharp_slow_shutter: 'it cleared tier 3, but only barely, at a shutter speed slow enough for motion blur, so it was demoted',
+  borderline_sharp_noisy: 'it cleared tier 3, but only barely, on a frame noisy enough that grain or noise reduction could have made the difference, so it was demoted',
   primary_eyes_slightly_soft: "the primary subject's eye band cleared tier 2 but not tier 3",
   primary_slightly_soft: "the primary subject's head box cleared tier 2 but not tier 3 (no eyes located)",
   primary_eyes_soft: "the primary subject's eye band cleared tier 1 but not tier 2",
@@ -83,6 +84,9 @@ export function explainLocal(l: LocalResult, cfg: Cfg): ReactNode {
       <CheckTable checks={checks} />
       {l.local_reason === 'borderline_sharp_slow_shutter' && (
         <div className="text-gray-400">Tier 3 at a slow shutter must clear {margin}× the tier-3 thresholds; this one didn't, so it's soft (2).</div>
+      )}
+      {l.local_reason === 'borderline_sharp_noisy' && l.noise && (
+        <div className="text-gray-400">{explainNoise(l.noise, cfg)} This one didn't clear the margin, so it's soft (2).</div>
       )}
       {p.plane && thr.use_plane !== false && planeNote(p.plane, (thr.plane_max_extra as number | null) ?? undefined, (thr.plane_body_max_extra as number | null) ?? undefined)}
       {l.local_reason === 'soft_person_in_front' && (
@@ -194,6 +198,16 @@ export const METRIC_TIPS = {
   } as Record<string, ReactNode>,
   people: <>People found by YOLO pose, ignoring anyone smaller than min_person_frac of the frame and dropping duplicate boxes on one person (dedup_iou, or dedup_head_iou with the heads in the same spot). Eye bands are measured for the most prominent few (eye_max_people).</>,
 };
+
+/** Where a frame's noise risk came from (exif.noise_prior) and what high risk does to a tier 3. */
+export function explainNoise(n: NonNullable<LocalResult['noise']>, cfg: Cfg): string {
+  const nc = (cfg?.noise as Thr | undefined) ?? {};
+  const iso = n.iso == null ? 'no ISO in EXIF' : n.ev ? `ISO ${n.iso} lifted +${n.ev} EV, about ISO ${n.eff_iso}` : `ISO ${n.iso}`;
+  const src = n.by === 'measured'
+    ? `Measured noise ${n.sigma} levels (${iso}); high from ${String(nc.high_sigma)}.`
+    : `${iso}; high from effective ISO ${String(nc.high_iso ?? 6400)}${n.sigma != null ? ` (measured noise ${n.sigma} levels, not used until its cuts are set)` : ''}.`;
+  return `${src} At high noise a tier 3 must clear ${String(nc.margin ?? 1.5)}× the tier-3 thresholds.`;
+}
 
 export function explainPrior(pr: NonNullable<LocalResult['exif_prior']>, cfg: Cfg): { dof: ReactNode; motion: ReactNode } {
   const ex = (cfg?.exif as Thr | undefined) ?? {};

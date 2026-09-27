@@ -132,6 +132,24 @@ export const GROUPS: Group[] = [
     ],
   },
   {
+    title: 'Noise',
+    intro: 'Grain that survives the metrics’ pre-blur reads as detail, and the camera’s noise reduction smears real detail away, so a borderline tier 3 means less on a noisy frame. Noise is judged on effective ISO (ISO × 2^lift: an exposure lift amplifies noise like shooting that much higher). The noise measured on each frame is stored too; set its cuts to judge on that instead.',
+    params: [
+      { key: 'noise.margin', label: 'high-noise margin', kind: 'number', step: 0.1, min: 1, unit: '× tier-3 cut', stricter: 'higher', applies: 'rescore',
+        up: 'noisy shots must be sharper to keep tier 3',
+        help: 'At high noise, a tier 3 must clear this many times the tier-3 cuts or it drops to 2 (borderline_sharp_noisy). Higher is stricter; 1 turns it off.' },
+      { key: 'noise.high_iso', label: 'high noise from', kind: 'number', step: 100, min: 100, unit: 'effective ISO', stricter: 'lower', applies: 'rescore',
+        up: 'fewer frames count as noisy',
+        help: 'Effective ISO (ISO × 2^lift) at or above this is high noise, which applies the margin above. Lower is stricter.' },
+      { key: 'noise.noisy_iso', label: 'moderate noise from', kind: 'number', step: 100, min: 100, unit: 'effective ISO', applies: 'info',
+        help: 'Effective ISO at or above this is noted as moderate noise for the vision model. It doesn’t move the tier.' },
+      { key: 'noise.high_sigma', label: 'measured: high from', kind: 'number', nullable: true, whenOn: 2, step: 0.1, min: 0, unit: 'levels', stricter: 'lower', applies: 'rescore',
+        help: 'Judge on the noise measured on the frame (sigma in 8-bit levels, after any lift) instead of ISO; needs both measured cuts set. The level depends on how the file was processed, so calibrate it on your own camera files: look up the noise sigma of a few clean and a few grainy frames on the Trace page. Off uses ISO.' },
+      { key: 'noise.medium_sigma', label: 'measured: moderate from', kind: 'number', nullable: true, whenOn: 1, step: 0.1, min: 0, unit: 'levels', applies: 'info',
+        help: 'Measured noise at or above this is noted as moderate for the vision model. Needs the high cut set too.' },
+    ],
+  },
+  {
     title: 'AF points',
     intro: 'Canon maker notes say where the camera focused. The person the active points land on becomes the primary subject, even if someone else is bigger or more central.',
     params: [

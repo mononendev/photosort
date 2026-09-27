@@ -125,6 +125,13 @@ export interface LocalResult {
   /** Set when an underexposed frame was brightened before analysis: stops added, what was lifted, and the scene key */
   exposure?: { ev: number; source: 'raw' | 'jpeg'; key: number; p99: number } | null;
   exif_prior?: { dof_risk: string | null; motion_risk: string | null; shake_stops: number | null; pupil_mm?: number | null; summary: string | null };
+  /** Noise risk: from the measured noise sigma (8-bit levels) when its cuts are set, else effective ISO (ISO × 2^lift) */
+  noise?: NoisePrior | null;
+}
+
+export interface NoisePrior {
+  iso: number | null; ev: number | null; eff_iso: number | null; sigma: number | null;
+  risk: 'low' | 'medium' | 'high' | null; by: 'measured' | 'iso' | null; summary: string | null;
 }
 
 export interface VlmResult {

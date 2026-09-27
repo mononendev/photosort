@@ -30,7 +30,9 @@ subject at native resolution, and falls back to the head when the eyes can't be 
    primary subject and decides the tier. On Canon files, the AF points in the maker notes override this:
    each active point scores 2 on a person's head, 1.5 on the torso, 1 elsewhere on the body, and the
    person with the highest score (at least `af.min_score`) becomes the primary, whatever their size or
-   sharpness. CR3 needs `exiftool` installed for this.
+   sharpness. A point just beside a region earns up to half its weight, fading to nothing `af.near` (2)
+   point-widths away: spot AF often sits a point-width off the head it focused on. CR3 needs `exiftool`
+   installed for this.
 3. **Eyes.** OpenCV's [YuNet](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet)
    face detector runs on a native-resolution window around each head box (the four most prominent
    people). If it finds a face, its eye landmarks are used; otherwise the pose model's eye keypoints are,
@@ -56,8 +58,10 @@ subject at native resolution, and falls back to the head when the eyes can't be 
    Laplacian even when a little soft. When the band's Laplacian is more than `eyewear_ratio` times the head's,
    the head box has to clear the tier as well.
 
-   The tier grades the primary subject only: if it misses while someone else in the frame grades tier 3,
-   the frame is still tier 0, with the reason `secondary_person_sharp`. No people is tier 0 (`no_people`). The reason is stored with the tier and
+   The tier grades the primary subject, but the primary is a guess. If it grades below `floor_tier` (2)
+   while someone else, detected with confidence at least `floor_conf`, grades `floor_grade` (3) or better,
+   focus landed on a person, so the frame is raised to `floor_tier` with the reason `secondary_person_sharp`.
+   With `floor_tier` off, such a frame stays tier 0 under that reason. No people is tier 0 (`no_people`). The reason is stored with the tier and
    shown in the UI.
 7. **Focus plane.** The metrics above grade the subject in absolute terms, so a frame whose focus landed
    just behind the rider can still pass. This step checks that the head is the sharpest thing around it.
@@ -135,6 +139,8 @@ high is usually right: a false "sharp" costs more than a false "check this".
 | `front_min_height`, `front_min_drop`, `front_max_gap` | 1.0, 0.25, 0.5 | Nearer and beside: height ratio, feet drop and sideways gap, in primary heights |
 | `front_max_grade` | 1 | Head box grade at or below which the person in front counts as soft |
 | `front_edge` | 0.01 | Ignore people within this fraction of the frame edge |
+| `floor_tier` | 2 | Minimum tier when someone besides the primary grades sharp (`null` = off, a miss stays 0) |
+| `floor_grade`, `floor_conf` | 3, 0.5 | How sharp that person must grade, and the least detector confidence that counts |
 | `split_steps` | 2 | Needs review when one metric grades this many tiers from the nearest other (`null` = off) |
 
 `exif`: `crop_factor` (for bodies that don't write a 35 mm-equivalent focal length), `wide_open_f`,

@@ -251,9 +251,18 @@ def _centering(a, b) -> float:
     return 1 - 0.25 * min(1.0, max(dx, dy))
 
 
-def person_score(af: Optional[dict], person: dict) -> float:
+def _gap(a, b) -> float:
+    """How far apart boxes a and b are: 0 when they touch or overlap, else the larger per-axis gap."""
+    return max(0, b[0] - a[2], a[0] - b[2], b[1] - a[3], a[1] - b[3])
+
+
+def person_score(af: Optional[dict], person: dict, near: float = 0.0) -> float:
     """How strongly the active AF points land on this person: head hits count double, torso 1.5, body 1,
-    each scaled by how much of the point lies inside the region and how central it sits there."""
+    each scaled by how much of the point lies inside the region and how central it sits there.
+
+    With near > 0, a point just beside a region still earns up to half its weight, falling to nothing at near
+    point-widths away. Spot AF lands a point-width off a head (focus-and-recompose, a subject turning) often
+    enough, and the focus plane still runs through that person."""
     if not af or not af.get("active"):
         return 0.0
     by_i = {p["i"]: p["box"] for p in af["points"]}
@@ -262,9 +271,14 @@ def person_score(af: Optional[dict], person: dict) -> float:
         b = by_i.get(i)
         if b is None:
             continue
+        reach = near * max(1, b[2] - b[0])
         best = 0.0
         for key, wgt in (("head", 2.0), ("torso", 1.5), ("box", 1.0)):
-            if person.get(key):
-                best = max(best, wgt * _overlap(b, person[key]) * _centering(b, person[key]))
+            r = person.get(key)
+            if not r:
+                continue
+            best = max(best, wgt * _overlap(b, r) * _centering(b, r))
+            if reach:
+                best = max(best, wgt * 0.5 * max(0.0, 1 - _gap(b, r) / reach))
         s += best
     return round(s, 3)

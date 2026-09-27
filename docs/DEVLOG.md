@@ -239,3 +239,15 @@ treat subject/composition as hints until calibrated; keywords/remarks are usable
   lock that doesn't install or import fails CI rather than the rollout.
 - Needs pod egress to PyPI + download.pytorch.org on lock changes (production has no NetworkPolicies).
 - Because deps no longer touch node disk, the cu124 torch build is now only a question of PVC size (~5 GB/env).
+
+### AF point beside a head; a sharp bystander floors the tier at 2 (2026-09-27)
+- IMG_1055 (FLF 2024/09/12, centre spot AF): the point sat ~1 point-width right of a spectator's head, overlapping
+  only his box edge (af_score 0.33 < 0.5), so prominence picked an edge-cut rider (tier 2). Rated 3: the spectator
+  was the subject and is sharp.
+- `af.near` (2.0): a point beside a region earns up to half its weight, 0 at `near` point-widths.
+- `focus.floor_tier/floor_grade/floor_conf` (2/3/0.5): below tier 2, anyone else with conf >= 0.5 grading 3 raises
+  the frame to 2 (`secondary_person_sharp`). Floor 3 was rejected: it overrode sharper_around_subject /
+  soft_person_in_front on rated 0s (IMG_1053/1054) and AA4I6532.
+- Sim on that folder (889 rows, 25 in-app ratings, via the API): 110 tiers change, agreement with VLM 453 -> 530,
+  with ratings 17 -> 18 (IMG_1055), none worse. The rejected alternative (cap at 1 when the AF point sits beside a
+  sharp non-primary) mostly hit VLM-3 frames. Applies on rescore.

@@ -33,7 +33,7 @@ const REASON_TEXT: Record<string, string> = {
   sharper_around_subject: 'it cleared tier 3, but things right around the subject are clearly sharper than their head, so focus landed just in front or behind',
   sharper_body_than_head: "it cleared tier 3, but the subject's torso is clearly sharper than their head, so focus landed on the body",
   soft_person_in_front: 'it cleared tier 3, but a soft person stands right beside them and nearer the camera, so focus likely went past the real subject onto someone behind',
-  secondary_person_sharp: 'the primary subject missed, though someone else in the frame is sharp',
+  secondary_person_sharp: 'the primary subject missed or was soft, though someone else in the frame is sharp',
   nothing_sharp: 'nobody cleared the tier-1 threshold',
 };
 
@@ -89,7 +89,9 @@ export function explainLocal(l: LocalResult, cfg: Cfg): ReactNode {
         <div className="text-gray-400">Someone at least as tall, with their feet clearly lower in the frame (nearer), stands beside the primary and their head box is soft. That's what an AF point slipping off a rider onto the background looks like, so a tier 3 is capped at 2. People cut by the frame edge (passers-by) don't count.</div>
       )}
       {l.local_reason === 'secondary_person_sharp' && (
-        <div className="text-gray-400">Another person graded tier 3, but the tier grades the primary subject, so the frame is still a miss.</div>
+        <div className="text-gray-400">{l.local_tier > 0
+          ? <>Someone else, confidently detected, grades sharp, so focus landed on a person: the frame is raised to tier {l.local_tier} (focus.floor_tier) whatever the primary graded.</>
+          : <>Another person graded tier 3, but the tier grades the primary subject, so the frame is still a miss.</>}</div>
       )}
       <div className="text-gray-500">Thresholds are set on the Calibrate page. The primary subject is the largest, most central, most confident person.</div>
     </div>

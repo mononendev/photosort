@@ -28,7 +28,7 @@ jobs:
     runs-on: [homelab]
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0   # no floating major tags since v8
         with:
           working-directory: analyzer
           enable-cache: true
@@ -42,14 +42,21 @@ jobs:
     runs-on: [homelab]
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          package_json_file: web/package.json
       - uses: actions/setup-node@v7
         with:
           node-version-file: .tool-versions
-          cache: pnpm
-          cache-dependency-path: web/pnpm-lock.yaml
+      # pnpm comes from corepack, at the version package.json pins (packageManager).
+      - name: Enable pnpm
+        working-directory: web
+        run: |
+          corepack enable
+          echo "COREPACK_ENABLE_DOWNLOAD_PROMPT=0" >> "$GITHUB_ENV"
+          echo "PNPM_STORE=$(COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm store path)" >> "$GITHUB_ENV"
+      - uses: actions/cache@v6
+        with:
+          path: ${{ env.PNPM_STORE }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('web/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
       - name: Install
         working-directory: web
         run: pnpm install --frozen-lockfile

@@ -3,6 +3,7 @@ package schema
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/mononendev/photosort/internal/pj"
@@ -96,6 +97,9 @@ func TestContextTextMatchesPython(t *testing.T) {
 	}
 	for _, c := range g.ContextText {
 		if c.Fixture != "" {
+			if _, err := os.Stat("../../" + c.Fixture); err != nil && strings.HasPrefix(c.Fixture, "testdata/golden-local/") {
+				continue // the CR2/HEIC fixtures stay on the machine that has the originals (gitignored)
+			}
 			c.Local = fixtureLocal(t, c.Fixture)
 		}
 		// Both decodings must give Python's text: json.Number (int/float per literal) and float64 (pj.Parse).

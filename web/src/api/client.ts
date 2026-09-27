@@ -16,6 +16,7 @@ export interface ImageSummary {
   focus_tier_local?: number | null;
   focus_tier_vlm?: number | null;
   review?: boolean;
+  split?: MetricSplit | null;  // the primary's metrics disagree among themselves (local.metric_split)
   subject?: string;
   composition?: string;
   quality_score?: number | null;
@@ -100,11 +101,14 @@ export interface RescoreResult {
   errors: number; first_error: string | null;
 }
 
+/** local.metric_split(): each metric's own tier; `odd` sits `gap` tiers from the nearest other. */
+export interface MetricSplit { grades: Partial<Record<'eye' | 'fft' | 'head', number>>; odd: 'eye' | 'fft' | 'head'; gap: number }
+
 export interface LocalResult {
   width: number; height: number; orientation: string; n_people: number; people: Person[];
   bg_sharp: number | null; global_sharp: number | null; primary_head_sharp: number | null; primary_body_sharp: number | null;
   primary_eye_sharp?: number | null; primary_eye_hf?: number | null; primary_eye_src?: string | null;
-  crop_box: number[] | null; local_tier: number; local_reason: string; mask_boxes?: number[][];
+  crop_box: number[] | null; local_tier: number; local_reason: string; split?: MetricSplit | null; mask_boxes?: number[][];
   bg_terms?: MetricTerms | null; global_terms?: MetricTerms | null; eps?: number;
   exif?: { camera?: string; lens?: string; f_number?: number; shutter_s?: number; iso?: number; focal_mm?: number; focal_35mm?: number; taken?: string };
   af?: AfInfo | null;

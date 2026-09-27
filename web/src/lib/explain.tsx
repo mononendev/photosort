@@ -3,7 +3,7 @@
  * photosort/local.py (_grade / local_tier), so keep the two in step when the tier rule changes.
  */
 import type { ReactNode } from 'react';
-import type { FocusPlane, LocalResult, Person } from '../api/client';
+import type { FocusPlane, LocalResult, MetricSplit, Person } from '../api/client';
 import CheckTable from '../components/CheckTable';
 import type { Check } from '../components/CheckTable';
 
@@ -145,6 +145,31 @@ export function explainDisagree(l: LocalResult, vlmTier: number, notes: string |
         {' '}With focus_source = {src}, {src === 'local' ? 'the local tier' : src === 'strict' ? 'the lower one' : "the model's tier"} is what's shown.
       </div>
       <div className="text-gray-500">Flagged for review: it appears under “needs review” and in the export's review/ folder. Setting your call settles it.</div>
+    </div>
+  );
+}
+
+const SPLIT_NAME: Record<string, string> = { eye: 'eye band Laplacian', fft: 'eye band FFT ratio', head: 'head box Laplacian' };
+
+/** Short "head 3 vs eye 1, fft 0" for badges. */
+export const splitShort = (s: MetricSplit): string => {
+  const others = Object.entries(s.grades).filter(([k]) => k !== s.odd).map(([k, g]) => `${k} ${g}`).join(', ');
+  return `${s.odd} ${s.grades[s.odd]} vs ${others}`;
+};
+
+/** local.py metric_split(): one metric grades far from the others, so a region likely landed in the wrong place. */
+export function explainSplit(s: MetricSplit, cfg: Cfg): ReactNode {
+  const steps = focusThr(cfg).split_steps;
+  return (
+    <div className="space-y-1">
+      <div><b>The metrics disagree</b>: graded on its own thresholds, the {SPLIT_NAME[s.odd]} reads tier {s.grades[s.odd]}, {s.gap} tiers
+        from the nearest of the others ({Object.entries(s.grades).filter(([k]) => k !== s.odd).map(([k, g]) => `${SPLIT_NAME[k]} ${g}`).join(', ')}).</div>
+      <div className="text-gray-400">
+        They measure overlapping regions of the same head, so they should roughly agree. One far off usually means a box landed wrong
+        (an eye band on a visor or hair, a head box full of background), so the tier can't be trusted either way.
+        {steps != null && <> Flagged at a gap of {String(steps)} or more (split_steps).</>}
+      </div>
+      <div className="text-gray-500">Flagged for review: it appears under “needs review” and in the export's review/metrics_split/ folder.</div>
     </div>
   );
 }

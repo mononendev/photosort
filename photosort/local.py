@@ -434,6 +434,29 @@ def soft_in_front(primary: dict, others: list[dict], thr: dict, W: int, H: int) 
     return None
 
 
+def metric_split(p: Optional[dict], thr: dict) -> Optional[dict]:
+    """The primary's metrics disagree: one grades split_steps or more tiers from the nearest of the others.
+
+    Each metric (eye band Laplacian, eye band FFT ratio, head box Laplacian) is graded on its own thresholds. They
+    should roughly agree; when one stands well apart, a region landed wrong (say the eye band on a helmet visor
+    while the head box is plainly sharp) and the tier can't be trusted either way, so the frame needs review.
+    None when they agree, split_steps is off, or fewer than two metrics were measured."""
+    steps = thr.get("split_steps")
+    if not steps or p is None:
+        return None
+    eyes, hf = thr.get("use_eyes", True), thr.get("use_eyes", True) and thr.get("use_hf", True)
+    grades = {}
+    for name, v, pre, on in (("eye", p.get("sharp_eye"), "eye_", eyes), ("fft", p.get("hf_eye"), "hf_", hf),
+                             ("head", p.get("sharp_head"), "", True)):
+        if on and v is not None and f"{pre}tier3_min" in thr:
+            grades[name] = next((lvl for lvl in (3, 2, 1) if v >= thr[f"{pre}tier{lvl}_min"]), 0)
+    if len(grades) < 2:
+        return None
+    gaps = {k: min(abs(g - h) for o, h in grades.items() if o != k) for k, g in grades.items()}
+    odd = max(gaps, key=gaps.get)
+    return {"grades": grades, "odd": odd, "gap": gaps[odd]} if gaps[odd] >= steps else None
+
+
 def local_tier(primary: Optional[dict], others: list[dict], thr: dict, prior: Optional[dict] = None,
                shake_margin: float = 1.5, size: Optional[tuple[int, int]] = None) -> tuple[int, str]:
     """Tier from measured sharpness (3 sharp, 2 slightly soft, 1 soft, 0 miss); the EXIF prior only demotes a
@@ -610,7 +633,7 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
         "af": af, "af_note": af_note, "primary_by": primary_by,
         "crop_box": crop_used,
         "exif": exif, "exif_prior": prior, "exposure": exposure,
-        "local_tier": tier, "local_reason": reason,
+        "local_tier": tier, "local_reason": reason, "split": metric_split(primary, cfg["focus"]),
     }
     return LocalResult(data, frame, crop_jpeg, thumb)
 
@@ -654,10 +677,11 @@ def rescore(db, cfg: dict, backfill_exif: bool = True) -> dict:
             tier, reason = local_tier(people[0] if people else None, people[1:], cfg["focus"], d.get("exif_prior"),
                                       cfg.get("exif", {}).get("shake_margin", 1.5),
                                       (d["width"], d["height"]) if d.get("width") else None)
-            if tier != d.get("local_tier") or dirty:
+            split = metric_split(people[0] if people else None, cfg["focus"])
+            if tier != d.get("local_tier") or split != d.get("split") or dirty:
                 if tier != d.get("local_tier"):
                     changed += 1
-                d["local_tier"], d["local_reason"] = tier, reason
+                d["local_tier"], d["local_reason"], d["split"] = tier, reason, split
                 updates.append((r["id"], d))
         except Exception as e:  # one malformed row must not abort the pass
             errors += 1

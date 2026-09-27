@@ -101,7 +101,7 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             "vlm_skip": row["vlm_skip"],
             "has_crop": bool(local and local.get("n_people")),
             "focus_tier": rec["focus_tier"], "focus_tier_local": rec["focus_tier_local"], "focus_tier_vlm": rec["focus_tier_vlm"],
-            "review": rec["review"], "subject": rec["subject"], "composition": rec["composition"],
+            "review": rec["review"], "split": rec["split"], "subject": rec["subject"], "composition": rec["composition"],
             "quality_score": rec["quality_score"], "keeper": rec["keeper"], "overridden": rec["overridden"],
             "rating": rec["rating"], "reviewed": rec["reviewed"],
             "people_count": rec["people_count"], "description": rec["description"], "error": row["error"],

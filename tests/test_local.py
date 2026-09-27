@@ -70,6 +70,21 @@ THR = {"tier3_min": 0.03, "tier2_min": 0.017, "tier1_min": 0.01,
        "hf_tier3_min": 0.03, "hf_tier2_min": 0.017, "hf_tier1_min": 0.01}
 
 
+def test_metric_split_flags_one_metric_far_from_the_others():
+    """The eye band landed on a visor (eyes 1, FFT 0) while the head box reads plainly sharp (3): needs review."""
+    thr = {**THR, "split_steps": 2}
+    p = {"sharp_eye": 0.026, "hf_eye": 0.003, "sharp_head": 0.073}
+    assert local.metric_split(p, thr) == {"grades": {"eye": 1, "fft": 0, "head": 3}, "odd": "head", "gap": 2}
+    assert local.metric_split(p, {**thr, "split_steps": 3}) is None
+    assert local.metric_split(p, {**thr, "split_steps": None}) is None
+    # Close together (3, 2, 2), or only one metric measured: nothing to flag.
+    assert local.metric_split({"sharp_eye": 0.07, "hf_eye": 0.02, "sharp_head": 0.02}, thr) is None
+    assert local.metric_split({"sharp_head": 0.073}, thr) is None
+    # Switched-off metrics don't vote: without the eye band, the head has nobody to disagree with.
+    assert local.metric_split(p, {**thr, "use_eyes": False}) is None
+    assert local.metric_split(p, {**thr, "use_hf": False})["grades"] == {"eye": 1, "head": 3}
+
+
 def test_local_tier_eye_band_needs_both_metrics():
     sharp = {"sharp_eye": 0.08, "hf_eye": 0.05, "sharp_head": 0.001}
     assert local.local_tier(sharp, [], THR) == (3, "primary_eyes_sharp")          # eyes beat a soft head box

@@ -77,6 +77,10 @@ def test_verdict_on_an_unlifted_frame_is_stale_and_retagged(tmp_path, monkeypatc
     db.set_local(b, {"local_tier": 3, "people": []})   # disagrees with the model's 2, but on the same frame
     assert [x["id"] for x in db.rows(VLM_STALE_SQL)] == [a]
     assert [x["id"] for x in db.rows(REVIEW_SQL)] == [b]
+    db.set_local(a, {"local_tier": 3, "people": [], "exposure": {"ev": 4.0, "source": "raw"},
+                     "split": {"grades": {"eye": 1, "head": 3}, "odd": "head", "gap": 2}})
+    assert [x["id"] for x in db.rows(REVIEW_SQL)] == [a, b]   # split metrics need review whatever the model said
+    db.set_local(a, {"local_tier": 3, "people": [], "exposure": {"ev": 4.0, "source": "raw"}})
 
     jid = db.add_job([str(photos)], {"vlm": True})
     r.run_job(db.job(jid))

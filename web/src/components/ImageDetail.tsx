@@ -10,7 +10,7 @@ import { FocusMath, PersonInspector } from './PersonInspector';
 import { gradePerson } from '../lib/pose';
 import useHotkeys from '../hooks/useHotkeys';
 import useStore from '../hooks/useStore';
-import { METRIC_TIPS, TIER_MEANING, explainDisagree, explainFinal, explainLocal, explainPrior } from '../lib/explain';
+import { METRIC_TIPS, TIER_MEANING, explainDisagree, explainFinal, explainLocal, explainPrior, explainSplit, splitShort } from '../lib/explain';
 
 function Row({ k, v, tip }: { k: string; v: React.ReactNode; tip?: React.ReactNode }) {
   return (
@@ -200,6 +200,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
                 ) : data.focus_tier_local !== null && data.focus_tier_vlm != null && data.focus_tier_local !== data.focus_tier_vlm && (
                   <> · <Tip tip={explainDisagree(data.local, data.focus_tier_vlm, v?.focus_notes, cfg)} className="text-amber-300">local ({data.focus_tier_local}) and model ({data.focus_tier_vlm}) disagree</Tip></>
                 )}
+                {data.local.split && <> · <Tip tip={explainSplit(data.local.split, cfg)} className="text-amber-300">metrics split ({splitShort(data.local.split)})</Tip></>}
               </div>
             )}
             <div className="rounded-lg border border-gray-800 p-3 space-y-2">

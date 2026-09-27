@@ -30,11 +30,12 @@ def final_record(row, source: str) -> dict:
         tier = use_vt
     if ov.get("focus_tier") is not None:
         tier = int(ov["focus_tier"])
-    rec = {
+    rec: dict = {
         "path": row["path"],
         "focus_tier": tier,
         "focus_tier_local": lt, "focus_tier_vlm": vt,
-        "review": (lt is not None and use_vt is not None and lt != use_vt),   # as REVIEW_SQL
+        "disagree": lt is not None and use_vt is not None and lt != use_vt,
+        "split": (local or {}).get("split"),
         "subject": (vlm or {}).get("primary_subject", "no_people" if (local and local["n_people"] == 0) else "unknown"),
         "composition": (vlm or {}).get("composition", "unknown"),
         "placement": (vlm or {}).get("subject_placement"),
@@ -55,6 +56,7 @@ def final_record(row, source: str) -> dict:
         "local": {k: local.get(k) for k in ("n_people", "primary_head_sharp", "primary_body_sharp", "bg_sharp", "local_reason")} if local else None,
         "error": row["error"],
     }
+    rec["review"] = rec["disagree"] or rec["split"] is not None   # as REVIEW_SQL
     return rec
 
 
@@ -86,7 +88,8 @@ def build_tree(records: list[dict], out: Path, mode: str) -> dict:
         place(src, dst, mode)
         counts[tier_dir] = counts.get(tier_dir, 0) + 1
         if r["review"]:
-            place(src, out / "review" / f"local{r['focus_tier_local']}_vlm{r['focus_tier_vlm']}" / src.name, "symlink" if mode == "move" else mode)
+            why = f"local{r['focus_tier_local']}_vlm{r['focus_tier_vlm']}" if r["disagree"] else "metrics_split"
+            place(src, out / "review" / why / src.name, "symlink" if mode == "move" else mode)
             counts["review"] = counts.get("review", 0) + 1
         if r.get("banger"):
             place(src, out / "bangers" / src.name, "symlink" if mode == "move" else mode)

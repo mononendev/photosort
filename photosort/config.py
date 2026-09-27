@@ -95,7 +95,10 @@ DEFAULTS: dict = {
               # front_min_drop x that height) and beside it (<= front_max_gap heights apart) has a head at
               # front_max_grade or worse: focus went past them. People within front_edge of the frame edge don't count.
               "use_front": True, "front_min_height": 1.0, "front_min_drop": 0.25, "front_max_gap": 0.5,
-              "front_max_grade": 1, "front_edge": 0.01},
+              "front_max_grade": 1, "front_edge": 0.01,
+              # Needs review when one of the primary's metrics (eye band Laplacian, eye band FFT, head box Laplacian),
+              # each graded on its own thresholds, sits >= split_steps tiers from the nearest other (None = off).
+              "split_steps": 2},
     # Camera-metadata prior: crop_factor converts focal length to 35mm-equivalent when EXIF lacks it;
     # f-number <= wide_open_f or entrance pupil >= 40mm = "very shallow DOF"; a tier-3 sharpness below tier3_min*shake_margin is
     # demoted to tier 2 when the shutter was slow enough that motion blur is likely.

@@ -78,6 +78,13 @@ subject at native resolution, and falls back to the head when the eyes can't be 
    `front_max_grade` or worse. Their head box decides, not their eye band, which can grade low on a sharp face.
    People within `front_edge` of the frame edge are passers-by in the foreground and don't count. It uses only
    stored boxes and metrics, so a rescore applies it.
+
+   **Metrics split.** The eye band Laplacian, the eye band FFT ratio and the head box Laplacian each get graded
+   on their own thresholds too. They measure overlapping parts of one head, so they should roughly agree. When
+   one sits `split_steps` or more tiers from the nearest of the others (say the pose model put the eye band on a
+   helmet visor, eyes 1 and FFT 0, while the head box is plainly sharp at 3), a region landed wrong and the tier
+   can't be trusted either way. The tier is left alone, but the frame is flagged for review (`split` in the
+   local result; the export's `review/metrics_split/` folder). A rescore applies it.
 8. **EXIF prior.** Aperture, shutter, focal length and ISO are read from EXIF. An entrance pupil ≥ 40 mm
    or f/2 and wider flags very shallow depth of field; a shutter at least a stop slower than 1/focal-length
    (35 mm equivalent) or slower than 1/60 s flags motion-blur risk. A tier 3 that clears its thresholds by
@@ -128,6 +135,7 @@ high is usually right: a false "sharp" costs more than a false "check this".
 | `front_min_height`, `front_min_drop`, `front_max_gap` | 1.0, 0.25, 0.5 | Nearer and beside: height ratio, feet drop and sideways gap, in primary heights |
 | `front_max_grade` | 1 | Head box grade at or below which the person in front counts as soft |
 | `front_edge` | 0.01 | Ignore people within this fraction of the frame edge |
+| `split_steps` | 2 | Needs review when one metric grades this many tiers from the nearest other (`null` = off) |
 
 `exif`: `crop_factor` (for bodies that don't write a 35 mm-equivalent focal length), `wide_open_f`,
 `shake_margin`.

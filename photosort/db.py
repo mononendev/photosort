@@ -65,11 +65,17 @@ def jcol(row, key: str, default=None):
     return json.loads(v) if v else default
 
 
+# The model's verdict was made on a different frame than the local stage now has: the exposure lift it saw (stamped
+# into vlm_json as seen_ev when stored) no longer matches the local stage's. Results from before the lift carry no
+# stamp, which reads as 0: they saw the unlifted frame.
+_EV = "IFNULL(json_extract(local_json,'$.exposure.ev'), 0)"
+VLM_STALE_SQL = f"(vlm_json IS NOT NULL AND IFNULL(json_extract(vlm_json,'$.seen_ev'), 0) != {_EV})"
+
 # The tier a photo ends up with, as SQL over the images table: your override, else the configured focus_source
 # (vlm: the model's, falling back to local until it has run; local: the local stage's; strict: the lower of the
-# two). sort.final_record is the Python twin; keep them in step.
-_OV, _VLM, _LOC = ("json_extract(override_json,'$.focus_tier')", "json_extract(vlm_json,'$.focus_tier')",
-                   "json_extract(local_json,'$.local_tier')")
+# two). A stale model tier counts as not run yet. sort.final_record is the Python twin; keep them in step.
+_OV, _LOC = "json_extract(override_json,'$.focus_tier')", "json_extract(local_json,'$.local_tier')"
+_VLM = f"(CASE WHEN {VLM_STALE_SQL} THEN NULL ELSE json_extract(vlm_json,'$.focus_tier') END)"
 FOCUS_SOURCES = {
     "vlm": f"COALESCE({_OV}, {_VLM}, {_LOC})",
     "local": f"COALESCE({_OV}, {_LOC})",
@@ -82,13 +88,6 @@ FINAL_TIER_SQL = FOCUS_SOURCES["vlm"]
 def final_tier_sql(source: str) -> str:
     """FINAL_TIER_SQL for a focus_source; anything unknown reads as vlm, as in sort.final_record."""
     return FOCUS_SOURCES.get(source, FINAL_TIER_SQL)
-
-
-# The model's verdict was made on a different frame than the local stage now has: the exposure lift it saw (stamped
-# into vlm_json as seen_ev when stored) no longer matches the local stage's. Results from before the lift carry no
-# stamp, which reads as 0: they saw the unlifted frame.
-_EV = "IFNULL(json_extract(local_json,'$.exposure.ev'), 0)"
-VLM_STALE_SQL = f"(vlm_json IS NOT NULL AND IFNULL(json_extract(vlm_json,'$.seen_ev'), 0) != {_EV})"
 
 
 def vlm_stale(local: Optional[dict], vlm: Optional[dict]) -> bool:

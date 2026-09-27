@@ -7,7 +7,7 @@ import shutil
 from pathlib import Path
 from xml.sax.saxutils import escape
 
-from .db import jcol
+from .db import jcol, vlm_stale
 
 TIER_NAMES = {0: "focus_0_miss", 1: "focus_1_soft", 2: "focus_2_slightly_soft", 3: "focus_3_sharp"}
 # Your cull rating from the UI: 0-3 are the focus tiers, 4 is a banger (sharp and a favorite; only you give it).
@@ -21,19 +21,20 @@ def final_record(row, source: str) -> dict:
     ov = jcol(row, "override_json", {}) if "override_json" in row.keys() else {}
     lt = local["local_tier"] if local else None
     vt = vlm["focus_tier"] if vlm else None
-    if source == "local" or vt is None:
+    use_vt = None if vlm_stale(local, vlm) else vt   # a verdict on the pre-lift frame counts as not run yet
+    if source == "local" or use_vt is None:
         tier = lt
     elif source == "strict" and lt is not None:
-        tier = min(lt, vt)
+        tier = min(lt, use_vt)
     else:
-        tier = vt
+        tier = use_vt
     if ov.get("focus_tier") is not None:
         tier = int(ov["focus_tier"])
     rec = {
         "path": row["path"],
         "focus_tier": tier,
         "focus_tier_local": lt, "focus_tier_vlm": vt,
-        "review": (lt is not None and vt is not None and lt != vt),
+        "review": (lt is not None and use_vt is not None and lt != use_vt),   # as REVIEW_SQL
         "subject": (vlm or {}).get("primary_subject", "no_people" if (local and local["n_people"] == 0) else "unknown"),
         "composition": (vlm or {}).get("composition", "unknown"),
         "placement": (vlm or {}).get("subject_placement"),

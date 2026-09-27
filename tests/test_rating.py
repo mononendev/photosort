@@ -75,6 +75,19 @@ def test_lift_after_tagging_marks_verdict_stale_and_keeps_rating(client):
     assert client.get(f"/api/images/{a}").json()["vlm_stale"] is False
 
 
+def test_stale_model_tier_falls_back_to_local(client):
+    """The final tier skips a verdict made on the pre-lift frame, in the detail view and in the SQL filters alike."""
+    a, _ = ids(client)
+    client.db.set_vlm(a, {"focus_tier": 0, "keeper": False}, {}, None)
+    client.db.set_local(a, {"local_tier": 3, "n_people": 0, "people": [], "exposure": {"ev": 4.0}})
+    d = client.get(f"/api/images/{a}").json()
+    assert (d["focus_tier"], d["focus_tier_vlm"], d["review"]) == (3, 0, False)
+    assert a in ids(client, tier=3) and a not in ids(client, tier=0)
+    client.db.set_vlm(a, {"focus_tier": 1, "keeper": False}, {}, None)   # the re-tag counts again
+    assert client.get(f"/api/images/{a}").json()["focus_tier"] == 1
+    assert a in ids(client, tier=1)
+
+
 def test_rating_out_of_range_rejected(client):
     a, _ = ids(client)
     assert client.patch(f"/api/images/{a}", json={"rating": 5}).status_code == 422

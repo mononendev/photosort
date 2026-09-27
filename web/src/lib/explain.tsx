@@ -110,7 +110,7 @@ function planeNote(pl: FocusPlane, cut: number | undefined, bodyCut: number | un
   );
 }
 
-export function explainFinal(d: { focus_tier?: number | null; focus_tier_local?: number | null; focus_tier_vlm?: number | null; overridden?: boolean; override?: { focus_tier?: number } | null }, cfg: Cfg): ReactNode {
+export function explainFinal(d: { focus_tier?: number | null; focus_tier_local?: number | null; focus_tier_vlm?: number | null; overridden?: boolean; override?: { focus_tier?: number } | null; vlm_stale?: boolean }, cfg: Cfg): ReactNode {
   const src = focusSource(cfg);
   const rule = src === 'local' ? 'the local tier' : src === 'strict' ? 'the lower of the local and model tiers' : 'the vision model tier, or the local tier until the model has run';
   return (
@@ -119,7 +119,9 @@ export function explainFinal(d: { focus_tier?: number | null; focus_tier_local?:
       <div className="text-gray-400">
         {d.override?.focus_tier != null
           ? <>This is your call, which beats everything.</>
-          : <>Comes from {rule} (focus_source = {src}).</>}
+          : d.vlm_stale && src !== 'local'
+            ? <>Comes from the local tier: the model's verdict predates the exposure lift, so it doesn't count until the model re-tags this photo.</>
+            : <>Comes from {rule} (focus_source = {src}).</>}
         {' '}Local {d.focus_tier_local ?? '–'}, model {d.focus_tier_vlm ?? '–'}.
       </div>
       <div className="text-gray-500">This tier sorts the export tree (focus_N/…) and is written into the XMP keywords.</div>

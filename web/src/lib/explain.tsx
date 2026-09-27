@@ -3,7 +3,7 @@
  * photosort/local.py (_grade / local_tier), so keep the two in step when the tier rule changes.
  */
 import type { ReactNode } from 'react';
-import type { LocalResult, Person } from '../api/client';
+import type { FocusPlane, LocalResult, Person } from '../api/client';
 import CheckTable from '../components/CheckTable';
 import type { Check } from '../components/CheckTable';
 
@@ -30,6 +30,8 @@ const REASON_TEXT: Record<string, string> = {
   primary_slightly_soft: "the primary subject's head box cleared tier 2 but not tier 3 (no eyes located)",
   primary_eyes_soft: "the primary subject's eye band cleared tier 1 but not tier 2",
   primary_soft: "the primary subject's head box cleared tier 1 but not tier 2 (no eyes located)",
+  sharper_around_subject: 'it cleared tier 3, but things right around the subject are clearly sharper than their head, so focus landed just in front or behind',
+  sharper_body_than_head: "it cleared tier 3, but the subject's torso is clearly sharper than their head, so focus landed on the body",
   secondary_person_sharp: 'the primary subject missed, though someone else in the frame is sharp',
   nothing_sharp: 'nobody cleared the tier-1 threshold',
 };
@@ -39,6 +41,12 @@ const REASON_TEXT: Record<string, string> = {
 export const tierCuts = (thr: Thr, prefix: string): [number, number, number] =>
   [1, 2, 3].map((n) => thr[`${prefix}tier${n}_min`] as number) as [number, number, number];
 
+/** local.py eyewear(): an eye band far sharper than its head is sunglasses or goggles, so the head must clear too. */
+export const isEyewear = (p: Person, thr: Thr): boolean => {
+  const r = thr.eyewear_ratio as number | undefined;
+  return !!r && p.sharp_eye != null && p.sharp_head != null && p.sharp_eye > r * p.sharp_head;
+};
+
 /** Which region and thresholds decide this person's grade, as local.py's _grade picks them. */
 export function gradeBasis(p: Person, thr: Thr): { onEyes: boolean; checks: Check[] } {
   const onEyes = thr.use_eyes !== false && p.sharp_eye != null && 'eye_tier3_min' in thr;
@@ -47,6 +55,7 @@ export function gradeBasis(p: Person, thr: Thr): { onEyes: boolean; checks: Chec
     if (thr.use_hf !== false && p.hf_eye != null && 'hf_tier3_min' in thr) {
       checks.push({ label: 'eye band FFT ratio', value: p.hf_eye, t: tierCuts(thr, 'hf_') });
     }
+    if (isEyewear(p, thr)) checks.push({ label: 'head box Laplacian (eyewear)', value: p.sharp_head, t: tierCuts(thr, '') });
     return { onEyes, checks };
   }
   const s = p.sharp_head ?? p.sharp_body;
@@ -66,17 +75,37 @@ export function explainLocal(l: LocalResult, cfg: Cfg): ReactNode {
       <div><b>Local tier {l.local_tier}</b> ({l.local_reason}): {reason}.</div>
       <div className="text-gray-400">
         {onEyes
-          ? <>Judged on the band across both eyes, found by {p.eye_src === 'face' ? 'the face-landmark model' : "the pose model's eye keypoints (no face found)"}. Both metrics must clear a threshold for that tier.</>
+          ? <>Judged on the band across both eyes, found by {p.eye_src === 'face' ? 'the face-landmark model' : "the pose model's eye keypoints (no face found)"}. Both metrics must clear a threshold for that tier.
+            {isEyewear(p, thr) && <> The band reads over {String(thr.eyewear_ratio)}× sharper than the head around it, which is what sunglasses or goggles do (their hard frame edges pass even when soft), so the head box must clear the tier as well.</>}</>
           : <>No eyes located (helmet, visor, turned away, or too small), so the head box decides on its own thresholds.</>}
       </div>
       <CheckTable checks={checks} />
       {l.local_reason === 'borderline_sharp_slow_shutter' && (
         <div className="text-gray-400">Tier 3 at a slow shutter must clear {margin}× the tier-3 thresholds; this one didn't, so it's soft (2).</div>
       )}
+      {p.plane && thr.use_plane !== false && planeNote(p.plane, (thr.plane_max_extra as number | null) ?? undefined, (thr.plane_body_max_extra as number | null) ?? undefined)}
       {l.local_reason === 'secondary_person_sharp' && (
         <div className="text-gray-400">Another person graded tier 3, but the tier grades the primary subject, so the frame is still a miss.</div>
       )}
       <div className="text-gray-500">Thresholds are set on the Calibrate page. The primary subject is the largest, most central, most confident person.</div>
+    </div>
+  );
+}
+
+const px = (v: number | null) => (v == null ? '–' : `${v.toFixed(2)} px`);
+
+/** The focus-plane check: edge-width blur of the head against its surroundings and torso (local.py focus_plane). */
+function planeNote(pl: FocusPlane, cut: number | undefined, bodyCut: number | undefined): ReactNode {
+  const flag = (v: number | null, c: number | undefined) => (c != null && v != null && v >= c ? 'text-amber-300' : '');
+  return (
+    <div className="text-gray-400">
+      Focus plane: the sharpest edges are {px(pl.head)} wide on the head, {px(pl.torso)} on the torso and{' '}
+      {pl.near != null ? px(pl.near) : 'unmeasurable (too few edges: bokeh)'} in the surroundings. The head carries{' '}
+      <span className={flag(pl.head_vs_near, cut)}>{px(pl.head_vs_near)}</span> more blur than the surroundings
+      {cut != null ? <> ({cut} px or more takes a tier 3 down to 2)</> : <> (check off)</>} and{' '}
+      <span className={flag(pl.head_vs_torso, bodyCut)}>{px(pl.head_vs_torso)}</span> more than the torso
+      {bodyCut != null ? <> ({bodyCut} px or more takes a tier 3 down to 2)</> : <> (shown only: clothing print reads sharper than a face)</>}.
+      Edge width compares grass, jersey and face more fairly than the Laplacian does.
     </div>
   );
 }

@@ -91,6 +91,53 @@ def test_local_tier_slow_shutter_demotes_borderline_eyes_only():
     assert local.local_tier({"sharp_eye": 0.2, "hf_eye": 0.05}, [], THR, slow)[0] == 3
 
 
+def test_eyewear_band_needs_the_head_too():
+    thr = {**THR, "eyewear_ratio": 3.0}
+    shades = {"sharp_eye": 0.5, "hf_eye": 0.07, "sharp_head": 0.02}   # frame edges: band 25x the head
+    assert local.eyewear(shades, thr) and not local.eyewear(shades, THR)
+    assert local.local_tier(shades, [], thr) == (2, "primary_eyes_slightly_soft")   # head only clears tier 2
+    assert local.local_tier({**shades, "sharp_head": 0.05}, [], thr)[0] == 3
+    assert local.local_tier({"sharp_eye": 0.08, "hf_eye": 0.05, "sharp_head": 0.001}, [], {**thr, "eyewear_ratio": None})[0] == 3
+
+
+def test_local_tier_focus_plane_caps_sharp_at_two():
+    thr = {**THR, "plane_max_extra": 0.4}
+    sharp = {"sharp_eye": 0.08, "hf_eye": 0.05}
+    behind = {**sharp, "plane": {"head": 1.29, "torso": 1.02, "near": 0.92, "head_vs_near": 0.91, "head_vs_torso": 0.79}}
+    assert local.local_tier(behind, [], thr) == (2, "sharper_around_subject")
+    body = {**sharp, "plane": {"head_vs_near": None, "head_vs_torso": 0.7}}
+    assert local.local_tier(body, [], thr)[0] == 3                                  # torso check off by default
+    assert local.local_tier(body, [], {**thr, "plane_body_max_extra": 0.5}) == (2, "sharper_body_than_head")
+    ok = {**sharp, "plane": {"head": 1.02, "torso": 1.09, "near": None, "head_vs_near": None, "head_vs_torso": 0.0}}
+    assert local.local_tier(ok, [], thr) == (3, "primary_eyes_sharp")
+    assert local.local_tier(behind, [], {**thr, "use_plane": False})[0] == 3
+    assert local.local_tier({**behind, "sharp_eye": 0.04}, [], thr) == (2, "primary_eyes_slightly_soft")  # only caps a 3
+
+
+def _scene(head_blur, bg_blur, size=1200):
+    """Textured surroundings with a person-shaped patch of texture in the middle, each blurred separately."""
+    rng = np.random.default_rng(1)
+    tex = lambda s: cv2.GaussianBlur(((rng.random((size // 8, size // 8)) > 0.5) * 1.0).astype(np.float32)
+                                     .repeat(8, 0).repeat(8, 1), (0, 0), s) if s else \
+        ((rng.random((size // 8, size // 8)) > 0.5) * 1.0).astype(np.float32).repeat(8, 0).repeat(8, 1)
+    g = 0.2 + 0.6 * tex(bg_blur)
+    person = 0.2 + 0.6 * tex(head_blur)
+    g[400:1000, 450:750] = person[400:1000, 450:750]
+    p = {"box": (450, 400, 750, 1000), "head": (530, 400, 670, 540), "torso": (450, 540, 750, 800)}
+    return g, p
+
+
+def test_focus_plane_sees_focus_behind_the_head():
+    g, p = _scene(head_blur=2.0, bg_blur=0.6)
+    pl = local.focus_plane(g, p, g.shape[1], g.shape[0])
+    assert pl["head_vs_near"] > 1.0 and pl["near"] < pl["head"]
+    g, p = _scene(head_blur=0.6, bg_blur=2.0)
+    pl = local.focus_plane(g, p, g.shape[1], g.shape[0])
+    assert pl["head_vs_near"] == 0 and pl["head_vs_torso"] < 0.2 and pl["near"] > 1.5
+    flat = np.full((1200, 1200), 0.5, np.float32)                       # nothing to measure on the head
+    assert local.focus_plane(flat, p, 1200, 1200) is None
+
+
 def test_local_tier_rules():
     thr = {"tier3_min": 0.03, "tier2_min": 0.017, "tier1_min": 0.01}
     assert local.local_tier(None, [], thr) == (0, "no_people")

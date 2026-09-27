@@ -95,6 +95,81 @@ def hf_ratio(gray: np.ndarray, band=(0.25, 0.75), floor: float = 0.03, min_px: i
     return None if t is None else t["band_e"] / t["total_e"]
 
 
+PLANE_PRE = 1.0      # denoise blur before the edge-width estimate; subtracted back out in quadrature
+PLANE_MIN_STEP = 0.12
+PLANE_MIN_EDGES = 40
+
+
+def _edge_maps(gray: np.ndarray):
+    """Per-pixel inputs to the edge-width estimate: gradient magnitude, local step height, strong-edge mask."""
+    b = cv2.GaussianBlur(gray, (0, 0), PLANE_PRE)
+    mag = np.hypot(cv2.Sobel(b, cv2.CV_32F, 1, 0, ksize=3), cv2.Sobel(b, cv2.CV_32F, 0, 1, ksize=3)) / 8
+    k = np.ones((11, 11), np.uint8)
+    step = cv2.dilate(b, k) - cv2.erode(b, k)
+    edges = (cv2.Canny((b * 255).astype(np.uint8), 40, 90, L2gradient=True) > 0) & (step >= PLANE_MIN_STEP)
+    return mag, step, edges
+
+
+def _edge_blur(mag, step, edges, q: float = 90, min_n: int = PLANE_MIN_EDGES) -> Optional[float]:
+    """Blur width in native pixels from the steepest strong edges, or None with too few of them.
+
+    A step blurred by a Gaussian of width s rises with a peak slope of step / (s·√(2π)), so slope ÷ step
+    measures s whatever the edge's contrast or what it belongs to (grass, jersey, helmet). Unlike the
+    Laplacian ratio, that makes it comparable across different content."""
+    if edges.sum() < min_n:
+        return None
+    s = 1 / (float(np.percentile(mag[edges] / step[edges], q)) * np.sqrt(2 * np.pi))
+    return float(np.sqrt(max(s * s - PLANE_PRE ** 2, 0.01)))
+
+
+def _grow(b, fx: float, fy: float, W: int, H: int):
+    w, h = b[2] - b[0], b[3] - b[1]
+    return _clamp_box((b[0] - fx * w, b[1] - fy * h, b[2] + fx * w, b[3] + fy * h), W, H)
+
+
+def _extra(a: Optional[float], b: Optional[float]) -> Optional[float]:
+    """How much more blur a carries than b, in px (blur widths add in quadrature); None if either is missing."""
+    return None if a is None or b is None else round(float(np.sqrt(max(a * a - b * b, 0))), 3)
+
+
+def focus_plane(gray: np.ndarray, p: dict, W: int, H: int) -> Optional[dict]:
+    """Is the focus plane on this person's head, or next to it? Edge-width blur (see _edge_blur) of the head,
+    the torso and the surroundings, each measured on its own: at shallow depth of field the torso can sit in
+    another plane, so a sharp jersey must not vouch for a soft face. The surroundings are everything within
+    one person-size, outside a margin that takes in the helmets, hair and limbs the boxes miss.
+
+    A head in focus is the sharpest thing at its depth, so surroundings that are clearly sharper mean focus
+    landed in front or behind. Returns blur σ in px for "head", "torso" and "near", the extra blur the head
+    carries over each ("head_vs_near", "head_vs_torso") and the torso over the surroundings ("torso_vs_near"),
+    and the edge counts; None without a head reading. "near" is None when the surroundings have too few edges
+    (bokeh). Clothing print is steeper than any face, so head_vs_torso reads high on sharp frames too.
+    """
+    head, torso, box = p["head"], p["torso"], p["box"]
+    if min(head[2] - head[0], head[3] - head[1]) < MIN_REGION_PX:
+        return None
+    m = max(box[2] - box[0], box[3] - box[1])
+    X0, Y0, X1, Y1 = _clamp_box((box[0] - m, min(box[1], head[1]) - m, box[2] + m, box[3] + m), W, H)
+    mag, step, edges = _edge_maps(gray[Y0:Y1, X0:X1])
+    crop = lambda b: tuple(a[b[1] - Y0:b[3] - Y0, b[0] - X0:b[2] - X0] for a in (mag, step, edges))
+    # Each region pools its edge pixels and takes the same statistic, so a region with many more edges (the
+    # surroundings) doesn't win by picking its luckiest tile. The torso and the surroundings each need a
+    # decent sample; a sharp strip at least a tenth of their edges wide is enough to show.
+    s_head = _edge_blur(*crop(head))
+    if s_head is None:
+        return None
+    yy, xx = np.mgrid[Y0:Y1, X0:X1]
+    inside = lambda b: (xx >= b[0]) & (xx < b[2]) & (yy >= b[1]) & (yy < b[3])
+    zone = inside(_grow(box, 0.15, 0.1, W, H)) | inside(_grow(head, 0.6, 1.0, W, H))
+    tor_m, near_m = inside(torso) & ~inside(head), ~zone
+    s_tor = _edge_blur(mag, step, edges & tor_m, min_n=4 * PLANE_MIN_EDGES)
+    s_near = _edge_blur(mag, step, edges & near_m, min_n=4 * PLANE_MIN_EDGES)
+    n_tor, n_near = int((edges & tor_m).sum()), int((edges & near_m).sum())
+    r3 = lambda v: None if v is None else round(v, 3)
+    return {"head": r3(s_head), "torso": r3(s_tor), "near": r3(s_near),
+            "head_vs_near": _extra(s_head, s_near), "head_vs_torso": _extra(s_head, s_tor),
+            "torso_vs_near": _extra(s_tor, s_near), "n_torso": n_tor, "n_near": n_near}
+
+
 def _sig(t: Optional[dict]) -> Optional[dict]:
     """Round stored metric terms to 4 significant figures (they span many orders of magnitude)."""
     return None if t is None else {k: (float(f"{v:.4g}") if isinstance(v, float) else v) for k, v in t.items()}
@@ -300,18 +375,27 @@ def _person_regions(det: dict, scale: float, W: int, H: int) -> dict:
     }
 
 
+def eyewear(p: dict, thr: dict) -> bool:
+    """The eye band reads far sharper than the head around it: sunglasses or goggles, whose hard frame edges
+    pass the contrast-normalized Laplacian even when a little soft. The head then has to clear its tier too."""
+    r, eye, head = thr.get("eyewear_ratio"), p.get("sharp_eye"), p.get("sharp_head")
+    return bool(r) and eye is not None and head is not None and eye > r * head
+
+
 def _grade(p: dict, thr: dict, k: float = 1.0) -> Optional[int]:
     """3/2/1/0 for one person with every threshold multiplied by k, or None when nothing is measurable.
 
     With an eye band, both the Laplacian and the FFT ratio on it must clear their thresholds (the FFT
-    check is skipped when use_hf is off or the band had no FFT value). Without one, the head box
-    Laplacian is judged against the head thresholds, as before."""
+    check is skipped when use_hf is off or the band had no FFT value), and so must the head box when the
+    band looks like eyewear. Without one, the head box Laplacian is judged against the head thresholds."""
     if thr.get("use_eyes", True) and p.get("sharp_eye") is not None and "eye_tier3_min" in thr:
         lap, hf = p["sharp_eye"], p.get("hf_eye")
         use_hf = thr.get("use_hf", True) and hf is not None and "hf_tier3_min" in thr
+        head = p.get("sharp_head") if eyewear(p, thr) else None
 
         def ok(lvl):
-            return lap >= k * thr[f"eye_tier{lvl}_min"] and (not use_hf or hf >= k * thr[f"hf_tier{lvl}_min"])
+            return lap >= k * thr[f"eye_tier{lvl}_min"] and (not use_hf or hf >= k * thr[f"hf_tier{lvl}_min"]) \
+                and (head is None or head >= k * thr[f"tier{lvl}_min"])
     else:
         s = p.get("sharp_head") or p.get("sharp_body")
         if s is None:
@@ -325,7 +409,9 @@ def _grade(p: dict, thr: dict, k: float = 1.0) -> Optional[int]:
 def local_tier(primary: Optional[dict], others: list[dict], thr: dict, prior: Optional[dict] = None,
                shake_margin: float = 1.5) -> tuple[int, str]:
     """Tier from measured sharpness (3 sharp, 2 slightly soft, 1 soft, 0 miss); the EXIF prior only demotes a
-    *borderline* tier 3 shot at a slow shutter (a clearly sharp subject wins, e.g. a well-panned rider)."""
+    *borderline* tier 3 shot at a slow shutter (a clearly sharp subject wins, e.g. a well-panned rider). A tier 3
+    whose surroundings (or, when plane_body_max_extra is set, torso) are clearly sharper than the head
+    (focus_plane) is only slightly soft: focus landed just off the face."""
     if primary is None:
         return 0, "no_people"
     g = _grade(primary, thr)
@@ -335,6 +421,13 @@ def local_tier(primary: Optional[dict], others: list[dict], thr: dict, prior: Op
     if g == 3:
         if prior and prior.get("motion_risk") == "high" and _grade(primary, thr, shake_margin) < 3:
             return 2, "borderline_sharp_slow_shutter"
+        pl = primary.get("plane") or {}
+        if thr.get("use_plane", True):
+            cut, body_cut = thr.get("plane_max_extra"), thr.get("plane_body_max_extra")
+            if cut and (pl.get("head_vs_near") or 0) >= cut:
+                return 2, "sharper_around_subject"
+            if body_cut and (pl.get("head_vs_torso") or 0) >= body_cut:
+                return 2, "sharper_body_than_head"
         return 3, "primary_eyes_sharp" if on_eyes else "primary_head_sharp"
     if g == 2:
         return 2, "primary_eyes_slightly_soft" if on_eyes else "primary_slightly_soft"
@@ -461,6 +554,8 @@ def analyze(path: Path, cfg: dict, detector: Detector, faces: Optional[FaceLandm
         if i < cfg.get("eye_max_people", 4):
             _eye_metrics(p, det, scale, rgb, gray, W, H, faces)
     primary = people[0] if people else None
+    if primary is not None and cfg["focus"].get("use_plane", True):
+        primary["plane"] = focus_plane(gray, primary, W, H)
     exif = X.read(path)
     prior = X.prior(exif, cfg.get("exif"))
     tier, reason = local_tier(primary, people[1:], cfg["focus"], prior, cfg.get("exif", {}).get("shake_margin", 1.5))

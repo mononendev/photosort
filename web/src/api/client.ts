@@ -64,6 +64,14 @@ export interface Person {
   af_score?: number | null;
   /** Each metric's stored terms: value = lap_var / (gray_var + eps); eye FFT ratio = band_e / total_e */
   terms?: Partial<Record<'head' | 'torso' | 'body' | 'eye', MetricTerms | null>>;
+  /** Edge-width blur (px) of the head, torso and sharpest surroundings, and the extra blur between them (primary only) */
+  plane?: FocusPlane | null;
+}
+
+export interface FocusPlane {
+  head: number; torso: number | null; near: number | null;
+  head_vs_near: number | null; head_vs_torso: number | null; torso_vs_near: number | null;
+  n_torso: number; n_near: number; tile: number;
 }
 
 export interface MetricTerms { lap_var: number; gray_var: number; px?: number[]; px_count?: number; band_e?: number; total_e?: number }

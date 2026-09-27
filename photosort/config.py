@@ -75,7 +75,13 @@ DEFAULTS: dict = {
     "focus": {"tier3_min": 0.030, "tier2_min": 0.017, "tier1_min": 0.010,
               "eye_tier3_min": 0.060, "eye_tier2_min": 0.035, "eye_tier1_min": 0.020,
               "hf_tier3_min": 0.030, "hf_tier2_min": 0.017, "hf_tier1_min": 0.010,
-              "use_eyes": True, "use_hf": True},
+              "use_eyes": True, "use_hf": True,
+              # Eye band Laplacian above eyewear_ratio x the head's: sunglasses/goggles, so the head must clear too.
+              "eyewear_ratio": 3.0,
+              # A tier 3 whose head carries >= plane_max_extra px more edge blur than its surroundings drops to 2:
+              # focus landed just in front or behind. plane_body_max_extra does the same against the torso; off
+              # by default, since clothing print reads sharper than a face even when both are in focus.
+              "use_plane": True, "plane_max_extra": 0.4, "plane_body_max_extra": None},
     # Camera-metadata prior: crop_factor converts focal length to 35mm-equivalent when EXIF lacks it;
     # f-number <= wide_open_f or entrance pupil >= 40mm = "very shallow DOF"; a tier-3 sharpness below tier3_min*shake_margin is
     # demoted to tier 2 when the shutter was slow enough that motion blur is likely.

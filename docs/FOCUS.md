@@ -40,13 +40,27 @@ subject at native resolution, and falls back to the head when the eyes can't be 
 
    | Eyes found? | Tier N (3 sharp, 2 slightly soft, 1 soft; else 0 miss) |
    |---|---|
-   | yes | Laplacian ≥ `eye_tierN_min` **and** FFT ≥ `hf_tierN_min` |
+   | yes | Laplacian ≥ `eye_tierN_min` **and** FFT ≥ `hf_tierN_min` (**and** head Laplacian ≥ `tierN_min` for eyewear) |
    | no | head Laplacian ≥ `tierN_min` |
+
+   **Eyewear.** Sunglasses and goggles put hard, high-contrast frame edges in the eye band, which pass the
+   Laplacian even when a little soft. When the band's Laplacian is more than `eyewear_ratio` times the head's,
+   the head box has to clear the tier as well.
 
    The tier grades the primary subject only: if it misses while someone else in the frame grades tier 3,
    the frame is still tier 0, with the reason `secondary_person_sharp`. No people is tier 0 (`no_people`). The reason is stored with the tier and
    shown in the UI.
-7. **EXIF prior.** Aperture, shutter, focal length and ISO are read from EXIF. An entrance pupil ≥ 40 mm
+7. **Focus plane.** The metrics above grade the subject in absolute terms, so a frame whose focus landed
+   just behind the rider can still pass. This step checks that the head is the sharpest thing around it.
+   It measures blur as edge width: for a blurred step, the steepest slope divided by the step height gives the
+   blur's width in pixels, whatever the contrast or what the edge belongs to. Unlike the Laplacian ratio, that
+   lets grass be compared with a face. The head, the torso and the surroundings (within one person-size, outside
+   a margin for helmets and limbs the boxes miss) are each measured on their own, from the 90th percentile of
+   their strong edges. A tier 3 whose head carries at least `plane_max_extra` px more blur than its surroundings
+   (added in quadrature) drops to tier 2 (`sharper_around_subject`). Bokeh with no edges can't trigger it. The
+   same comparison against the torso is stored and shown, but only decides when `plane_body_max_extra` is set:
+   clothing print is steeper than any face, so it reads high on sharp frames too. Primary subject only.
+8. **EXIF prior.** Aperture, shutter, focal length and ISO are read from EXIF. An entrance pupil ≥ 40 mm
    or f/2 and wider flags very shallow depth of field; a shutter at least a stop slower than 1/focal-length
    (35 mm equivalent) or slower than 1/60 s flags motion-blur risk. A tier 3 that clears its thresholds by
    less than 1.5× at a risky shutter speed is demoted to tier 2 (`borderline_sharp_slow_shutter`). A clearly
@@ -82,6 +96,10 @@ high is usually right: a false "sharp" costs more than a false "check this".
 | `eye_tier3_min`, `eye_tier2_min`, `eye_tier1_min` | 0.06, 0.035, 0.02 | Eye band Laplacian |
 | `hf_tier3_min`, `hf_tier2_min`, `hf_tier1_min` | 0.03, 0.017, 0.01 | Eye band FFT ratio |
 | `tier3_min`, `tier2_min`, `tier1_min` | 0.03, 0.017, 0.01 | Head box Laplacian |
+| `eyewear_ratio` | 3.0 | Eye band Laplacian over this × the head's counts as eyewear; the head must clear too (`null` = off) |
+| `use_plane` | `true` | Run the focus-plane check (needs a local re-analyze; re-scoring alone can't add it) |
+| `plane_max_extra` | 0.4 | Extra head blur over the surroundings, in px, that takes a tier 3 to 2 |
+| `plane_body_max_extra` | `null` | The same against the torso (off: clothing print reads sharp) |
 
 `exif`: `crop_factor` (for bodies that don't write a 35 mm-equivalent focal length), `wide_open_f`,
 `shake_margin`.

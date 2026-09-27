@@ -6,26 +6,96 @@ separate homelab repo owns cluster-level resources (volumes, Ollama).
 ## Shape of the deployment
 
 - **`photosort`** (UI): nginx serving the built React app; proxies `/api` and `/media` to the API service.
-- **`photosort-api`**: FastAPI plus the job worker, one replica. Mounts the photos read-only at `/photos`,
-  state at `/data`, and model weights at `/models`.
+- **`photosort-api`**: one pod, one replica, two containers:
+  - `photosort-api`: the Go server (`photosort web`): HTTP API, job runner, tier rules, vision backends,
+    export. Image `photosort-api` (~146 MB: Alpine, the binary, exiftool). Listens on `:8080`.
+  - `photosort-analyzer`: the pixel stage as a sidecar: decoding, exposure lift, pose detection on ONNX
+    Runtime, focus metrics, frame/crop/thumbnail JPEGs. Image `photosort-analyzer` (~750 MB unpacked:
+    Python 3.13, ONNX Runtime, OpenCV, Pillow, and a seed of converted pose models). It listens on
+    `127.0.0.1:8090` only, since it reads any path it is given; the API reaches it over the pod's loopback
+    (`PHOTOSORT_ANALYZER=http://127.0.0.1:8090`).
+
+  Both containers mount the photos read-only at `/photos`, state at `/data` (the analyzer writes each image's
+  frame, thumbnail and crop into `/data/cache`), and model weights at `/models`.
 - **Ollama** on the same GPU node, reached at `http://ollama.<namespace>.svc.cluster.local:11434`.
+
+## Images
+
+| Image | Dockerfile | Notes |
+|---|---|---|
+| `photosort-api` | [`docker/api.Dockerfile`](../docker/api.Dockerfile) | Static Go binary; runs as uid 568 |
+| `photosort-analyzer` | [`docker/analyzer.Dockerfile`](../docker/analyzer.Dockerfile) | Build args `POSE_MODELS`, `ORT`; runs as uid 568 |
+| `photosort-ui` | [`docker/ui.Dockerfile`](../docker/ui.Dockerfile) | nginx, [`docker/nginx.conf`](../docker/nginx.conf) |
+
+The analyzer's `POSE_MODELS` build arg (default `yolo11n-pose yolo26s-pose rtmo-s`) names the pose models
+converted to ONNX in a build-only stage that has PyTorch and Ultralytics; neither reaches the final image. The
+converted models and the YuNet face model are baked in under `/app/weights` as a seed: the analyzer reads the
+models volume's manifest over the seed's, and copies a seeded file onto `/models` the first time it's used.
+To make another model available in the cluster, add it to `POSE_MODELS` and rebuild.
+
+`make push` builds all three for `linux/amd64` on the remote buildx builder; CI does the same with
+`buildctl`. The CI jobs are `test-go` (`go vet`, `go test -race`), `test-analyzer` (`uv run pytest`),
+`test-web` (build and lint), a `build` matrix over `api`, `analyzer` and `ui`, and `deploy` (default branch
+only).
+
+## Volumes
+
+- `photos-ro-claim` at `/photos`, read-only, in both containers.
+- `photosort-data-claim` at `/data`: the SQLite database (unless Postgres is used), the frame/crop/thumbnail
+  cache (~0.5 MB/image), `config.json` and its history, and exports. ReadWriteOnce, which is why the API runs
+  one replica.
+- `photosort-models` at `/models`, created by the chart ([`templates/pvc-models.yaml`](../.ci/chart/templates/pvc-models.yaml),
+  kept on uninstall). It holds only weights now: the face model and the pose store in `/models/pose`
+  (`manifest.json` plus one `.onnx` per model). The Python dependencies that used to be installed onto it at
+  startup are in the analyzer image; the environments the old entrypoint left on it can be deleted.
+
+## Postgres (optional)
+
+State is SQLite in `/data/photosort.db` by default. To use Postgres instead:
+
+1. Create a database and a secret with its URL:
+   `kubectl -n production create secret generic photosort-db --from-literal=url=postgres://user:pass@host:5432/photosort`
+2. Copy the existing data while the API is stopped (scale it to 0, or run the copy in a one-off pod that
+   mounts `photosort-data-claim`):
+   `photosort db copy --from sqlite:///data/photosort.db --to postgres://…`
+   The target must be empty; the copy creates the schema, checks row counts per table, and moves the id
+   sequences past the copied rows.
+3. Uncomment the `PHOTOSORT_DB` entry (from the `photosort-db` secret) in the API container's `env` in
+   [`values.yaml`](../.ci/chart/values.yaml) and deploy.
+
+`/api/health` then reports `"database": "postgres"`. The cache and exports stay on `/data`, so this doesn't
+lift the one-replica limit.
+
+## GPU
+
+The API pod carries `runtimeClassName: nvidia` and node affinity to the GPU node; `NVIDIA_VISIBLE_DEVICES` and
+`NVIDIA_DRIVER_CAPABILITIES` are set on the analyzer container, the only one that could use the card. There is
+no `nvidia.com/gpu` request: the card is shared cooperatively with Ollama.
+
+The analyzer image ships the CPU build of ONNX Runtime by default, and detection runs on CPU. That is a small
+cost next to the vision model. To run it on the GPU, build the analyzer with
+`--build-arg ORT=onnxruntime-gpu`; it then picks the CUDA execution provider when the card is visible, and
+`/api/health` reports `"device": "cuda"`. `PHOTOSORT_ORT_PROVIDERS` on the analyzer container overrides the
+choice.
 
 ## Running it on another cluster
 
 The chart builds on [mononen-library-chart](https://mononen.github.io/charts/). To point it somewhere
 else, change in [`.ci/chart/values.yaml`](../.ci/chart/values.yaml):
 
-- image repositories (`registry.adoah.dev/projects/…`) and `imageDefaults.pullSecrets`
+- image repositories (`registry.adoah.dev/projects/…`, three of them) and `imageDefaults.pullSecrets`
 - `global.namespace`, `global.domain`, and the ingress host, class, and annotations
 - the volume claims (`photos-ro-claim`, `photosort-data-claim`) and `modelsVolume.storageClass`
-- the Ollama URL in the API's environment
-- the GPU node affinity and `runtimeClassName: nvidia`, or drop them to run on CPU
+- the Ollama URL in the API container's environment
+- the GPU node affinity, `runtimeClassName: nvidia` and the analyzer's `NVIDIA_*` variables, or drop them to
+  run on CPU
 
 In the Makefile, `REGISTRY` and `BUILDER`; in `.github/workflows/ci.yml`, the `REGISTRY` env and the
 `runs-on: [homelab]` runner labels. The workflow uses no secrets: the self-hosted runners already have
-registry push and cluster access, so a GitHub-hosted runner would need both added.
+registry push and cluster access, so a GitHub-hosted runner would need both added. Set the repository variable
+`PHOTOSORT_TEST_PG` to a Postgres URL to run the database, job and API tests on Postgres too.
 
-Without Kubernetes, the two images run anywhere: see "Build" in the [README](../README.md#build).
+Without Kubernetes, the three images run anywhere: see "Build" in the [README](../README.md#build).
 
 ## Reference cluster: one-time setup (homelab repo)
 - `cluster/apps/production/photosort/pvc.yaml` → `photosort-data-claim` (100Gi RBD). State, cache
@@ -33,9 +103,7 @@ Without Kubernetes, the two images run anywhere: see "Build" in the [README](../
 - `photos-ro-claim` already exists in `production` (ROX CephFS of `/photos`, also mounted by Immich).
 - `cluster/apps/production/ollama/helm-release.yaml`: chart ≥ 1.83.0, `ollama.models.pull:
   [qwen3-vl:4b-instruct]`, `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_FLASH_ATTENTION=1`, `OLLAMA_KV_CACHE_TYPE=q8_0`.
-
-- The chart creates `photosort-models` (RBD, kept on uninstall) and mounts it at `/models`; weights are
-  copied there from the image on first start, so later images can drop the pre-fetch.
+- The chart creates `photosort-models` itself (see Volumes).
 
 ## App
 ```bash
@@ -45,6 +113,36 @@ kubectl -n production rollout status deploy/photosort-api
 ```
 UI: https://photosort.adoah.dev (internal ingress, LAN/tailscale only). API health: `/api/health`.
 
+## Probes
+
+- `photosort-api`: readiness is an HTTP GET of `/api/health` on `:8080`. It answers as soon as the server is
+  up, whether or not the analyzer is.
+- `photosort-analyzer`: readiness runs a small Python one-liner inside the container that fetches
+  `http://127.0.0.1:8090/health`, because the analyzer isn't reachable from outside the pod.
+
+## Troubleshooting
+
+`/api/health` returns, among others:
+
+| Field | Meaning |
+|---|---|
+| `analyzer` | `true` when the analyzer answered its last health check (every 30 s) |
+| `device` | Where the analyzer runs detection: `cpu` or `cuda`; `null` while the analyzer isn't answering |
+| `database` | `sqlite` or `postgres` |
+| `models_dir` | Where the pose models and face model are read from |
+| `current_job` | The running job's id, if any |
+
+- `"analyzer": false`: check the sidecar's logs (`kubectl -n production logs deploy/photosort-api -c
+  photosort-analyzer`) and its readiness. Until it answers, local-stage images fail with an analyzer error and
+  the full-size viewer doesn't load; vision-model tagging of already analyzed images still works.
+- `"device": "cpu"` with an `onnxruntime-gpu` image: the GPU isn't visible to the analyzer. Check that
+  `runtimeClassName: nvidia` rendered, the `NVIDIA_*` variables are on the analyzer container, and the pod
+  landed on the GPU node (it follows the `nvidia.com/gpu` node label, as does Ollama). With the default image
+  `cpu` is expected.
+- A local-stage error saying a pose model "is not installed": the configured `detect_model` (or a job's
+  override) isn't in the image's seed or on the models volume. Pick an installed one on the Calibrate page,
+  or add it to `POSE_MODELS` and rebuild the analyzer.
+
 ## Gotchas
 - The api Deployment has one replica and an RWO data volume; rollouts overlap briefly on the same node.
   Don't scale it. During the overlap the running job stays with the old pod (it holds a heartbeat lease
@@ -52,6 +150,4 @@ UI: https://photosort.adoah.dev (internal ingress, LAN/tailscale only). API heal
   the new pod resumes it with done/total intact. A pod killed without that gets its job requeued once the
   lease is 45 s stale; only the images it had in flight are redone. Keep `terminationGracePeriodSeconds`
   at 30 s or more.
-- If `/api/health` reports `device: cpu`, the GPU isn't visible: check `runtimeClassName: nvidia` rendered
-  and that the ollama pod is on the same node (the api pod follows the `nvidia.com/gpu` node label).
 - Exports go to `/data/exports/<name>` on the data volume; copy them out with `kubectl cp` or mount the PVC.

@@ -157,7 +157,7 @@ func localCmd() *cobra.Command {
 	cmd.Flags().IntVar(&workers, "workers", 0, "parallel images (default: config workers)")
 	cmd.Flags().IntVar(&limit, "limit", 0, "only the first N")
 	cmd.Flags().BoolVar(&retry, "retry-errors", false, "also redo images that failed before")
-	cmd.Flags().StringVar(&model, "detector", "", "pose model for this run (default: config detector.model)")
+	cmd.Flags().StringVar(&model, "detector", "", "pose model for this run (default: config detect_model)")
 	return cmd
 }
 

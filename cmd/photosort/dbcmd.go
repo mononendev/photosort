@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -155,7 +156,7 @@ func copyTable(src, dst *db.DB, table string, cols []string) (int, error) {
 func analyzerModule(cmd *cobra.Command, extra bool, args ...string) error {
 	dir, _ := filepath.Abs(envOr("PHOTOSORT_ANALYZER_DIR", "analyzer"))
 	if !fileExists(filepath.Join(dir, "pyproject.toml")) {
-		return fmt.Errorf("the analyzer project isn't at %s (set PHOTOSORT_ANALYZER_DIR); in the cluster, run the exporter image", dir)
+		return fmt.Errorf("the analyzer project isn't at %s (set PHOTOSORT_ANALYZER_DIR); for the cluster image, list models in the POSE_MODELS build arg of docker/analyzer.Dockerfile", dir)
 	}
 	uvArgs := []string{"run", "--quiet", "--project", dir}
 	if extra {
@@ -174,7 +175,9 @@ func modelsCmd() *cobra.Command {
 		Short: "install pose models into $PHOTOSORT_MODELS/pose (converts YOLO from ultralytics, downloads RTMO)",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, names []string) error {
-			return analyzerModule(cmd, true, append([]string{"get"}, names...)...)
+			// Only YOLO models need torch (the ultralytics extra) to convert; RTMO downloads as ONNX.
+			yolo := slices.ContainsFunc(names, func(n string) bool { return strings.HasPrefix(n, "yolo") })
+			return analyzerModule(cmd, yolo, append([]string{"get"}, names...)...)
 		},
 	})
 	cmd.AddCommand(&cobra.Command{

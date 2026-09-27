@@ -90,6 +90,7 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
   const grades = useMemo(() => (l?.people ?? []).map((q) => gradePerson(q, cfg)), [l, cfg]);
   const localTip = useMemo(() => l && explainLocal(l, cfg), [l, cfg]);
   const p = l?.people?.[0];
+  const ratings = data && <RatingsStrip d={data} cfg={cfg} localTip={localTip} />;
   const heat = dbg.data?.heatmap;
   // Horizontal swipe on a touch screen steps to the next/previous photo (vertical scrolling wins when ambiguous).
   const swipe = useRef<{ x: number; y: number } | null>(null);
@@ -112,9 +113,9 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
       <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
         className={inline ? 'relative bg-gray-950'
           : 'relative sm:m-auto w-full h-[100dvh] sm:h-auto sm:w-[min(1200px,96vw)] sm:max-h-[94vh] overflow-auto overscroll-contain sm:rounded-xl sm:border border-gray-700 bg-gray-950 shadow-2xl animate-[sheet-in_180ms_ease-out]'}>
-        <div className={`flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1 px-3 sm:px-4 py-2 border-b border-gray-800 sticky z-10 bg-gray-950/95 backdrop-blur ${inline ? 'top-[calc(3.5rem+env(safe-area-inset-top))]' : 'top-0 pt-[max(0.5rem,env(safe-area-inset-top))] sm:pt-2'}`}>
+        <div className={`flex flex-wrap ${inline ? 'sm:flex-nowrap' : ''} items-center gap-x-3 gap-y-1 px-3 sm:px-4 py-2 border-b border-gray-800 sticky z-10 bg-gray-950/95 backdrop-blur ${inline ? 'top-[calc(3.5rem+env(safe-area-inset-top))]' : 'top-0 pt-[max(0.5rem,env(safe-area-inset-top))] sm:pt-2'}`}>
           <span className="font-mono text-sm text-gray-300 truncate min-w-0 flex-1 sm:flex-none">{data?.rel ?? id}</span>
-          <span className="order-last basis-full sm:basis-auto sm:order-none flex flex-wrap items-center gap-x-3 gap-y-1">
+          {inline && <span className="order-last basis-full sm:basis-auto sm:order-none flex flex-wrap items-center gap-x-3 gap-y-1">
           {data && <Tip plain tip={explainFinal(data, cfg)}><TierBadge tier={data.focus_tier} /></Tip>}
           {data?.reviewed && <Tip plain tip="You rated this photo (q/w/e/r/t). Re-running jobs never changes it; only another rating, clearing it (⌫), or reset does."><span className="inline-flex items-center gap-1 text-xs text-gray-300"><RatingBadge rating={data.rating} /> reviewed</span></Tip>}
           {ovm.isError && <span className="text-xs text-red-400">couldn't save: {String(ovm.error?.message ?? ovm.error)}</span>}
@@ -133,13 +134,21 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
               <span className="text-xs text-gray-300">truth: tier {data.truth_tier}{data.truth_rating ? ` · ${data.truth_rating}★` : ''}{data.truth_label ? ` · ${data.truth_label}` : ''}</span>
             </Tip>
           )}
-          </span>
+          </span>}
           <span className="sm:ml-auto flex items-center gap-1 sm:gap-2">
             {toolbar}
             {onNav && <button onClick={() => onNav(-1)} aria-label="Previous photo" className="px-3 py-1.5 sm:px-2 sm:py-0 rounded text-gray-400 hover:text-white active:bg-gray-800">←</button>}
             {onNav && <button onClick={() => onNav(1)} aria-label="Next photo" className="px-3 py-1.5 sm:px-2 sm:py-0 rounded text-gray-400 hover:text-white active:bg-gray-800">→</button>}
             {onClose && <button onClick={onClose} aria-label="Close" className="px-3 py-1.5 sm:px-2 sm:py-0 rounded text-gray-400 hover:text-white active:bg-gray-800">✕</button>}
           </span>
+          {/* As a modal (Photos, jobs), every verdict sits side by side under the name, the same row as the viewer's. */}
+          {!inline && (ratings || ovm.isError) && (
+            <div className="basis-full flex flex-wrap items-center gap-x-4 gap-y-1">
+              {ratings}
+              {data?.overridden && <Tip plain tip="You set at least one value under “Your call”. Your values beat the local and model results everywhere, including exports."><span className="text-[11px] text-purple-300">overridden</span></Tip>}
+              {ovm.isError && <span className="text-xs text-red-400">couldn't save: {String(ovm.error?.message ?? ovm.error)}</span>}
+            </div>
+          )}
         </div>
         <div className={`grid md:grid-cols-[minmax(0,1fr)_380px] gap-4 p-3 sm:p-4 pb-[max(1rem,env(safe-area-inset-bottom))] ${inline ? WIDE.grid : ''}`}>
           {/* Frame and crop sit beside the sidebar; the people and focus-math panels run the full width below
@@ -149,7 +158,7 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
             {l && layerBar}
             <FrameOverlay id={id} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} onOpen={() => openFull(0)} />
             {full && l && <FrameViewer id={id} name={data?.rel ?? String(id)} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} bar={layerBar}
-              ratings={data && <RatingsStrip d={data} cfg={cfg} localTip={localTip} />} zoomRef={zoomRef} onClose={closeFull} onNav={onNav} />}
+              ratings={ratings} zoomRef={zoomRef} onClose={closeFull} onNav={onNav} />}
             {data?.has_crop && (
               <div className="flex flex-col sm:flex-row gap-3 items-start">
                 <img src={cropUrl(id)} alt="head crop" onClick={l ? () => openFull(1) : undefined} title={l ? 'Open at 1:1 on the head' : undefined}

@@ -434,6 +434,18 @@ def soft_in_front(primary: dict, others: list[dict], thr: dict, W: int, H: int) 
     return None
 
 
+def sharp_other(others: list[dict], thr: dict) -> bool:
+    """Someone besides the primary is confidently detected (conf >= floor_conf) and grades floor_grade or better.
+
+    Then focus plainly landed on a person in the frame, so the frame is worth a look even when the primary missed:
+    local_tier raises it to floor_tier. The primary is only a guess (prominence, or an AF point beside someone),
+    and a frame with somebody sharp in it is rarely a throwaway."""
+    if thr.get("floor_tier") is None:
+        return False
+    c, g = thr.get("floor_conf", 0.5), thr.get("floor_grade", 3)
+    return any((o.get("conf") or 0) >= c and (_grade(o, thr) or 0) >= g for o in others)
+
+
 def metric_split(p: Optional[dict], thr: dict) -> Optional[dict]:
     """The primary's metrics disagree: one grades split_steps or more tiers from the nearest of the others.
 
@@ -463,10 +475,13 @@ def local_tier(primary: Optional[dict], others: list[dict], thr: dict, prior: Op
     *borderline* tier 3 shot at a slow shutter (a clearly sharp subject wins, e.g. a well-panned rider). A tier 3
     whose surroundings (or, when plane_body_max_extra is set, torso) are clearly sharper than the head
     (focus_plane) is only slightly soft: focus landed just off the face. So is one with a soft person standing
-    clearly in front of it (soft_in_front): focus went past the subject onto someone behind."""
+    clearly in front of it (soft_in_front): focus went past the subject onto someone behind. Below floor_tier,
+    someone else graded sharp (sharp_other) raises the frame to floor_tier."""
     if primary is None:
         return 0, "no_people"
     g = _grade(primary, thr)
+    if (g is None or g < (thr.get("floor_tier") or 0)) and sharp_other(others, thr):
+        return thr["floor_tier"], "secondary_person_sharp"
     if g is None:
         return 0, "subject_too_small"
     on_eyes = thr.get("use_eyes", True) and primary.get("sharp_eye") is not None and "eye_tier3_min" in thr
@@ -487,7 +502,8 @@ def local_tier(primary: Optional[dict], others: list[dict], thr: dict, prior: Op
         return 2, "primary_eyes_slightly_soft" if on_eyes else "primary_slightly_soft"
     if g == 1:
         return 1, "primary_eyes_soft" if on_eyes else "primary_soft"
-    # The tiers grade the primary subject, so a sharp bystander is still a miss; the reason keeps it findable.
+    # With the floor off, the tiers grade the primary subject only, so a sharp bystander is still a miss; the
+    # reason keeps it findable.
     if any(_grade(o, thr) == 3 for o in others):
         return 0, "secondary_person_sharp"
     return 0, "nothing_sharp"
@@ -533,10 +549,11 @@ def pick_primary(people: list[dict], af: Optional[dict], cfg: dict) -> str:
 
     People are ranked by prominence (size, centering, confidence). When the camera's active AF points land on
     someone, that person is who the photographer meant, so they lead even if smaller or softer than a bystander.
+    A point just beside someone counts too, for less (af.near).
     """
     acfg = cfg.get("af") or {}
     for p in people:
-        p["af_score"] = A.person_score(af, p) if af else None
+        p["af_score"] = A.person_score(af, p, acfg.get("near", 0.0)) if af else None
     # Rows analyzed before priority existed don't store it; the sort is stable, so they keep their stored order.
     people.sort(key=lambda p: -(p.get("priority") or 0))
     if not people or not af or not acfg.get("use", True):

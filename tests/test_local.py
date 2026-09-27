@@ -181,6 +181,18 @@ def test_local_tier_rules():
     assert local.local_tier({"sharp_head": 0.002}, [], thr)[0] == 0
 
 
+def test_local_tier_floor_for_a_sharp_bystander():
+    thr = {"tier3_min": 0.03, "tier2_min": 0.017, "tier1_min": 0.01, "floor_tier": 2, "floor_grade": 3, "floor_conf": 0.5}
+    sharp = {"sharp_head": 0.06, "conf": 0.9}
+    assert local.local_tier({"sharp_head": 0.002}, [sharp], thr) == (2, "secondary_person_sharp")
+    assert local.local_tier({"sharp_head": 0.012}, [sharp], thr) == (2, "secondary_person_sharp")
+    assert local.local_tier({}, [sharp], thr) == (2, "secondary_person_sharp")                  # primary unmeasurable
+    assert local.local_tier({"sharp_head": 0.012}, [{**sharp, "conf": 0.3}], thr)[0] == 1        # unsure detection
+    assert local.local_tier({"sharp_head": 0.012}, [{**sharp, "sharp_head": 0.02}], thr)[0] == 1  # only slightly soft
+    assert local.local_tier({"sharp_head": 0.02}, [sharp], thr) == (2, "primary_slightly_soft")  # already there
+    assert local.local_tier({"sharp_head": 0.002}, [sharp], {**thr, "floor_tier": None}) == (0, "secondary_person_sharp")
+
+
 def test_schema_validate_normalizes():
     d = {k: {"integer": 1, "string": "x", "array": ["A", "a "], "boolean": True}[v["type"]] for k, v in schema.FIELDS.items()}
     d["focus_tier"] = 2; d["primary_subject"] = "nope"; d["composition"] = "full_body"

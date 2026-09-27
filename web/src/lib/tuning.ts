@@ -93,6 +93,21 @@ export const GROUPS: Group[] = [
     ],
   },
   {
+    title: 'Someone else sharp',
+    intro: 'The tier grades the primary subject, but that pick is a guess (the most prominent person, or whoever the AF point landed on). When someone else in the frame is confidently detected and plainly sharp, focus landed on a person, so a lower tier is raised to this minimum (secondary_person_sharp).',
+    params: [
+      { key: 'focus.floor_tier', label: 'raise to at least', kind: 'number', nullable: true, whenOn: 2, step: 1, min: 1, max: 3, unit: 'tier', stricter: 'lower', applies: 'rescore',
+        up: 'more frames with a sharp bystander count as keepers',
+        help: 'The minimum tier for a frame where someone besides the primary grades sharp. Off keeps it a miss (tier 0). 3 overrides the checks for focus that went past the subject onto someone behind, so 2 is the useful setting.' },
+      { key: 'focus.floor_grade', label: 'when they grade', kind: 'select', stricter: 'higher', applies: 'rescore',
+        options: [{ value: 3, label: 'tier 3 (sharp)' }, { value: 2, label: 'tier 2 (slightly soft) or better' }],
+        help: 'How sharp the other person must be, on the same cuts as the primary. Higher is stricter.' },
+      { key: 'focus.floor_conf', label: 'detector confidence at least', kind: 'number', step: 0.05, min: 0, max: 1, stricter: 'higher', applies: 'rescore',
+        up: 'only surer detections can raise a frame',
+        help: 'Only people the pose model is at least this sure of count, so a sharp poster or statue doesn’t lift a miss. Higher is stricter.' },
+    ],
+  },
+  {
     title: 'Metrics split',
     intro: 'The eye band Laplacian, eye band FFT ratio and head box Laplacian are each graded on their own cuts. They measure the same head, so one far from the others usually means a box landed wrong (an eye band on a visor while the head is sharp). That never moves the tier; it flags the photo for review.',
     params: [
@@ -124,7 +139,10 @@ export const GROUPS: Group[] = [
         help: 'Off: the primary is always the largest, most central, most confident person.' },
       { key: 'af.min_score', label: 'minimum AF hit score', kind: 'number', step: 0.1, min: 0, applies: 'rescore',
         up: 'the AF points must land more squarely on someone to pick them',
-        help: 'Each active point scores by where it lands (head 2, torso 1.5, body 1, scaled by overlap). A person needs this much to override the prominence pick. Lower trusts the AF points more readily.' },
+        help: 'Each active point scores by where it lands (head 2, torso 1.5, body 1, scaled by overlap; half that just beside them). A person needs this much to override the prominence pick. Lower trusts the AF points more readily.' },
+      { key: 'af.near', label: 'reach beside a person', kind: 'number', step: 0.5, min: 0, unit: 'AF points', stricter: 'lower', applies: 'rescore',
+        up: 'points further beside someone still pick them',
+        help: 'A point just beside a head or body still earns up to half its weight, fading to nothing this many point-widths away (0 = only points on someone count). Spot AF often sits a point-width off the head it focused on.' },
       { key: 'af.y_up', label: 'AF y counts upward', kind: 'bool', applies: 'reanalyze',
         help: 'How the maker notes’ vertical offsets are read. Flip it only if AF boxes draw mirrored top-to-bottom on your body. Applied when the AF points are read.' },
     ],

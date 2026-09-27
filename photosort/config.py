@@ -96,6 +96,9 @@ DEFAULTS: dict = {
               # front_max_grade or worse: focus went past them. People within front_edge of the frame edge don't count.
               "use_front": True, "front_min_height": 1.0, "front_min_drop": 0.25, "front_max_gap": 0.5,
               "front_max_grade": 1, "front_edge": 0.01,
+              # Below floor_tier, a frame where someone besides the primary (detector conf >= floor_conf) grades
+              # floor_grade or better is raised to floor_tier: focus landed on a person (None = off).
+              "floor_tier": 2, "floor_grade": 3, "floor_conf": 0.5,
               # Needs review when one of the primary's metrics (eye band Laplacian, eye band FFT, head box Laplacian),
               # each graded on its own thresholds, sits >= split_steps tiers from the nearest other (None = off).
               "split_steps": 2},
@@ -105,8 +108,9 @@ DEFAULTS: dict = {
     "exif": {"crop_factor": 1.0, "wide_open_f": 2.0, "action_shutter": 1 / 500, "shake_margin": 1.5},
     # Camera AF points (Canon maker notes): the person the active points land on becomes the primary subject,
     # whatever their size or sharpness, when their score (head hit 2, torso 1.5, body 1 per point) >= min_score.
+    # A point beside a region earns up to half its weight, falling to 0 at `near` point-widths away (0 = off).
     # y_up: AF y offsets count upward from center (flip if boxes draw mirrored top-to-bottom on your body).
-    "af": {"use": True, "min_score": 0.5, "y_up": True},
+    "af": {"use": True, "min_score": 0.5, "near": 2.0, "y_up": True},
     # Cloud stage
     "backend": "ollama",         # ollama (local, free) | gemini | anthropic
     "model": None,               # None = backend default

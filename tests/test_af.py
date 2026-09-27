@@ -67,6 +67,21 @@ def test_pick_primary_follows_af():
     assert people[0] is big
 
 
+def test_pick_primary_af_point_beside_a_head():
+    # IMG_1055: a centre spot point just right of a spectator's head (box overlap only), rider bigger at the edge.
+    rider = {"box": [3090, 3671, 3450, 4779], "head": [3111, 3705, 3266, 3860], "torso": [3090, 3890, 3450, 4194],
+             "priority": 0.0129}
+    spectator = {"box": [1464, 2354, 1696, 3124], "head": [1502, 2359, 1630, 2487], "torso": [1464, 2514, 1696, 2766],
+                 "priority": 0.009}
+    pts = {"points": [{"i": 30, "box": [1644, 2506, 1812, 2678]}], "active": [30]}
+    people = [rider, spectator]
+    assert local.pick_primary(people, pts, {"af": {"min_score": 0.5}}) == "priority" and people[0] is rider
+    assert local.pick_primary(people, pts, {"af": {"min_score": 0.5, "near": 2.0}}) == "af" and people[0] is spectator
+    # Credit fades with distance: nothing at near point-widths away.
+    far = {"box": [1000, 0, 1100, 100], "head": [1000, 0, 1100, 100]}
+    assert af.person_score({"points": [{"i": 0, "box": [0, 0, 100, 100]}], "active": [0]}, far, near=2.0) == 0.0
+
+
 def test_read_missing_is_none(tmp_path):
     from PIL import Image
     p = tmp_path / "x.jpg"

@@ -29,12 +29,14 @@ CREATE TABLE IF NOT EXISTS batches (
 CREATE TABLE IF NOT EXISTS jobs (
   id INTEGER PRIMARY KEY,
   created REAL, started REAL, finished REAL,
-  state TEXT,                -- queued | running | cancelling | done | cancelled | failed
+  state TEXT,                -- queued | running | preempting | cancelling | done | cancelled | failed
   stage TEXT,                -- scan | local | vlm | done
   paths_json TEXT, options_json TEXT,
   total INTEGER DEFAULT 0, done INTEGER DEFAULT 0, errors INTEGER DEFAULT 0,
   message TEXT,
-  owner TEXT, heartbeat REAL -- the worker running it and when it last said so (see JobRunner)
+  owner TEXT, heartbeat REAL, -- the worker running it and when it last said so (see JobRunner)
+  lane TEXT,                 -- while running: main (the whole job) | ahead (local stage while main waits on the model)
+  priority INTEGER DEFAULT 0 -- queue order, highest first, then oldest; an override puts a job on top
 );
 CREATE TABLE IF NOT EXISTS job_items (
   id INTEGER PRIMARY KEY,
@@ -54,6 +56,7 @@ MIGRATIONS = [
     ("images", "vlm_skip", "TEXT"),
     ("jobs", "stages_json", "TEXT"),   # per-stage timings and settings, written as the job moves through them
     ("jobs", "owner", "TEXT"), ("jobs", "heartbeat", "REAL"),
+    ("jobs", "lane", "TEXT"), ("jobs", "priority", "INTEGER DEFAULT 0"),
 ]
 
 def jcol(row, key: str, default=None):
@@ -294,7 +297,23 @@ class DB:
         return self.conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
 
     def next_queued_job(self) -> Optional[sqlite3.Row]:
-        return self.conn.execute("SELECT * FROM jobs WHERE state='queued' ORDER BY id LIMIT 1").fetchone()
+        return self.conn.execute("SELECT * FROM jobs WHERE state='queued' ORDER BY priority DESC, id LIMIT 1").fetchone()
+
+    def next_local_ahead_job(self, exclude: set[int] = frozenset()) -> Optional[sqlite3.Row]:
+        """The first queued job whose local stage hasn't finished yet."""
+        return next((r for r in self.conn.execute(
+            "SELECT * FROM jobs WHERE state='queued' AND json_extract(COALESCE(stages_json, '{}'), '$.local.finished') IS NULL "
+            "ORDER BY priority DESC, id") if r["id"] not in exclude), None)
+
+    def override_job(self, job_id: int) -> bool:
+        """Put a queued (or running-ahead) job at the front of the queue and pause every other running job: their
+        runners see 'preempting', hand them back to the queue and pick this one next. False if it isn't waiting."""
+        with self.lock, self.conn as c:
+            if c.execute("SELECT 1 FROM jobs WHERE id=? AND state IN ('queued','running')", (job_id,)).fetchone() is None:
+                return False
+            c.execute("UPDATE jobs SET priority = (SELECT COALESCE(MAX(priority), 0) + 1 FROM jobs) WHERE id=?", (job_id,))
+            c.execute("UPDATE jobs SET state='preempting' WHERE state='running' AND id != ?", (job_id,))
+            return True
 
     def update_job(self, job_id: int, where_owner: Optional[str] = None, **fields) -> bool:
         """With where_owner, only writes while that worker still holds the job, and says whether it did."""
@@ -308,10 +327,10 @@ class DB:
     # A worker holds a job while it keeps the heartbeat fresh. During a rolling restart two workers share this
     # database: the new one leaves a job alone while the old one is still beating, and picks it up once the old
     # one hands it back (clean shutdown) or its heartbeat goes stale (killed).
-    def claim_job(self, job_id: int, owner: str) -> bool:
+    def claim_job(self, job_id: int, owner: str, lane: str = "main") -> bool:
         with self.lock, self.conn as c:
-            ok = c.execute("UPDATE jobs SET state='running', owner=?, heartbeat=? WHERE id=? AND state='queued'",
-                           (owner, time.time(), job_id)).rowcount > 0
+            ok = c.execute("UPDATE jobs SET state='running', owner=?, heartbeat=?, lane=? WHERE id=? AND state='queued'",
+                           (owner, time.time(), lane, job_id)).rowcount > 0
             if ok:  # images the previous worker had in flight never finished
                 c.execute("DELETE FROM job_items WHERE job_id=? AND finished IS NULL", (job_id,))
             return ok
@@ -324,15 +343,16 @@ class DB:
         return (r["state"], r["owner"]) if r else (None, None)
 
     def requeue_stale(self, ttl: float) -> list[int]:
-        """Running jobs whose worker went quiet go back in the queue; ones being cancelled end as cancelled."""
+        """Running (or preempting) jobs whose worker went quiet go back in the queue; ones being cancelled end as cancelled."""
         cutoff, now = time.time() - ttl, time.time()
         with self.lock, self.conn as c:
             stale = [r["id"] for r in c.execute(
-                "SELECT id FROM jobs WHERE state IN ('running','cancelling') AND (heartbeat IS NULL OR heartbeat < ?)", (cutoff,))]
+                "SELECT id FROM jobs WHERE state IN ('running','preempting','cancelling') AND (heartbeat IS NULL OR heartbeat < ?)",
+                (cutoff,))]
             for jid in stale:
                 c.execute("UPDATE jobs SET state = CASE state WHEN 'cancelling' THEN 'cancelled' ELSE 'queued' END, "
                           "stage = CASE state WHEN 'cancelling' THEN 'done' ELSE 'queued' END, "
-                          "finished = CASE state WHEN 'cancelling' THEN ? ELSE finished END, owner=NULL, heartbeat=NULL, "
+                          "finished = CASE state WHEN 'cancelling' THEN ? ELSE finished END, owner=NULL, heartbeat=NULL, lane=NULL, "
                           "message = CASE state WHEN 'cancelling' THEN message ELSE 'requeued: its worker stopped responding' END "
                           "WHERE id=?", (now, jid))
                 c.execute("DELETE FROM job_items WHERE job_id=? AND finished IS NULL", (jid,))
@@ -342,10 +362,11 @@ class DB:
         with self.lock, self.conn as c:
             c.execute("UPDATE jobs SET state = CASE state WHEN 'queued' THEN 'cancelled' ELSE 'cancelling' END, "
                       "finished = CASE state WHEN 'queued' THEN ? ELSE finished END "
-                      "WHERE id=? AND state IN ('queued','running')", (time.time(), job_id))
+                      "WHERE id=? AND state IN ('queued','running','preempting')", (time.time(), job_id))
 
     def running_job(self) -> Optional[int]:
-        r = self.conn.execute("SELECT id FROM jobs WHERE state IN ('running','cancelling') ORDER BY id LIMIT 1").fetchone()
+        r = self.conn.execute("SELECT id FROM jobs WHERE state IN ('running','preempting','cancelling') "
+                              "ORDER BY lane = 'ahead', id LIMIT 1").fetchone()
         return r["id"] if r else None
 
     def start_job_item(self, job_id: int, image_id: int, stage: str, started: float) -> int:

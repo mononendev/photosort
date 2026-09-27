@@ -200,7 +200,10 @@ def test_old_database_is_migrated_and_indexed(tmp_path):
     from photosort.db import FINAL_TIER_SQL, final_tier_sql
     plan = db.conn.execute(f"EXPLAIN QUERY PLAN SELECT {FINAL_TIER_SQL} t, COUNT(*) FROM images "
                            "WHERE local_json IS NOT NULL GROUP BY t").fetchall()
-    assert "USING INDEX idx_final_tier'" in str([tuple(r) for r in plan])
+    # either index leading with the tier expression serves it; which one is a planner tie that varies by SQLite version
+    plan = str([tuple(r) for r in plan])
+    assert "USING INDEX idx_final_tier'" in plan or "USING INDEX idx_tier_lr'" in plan
     plan = db.conn.execute(f"EXPLAIN QUERY PLAN SELECT {final_tier_sql('strict')} t, COUNT(*) FROM images "
                            "WHERE local_json IS NOT NULL GROUP BY t").fetchall()
-    assert "idx_final_tier_strict" in str([tuple(r) for r in plan])
+    plan = str([tuple(r) for r in plan])
+    assert "idx_final_tier_strict" in plan or "idx_tier_lr_strict" in plan

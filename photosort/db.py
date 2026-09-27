@@ -89,6 +89,13 @@ def final_tier_sql(source: str) -> str:
 # stamp, which reads as 0: they saw the unlifted frame.
 _EV = "IFNULL(json_extract(local_json,'$.exposure.ev'), 0)"
 VLM_STALE_SQL = f"(vlm_json IS NOT NULL AND IFNULL(json_extract(vlm_json,'$.seen_ev'), 0) != {_EV})"
+
+
+def vlm_stale(local: Optional[dict], vlm: Optional[dict]) -> bool:
+    """VLM_STALE_SQL's Python twin, on the parsed columns."""
+    return bool(vlm) and (vlm.get("seen_ev") or 0) != (((local or {}).get("exposure") or {}).get("ev") or 0)
+
+
 # Images the vision model still has to (re)tag: never tagged, or tagged on a stale frame.
 VLM_TODO_SQL = f"(vlm_json IS NULL OR {VLM_STALE_SQL})"
 

@@ -63,6 +63,18 @@ def test_reanalysis_does_not_touch_rating_but_reset_does(client):
     assert (d["rating"], d["reviewed"], d["focus_tier"]) == (None, False, 0)
 
 
+def test_lift_after_tagging_marks_verdict_stale_and_keeps_rating(client):
+    a, _ = ids(client)
+    client.patch(f"/api/images/{a}", json={"rating": 3})
+    client.db.set_vlm(a, {"focus_tier": 0, "keeper": False}, {}, None)
+    assert client.get(f"/api/images/{a}").json()["vlm_stale"] is False
+    client.db.set_local(a, {"local_tier": 3, "n_people": 0, "people": [], "exposure": {"ev": 4.0}})
+    d = client.get(f"/api/images/{a}").json()
+    assert d["vlm_stale"] is True and d["rating"] == 3
+    client.db.set_vlm(a, {"focus_tier": 3, "keeper": True}, {}, None)   # the re-tag
+    assert client.get(f"/api/images/{a}").json()["vlm_stale"] is False
+
+
 def test_rating_out_of_range_rejected(client):
     a, _ = ids(client)
     assert client.patch(f"/api/images/{a}", json={"rating": 5}).status_code == 422

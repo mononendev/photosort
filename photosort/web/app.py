@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .. import __version__, config, images as I, schema, sort as sorter, truth
-from ..db import DB, final_tier_sql, jcol, REVIEW_SQL, under_folder
+from ..db import DB, final_tier_sql, jcol, REVIEW_SQL, under_folder, vlm_stale
 from ..pipeline import JobRunner
 
 
@@ -365,8 +365,9 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
         r = db.row(img_id)
         if not r:
             raise HTTPException(404)
-        return {**summary(r), "local": jcol(r, "local_json"),
-                "vlm": jcol(r, "vlm_json"),
+        loc, vlm = jcol(r, "local_json"), jcol(r, "vlm_json")
+        return {**summary(r), "local": loc,
+                "vlm": vlm, "vlm_stale": vlm_stale(loc, vlm),
                 "override": jcol(r, "override_json"),
                 "usage": jcol(r, "vlm_usage"),
                 "final": sorter.final_record(r, cfg.get("focus_source", "vlm"))}

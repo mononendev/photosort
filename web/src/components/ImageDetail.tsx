@@ -159,7 +159,7 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
           <div className="space-y-4 min-w-0 md:col-start-2 md:row-start-1">
             {v ? (
               <div>
-                <Row k="model tier" v={<TierBadge tier={v.focus_tier} />} tip={<>The vision model's own focus verdict, from the downscaled frame plus the native-resolution crop, with the local numbers passed as evidence. Tier {v.focus_tier} means {TIER_MEANING[v.focus_tier]}.</>} />
+                <Row k="model tier" v={<><TierBadge tier={v.focus_tier} />{data?.vlm_stale && <span className="ml-2 text-xs text-amber-300">stale · re-tag pending</span>}</>} tip={<>The vision model's own focus verdict, from the downscaled frame plus the native-resolution crop, with the local numbers passed as evidence. Tier {v.focus_tier} means {TIER_MEANING[v.focus_tier]}.</>} />
                 <Row k="focus notes" v={v.focus_notes} tip="The model's reason for its tier: where focus landed, and whether blur looks like missed focus (the whole subject soft while something else is crisp) or motion (a directional smear)." />
                 <Row k="subject" v={`${v.primary_subject} · ${v.composition} · ${v.subject_placement}`} tip="Subject category · how much of the primary person is in frame · where they sit in the frame. From the model. The 4B model is shaky on subject labels for candid shots, so treat them as hints." />
                 <Row k="action" v={v.action} />
@@ -192,7 +192,9 @@ export default function ImageDetail({ id, onClose, onNav }: { id: number; onClos
               <div className="text-xs text-gray-500">
                 <Tip tip={localTip}>local: tier {data.local.local_tier}</Tip> · {data.local.width}×{data.local.height} {data.local.orientation}
                 {data.local.exposure && <> · <Tip tip={`Underexposed (scene key ${data.local.exposure.key}): brightened by ${data.local.exposure.ev} stops before detection, scoring, and the model's frame and crop. The viewer shows the brightened image.`} className="text-amber-300">+{data.local.exposure.ev} EV</Tip></>}
-                {data.focus_tier_local !== null && data.focus_tier_vlm != null && data.focus_tier_local !== data.focus_tier_vlm && (
+                {data.vlm_stale ? (
+                  <> · <Tip tip="The model's verdict predates this exposure lift: it judged the frame as it was before (usually the dark original). The next job over this folder re-tags it; until then the model's tier, notes and remarks describe the old frame." className="text-amber-300">model saw the unlifted frame</Tip></>
+                ) : data.focus_tier_local !== null && data.focus_tier_vlm != null && data.focus_tier_local !== data.focus_tier_vlm && (
                   <> · <Tip tip={explainDisagree(data.local, data.focus_tier_vlm, v?.focus_notes, cfg)} className="text-amber-300">local ({data.focus_tier_local}) and model ({data.focus_tier_vlm}) disagree</Tip></>
                 )}
               </div>

@@ -128,6 +128,8 @@ export interface Override { rating?: number; focus_tier?: number; quality_score?
 export interface ImageDetail extends ImageSummary {
   local: LocalResult | null;
   vlm: VlmResult | null;
+  /** The model's verdict was made on a frame with a different exposure lift than the local stage now has */
+  vlm_stale?: boolean;
   override: Override | null;
   usage: Record<string, unknown> | null;
   final: Record<string, unknown>;

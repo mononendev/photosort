@@ -220,7 +220,21 @@ export interface ImageFilters {
   folder?: string; recursive?: boolean; tier?: number; keeper?: boolean; subject?: string; status?: string;
   review?: boolean; split?: boolean; lr_rating?: number; lr_label?: string; truth_tier?: number; truth_mismatch?: boolean;
   rating?: number; reviewed?: boolean;
+  local_tier?: number; vlm_tier?: number; stages?: 'agree' | 'disagree'; stale?: boolean; composition?: string;
+  eye_src?: 'face' | 'pose' | 'none'; primary_by?: 'af' | 'priority'; lifted?: boolean; overridden?: boolean; noted?: boolean;
+  camera?: string; lens?: string;
+  people_min?: number; people_max?: number; score_min?: number; score_max?: number; eye_min?: number; eye_max?: number;
+  iso_min?: number; iso_max?: number; f_min?: number; f_max?: number; shutter_min?: number; shutter_max?: number;
+  focal_min?: number; focal_max?: number; taken_from?: string; taken_to?: string;
   q?: string; sort?: string; offset?: number; limit?: number;
+}
+
+/** What the image filters can pick from in this library (GET /api/images/facets). */
+export interface ImageFacets {
+  cameras: { value: string; n: number }[]; lenses: { value: string; n: number }[];
+  compositions: { value: string; n: number }[]; subjects: { value: string; n: number }[]; lr_labels: { value: string; n: number }[];
+  /** [min, max] over the library, null when no photo has the value; taken is an EXIF date string */
+  ranges: Record<'iso' | 'f' | 'shutter' | 'focal' | 'people' | 'score' | 'eye', [number | null, number | null]> & { taken: [string | null, string | null] };
 }
 
 export interface ExportRequest { name: string; folder?: string; link?: string; xmp?: boolean; focus_source?: string; tree?: boolean }
@@ -267,6 +281,7 @@ export const api = {
   stats: () => request<Stats>('/api/stats'),
   tree: (path: string) => request<Tree>(`/api/tree${qs({ path })}`),
   images: (f: ImageFilters) => request<ImagesPage>(`/api/images${qs(f as Record<string, unknown>)}`),
+  imageFacets: () => request<ImageFacets>('/api/images/facets'),
   image: (id: number) => request<ImageDetail>(`/api/images/${id}`),
   focusDebug: (id: number) => request<FocusDebug>(`/api/images/${id}/focus-debug`),
   override: (id: number, o: Override & { clear?: boolean; clear_rating?: boolean }) =>
@@ -321,6 +336,7 @@ export const BANGER = 4;
 /** The focus tiers, worst to best. */
 export const SUBJECTS = ['rider_action', 'rider_posed', 'group', 'crowd_spectators', 'gear_board', 'venue_scenery', 'other', 'no_people'];
 export const TIERS = [0, 1, 2, 3] as const;
+export const COMPOSITIONS = ['full_body', 'three_quarter', 'half_body', 'close_up', 'environmental', 'no_subject'];
 
 /** Focus tiers 0-3 share their label and colors with the matching cull rating. */
 export const TIER_LABEL: Record<number, string> = Object.fromEntries(RATINGS.slice(0, BANGER).map((r) => [r.value, r.label]));

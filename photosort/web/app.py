@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .. import __version__, config, images as I, schema, sort as sorter, truth
-from ..db import DB, final_tier_sql, jcol, REVIEW_SQL, under_folder, vlm_stale
+from ..db import DB, final_tier_sql, jcol, REVIEW_SQL, under_folder, vlm_stale, VLM_STALE_SQL
 from ..pipeline import JobRunner
 
 
@@ -118,6 +118,11 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
                 "device": dev, "backend": cfg.get("backend"), "ollama": cfg.get("base_url"), "current_job": db.running_job()}
 
     KEEPER_SQL = "COALESCE(json_extract(override_json,'$.keeper'), json_extract(vlm_json,'$.keeper'))"
+    # The rest of sort.final_record's fields that the image list filters and sorts on, as SQL
+    _LOC = "json_extract(local_json,'$.local_tier')"
+    SCORE_SQL = "COALESCE(json_extract(override_json,'$.quality_score'), json_extract(vlm_json,'$.quality_score'))"
+    PEOPLE_SQL = "COALESCE(json_extract(vlm_json,'$.people_count'), json_extract(local_json,'$.n_people'))"
+    TAKEN_SQL = "json_extract(local_json,'$.exif.taken')"
 
     @app.get("/api/stats")
     def stats():
@@ -309,8 +314,27 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
                     lr_rating: Optional[int] = None, lr_label: Optional[str] = None,
                     truth_tier: Optional[int] = None, truth_mismatch: Optional[bool] = None,
                     rating: Optional[int] = None, reviewed: Optional[bool] = None,
+                    local_tier: Optional[int] = None, vlm_tier: Optional[int] = None, stages: Optional[str] = None,
+                    stale: Optional[bool] = None, composition: Optional[str] = None, eye_src: Optional[str] = None,
+                    primary_by: Optional[str] = None, lifted: Optional[bool] = None, overridden: Optional[bool] = None,
+                    noted: Optional[bool] = None, camera: Optional[str] = None, lens: Optional[str] = None,
+                    people_min: Optional[int] = None, people_max: Optional[int] = None,
+                    score_min: Optional[float] = None, score_max: Optional[float] = None,
+                    eye_min: Optional[float] = None, eye_max: Optional[float] = None,
+                    iso_min: Optional[float] = None, iso_max: Optional[float] = None,
+                    f_min: Optional[float] = None, f_max: Optional[float] = None,
+                    shutter_min: Optional[float] = None, shutter_max: Optional[float] = None,
+                    focal_min: Optional[float] = None, focal_max: Optional[float] = None,
+                    taken_from: Optional[str] = None, taken_to: Optional[str] = None,
                     q: Optional[str] = None, sort: str = "path", offset: int = 0, limit: int = Query(60, le=500)):
         where, params = ["1"], []
+
+        def between(sql: str, lo, hi):
+            """`sql` within [lo, hi]; either end may be open. A photo without the value never matches a bound."""
+            if lo is not None:
+                where.append(f"{sql} >= ?"); params.append(lo)
+            if hi is not None:
+                where.append(f"{sql} <= ?"); params.append(hi)
         if folder:
             base = str(safe_path(folder))
             if recursive:
@@ -352,16 +376,83 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
             where.append("json_extract(override_json,'$.rating') = ?"); params.append(rating)
         if reviewed is not None:
             where.append("COALESCE(json_extract(override_json,'$.reviewed'), 0) = ?"); params.append(int(reviewed))
+        if local_tier is not None:
+            where.append(f"{_LOC} = ?"); params.append(local_tier)
+        if vlm_tier is not None:
+            where.append("json_extract(vlm_json,'$.focus_tier') = ?"); params.append(vlm_tier)
+        if stages in ("agree", "disagree"):   # local vs a current (not stale) model verdict, as sort.final_record
+            where.append(f"{_LOC} IS NOT NULL AND vlm_json IS NOT NULL AND NOT {VLM_STALE_SQL} AND "
+                         f"{_LOC} {'=' if stages == 'agree' else '!='} json_extract(vlm_json,'$.focus_tier')")
+        if stale is not None:
+            where.append(VLM_STALE_SQL if stale else f"NOT {VLM_STALE_SQL}")
+        if composition:
+            where.append("json_extract(vlm_json,'$.composition') = ?"); params.append(composition)
+        if eye_src == "none":
+            where.append("local_json IS NOT NULL AND json_extract(local_json,'$.primary_eye_src') IS NULL")
+        elif eye_src:
+            where.append("json_extract(local_json,'$.primary_eye_src') = ?"); params.append(eye_src)
+        if primary_by:
+            where.append("json_extract(local_json,'$.primary_by') = ?"); params.append(primary_by)
+        if lifted is not None:
+            where.append(f"json_extract(local_json,'$.exposure.ev') IS {'NOT ' if lifted else ''}NULL")
+        if overridden is not None:
+            where.append("override_json IS NOT NULL AND override_json NOT IN ('', '{}')" if overridden
+                         else "(override_json IS NULL OR override_json IN ('', '{}'))")
+        if noted is not None:
+            where.append(f"COALESCE(json_extract(override_json,'$.note'), '') {'!=' if noted else '='} ''")
+        if camera:
+            where.append("json_extract(local_json,'$.exif.camera') = ?"); params.append(camera)
+        if lens:
+            where.append("json_extract(local_json,'$.exif.lens') = ?"); params.append(lens)
+        between(PEOPLE_SQL, people_min, people_max)
+        between(SCORE_SQL, score_min, score_max)
+        between("json_extract(local_json,'$.primary_eye_sharp')", eye_min, eye_max)
+        between("json_extract(local_json,'$.exif.iso')", iso_min, iso_max)
+        between("json_extract(local_json,'$.exif.f_number')", f_min, f_max)
+        between("json_extract(local_json,'$.exif.shutter_s')", shutter_min, shutter_max)
+        between("COALESCE(json_extract(local_json,'$.exif.focal_35mm'), json_extract(local_json,'$.exif.focal_mm'))",
+                focal_min, focal_max)
+        # EXIF dates read "2024:05:01 12:00:00"; the bounds come in as ISO dates, and `to` takes the whole day
+        between(f"substr({TAKEN_SQL}, 1, 10)", taken_from and taken_from[:10].replace("-", ":"),
+                taken_to and taken_to[:10].replace("-", ":"))
         if q:
-            where.append("(path LIKE ? OR vlm_json LIKE ?)"); params += [f"%{q}%", f"%{q}%"]
-        order = {"path": "path", "newest": "id DESC", "score": "json_extract(vlm_json,'$.quality_score') DESC, path",
+            where.append("(path LIKE ? OR vlm_json LIKE ? OR override_json LIKE ?)"); params += [f"%{q}%"] * 3
+        order = {"path": "path", "newest": "id DESC", "score": f"{SCORE_SQL} DESC, path",
+                 "score_low": f"{SCORE_SQL} IS NULL, {SCORE_SQL}, path",
                  "sharpness": "json_extract(local_json,'$.primary_head_sharp') DESC",
                  "eye_sharpness": "json_extract(local_json,'$.primary_eye_sharp') DESC",
+                 "eye_softest": "json_extract(local_json,'$.primary_eye_sharp') IS NULL, json_extract(local_json,'$.primary_eye_sharp')",
+                 "taken": f"{TAKEN_SQL} IS NULL, {TAKEN_SQL}, path", "taken_desc": f"{TAKEN_SQL} DESC, path",
+                 "people": f"{PEOPLE_SQL} DESC, path", "iso": "json_extract(local_json,'$.exif.iso') DESC, path",
+                 "name": "substr(path, length(rtrim(path, replace(path, '/', ''))) + 1), path",
+                 "shuffle": "(id * 2654435761) % 4294967291",   # a fixed scramble, so paging stays stable
                  "lr": "json_extract(lr_json,'$.rating') DESC, path"}.get(sort, "path")
         w = " AND ".join(where)
         total = db.count(w, params)
         rows = db.rows(w, params, order=order, limit=limit, offset=offset)
         return {"total": total, "offset": offset, "items": [summary(r) for r in rows]}
+
+    @app.get("/api/images/facets")
+    def image_facets():
+        """The values the image filters can take in this library, with counts: cameras, lenses, compositions,
+        subjects and sidecar labels, plus the spread of the numeric EXIF fields and capture dates."""
+        c = db.conn
+
+        def counts(sql: str) -> list:
+            return [{"value": r["v"], "n": r["n"]} for r in c.execute(
+                f"SELECT {sql} v, COUNT(*) n FROM images WHERE v IS NOT NULL AND v != '' GROUP BY v ORDER BY n DESC, v")]
+        ranges = {}
+        for k, sql in (("iso", "json_extract(local_json,'$.exif.iso')"), ("f", "json_extract(local_json,'$.exif.f_number')"),
+                       ("shutter", "json_extract(local_json,'$.exif.shutter_s')"), ("people", PEOPLE_SQL),
+                       ("focal", "COALESCE(json_extract(local_json,'$.exif.focal_35mm'), json_extract(local_json,'$.exif.focal_mm'))"),
+                       ("score", SCORE_SQL), ("eye", "json_extract(local_json,'$.primary_eye_sharp')"), ("taken", TAKEN_SQL)):
+            r = c.execute(f"SELECT MIN({sql}) lo, MAX({sql}) hi FROM images").fetchone()
+            ranges[k] = [r["lo"], r["hi"]]
+        return {"cameras": counts("json_extract(local_json,'$.exif.camera')"),
+                "lenses": counts("json_extract(local_json,'$.exif.lens')"),
+                "compositions": counts("json_extract(vlm_json,'$.composition')"),
+                "subjects": counts("json_extract(vlm_json,'$.primary_subject')"),
+                "lr_labels": counts("json_extract(lr_json,'$.label')"), "ranges": ranges}
 
     @app.get("/api/images/{img_id}")
     def get_image(img_id: int):

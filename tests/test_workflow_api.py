@@ -162,6 +162,35 @@ def test_image_filters_and_sorting(api):
     assert set(by_name(api, tier=0)) == {"sharp.jpg"} and set(by_name(api, reviewed=True)) == {"sharp.jpg"}
 
 
+def test_image_filters_extended(api):
+    api.run([""])   # local: sharp 3, soft 0, empty 0; the model says 1 for all three
+    ids = {n: i["id"] for n, i in by_name(api).items()}
+    exif = {"sharp.jpg": '{"camera":"R5","lens":"RF 70-200","iso":100,"f_number":2.8,"shutter_s":0.001,"focal_mm":200,"taken":"2024:05:01 10:00:00"}',
+            "soft.jpg": '{"camera":"R6","iso":6400,"f_number":8,"shutter_s":0.05,"focal_mm":24,"taken":"2024:06:02 18:30:00"}'}
+    for n, e in exif.items():
+        api.db.conn.execute("UPDATE images SET local_json=json_set(local_json,'$.exif',json(?)) WHERE id=?", (e, ids[n]))
+    api.db.conn.commit()
+    assert set(by_name(api, local_tier=3)) == {"sharp.jpg"} and set(by_name(api, vlm_tier=1)) == set(ids)
+    assert set(by_name(api, stages="disagree")) == set(ids) and by_name(api, stages="agree") == {}
+    assert set(by_name(api, composition="full_body")) == set(ids) and by_name(api, composition="close_up") == {}
+    assert set(by_name(api, camera="R5")) == {"sharp.jpg"} and set(by_name(api, lens="RF 70-200")) == {"sharp.jpg"}
+    assert set(by_name(api, iso_min=400)) == {"soft.jpg"} and set(by_name(api, iso_max=400)) == {"sharp.jpg"}
+    assert set(by_name(api, f_max=4)) == {"sharp.jpg"} and set(by_name(api, shutter_min=0.01)) == {"soft.jpg"}
+    assert set(by_name(api, focal_min=100, focal_max=300)) == {"sharp.jpg"}
+    assert set(by_name(api, taken_from="2024-06-01")) == {"soft.jpg"} and set(by_name(api, taken_to="2024-05-01")) == {"sharp.jpg"}
+    assert set(by_name(api, people_min=1, people_max=1)) == set(ids) and by_name(api, score_min=5) == {}
+    assert by_name(api, overridden=True) == {} and set(by_name(api, overridden=False)) == set(ids)
+    api.patch(f"/api/images/{ids['soft.jpg']}", json={"note": "fence in the way"})
+    assert set(by_name(api, overridden=True)) == {"soft.jpg"} and set(by_name(api, noted=True)) == {"soft.jpg"}
+    assert set(by_name(api, q="fence")) == {"soft.jpg"}
+    order = lambda s: [it["name"] for it in api.get("/api/images", params={"sort": s}).json()["items"]]
+    assert order("taken")[:2] == ["sharp.jpg", "soft.jpg"] and order("iso")[0] == "soft.jpg"
+    assert sorted(order("shuffle")) == sorted(ids) and order("name") == sorted(ids)
+    f = api.get("/api/images/facets").json()
+    assert {c["value"] for c in f["cameras"]} == {"R5", "R6"} and f["compositions"] == [{"value": "full_body", "n": 3}]
+    assert f["ranges"]["iso"] == [100, 6400] and f["ranges"]["taken"][0].startswith("2024:05:01")
+
+
 def test_image_detail_and_vlm_request(api):
     api.run([""])
     s = by_name(api)["sharp.jpg"]

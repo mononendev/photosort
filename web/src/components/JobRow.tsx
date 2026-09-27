@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { Link, useMatch, useNavigate } from 'react-router-dom';
+import type { MouseEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, isFinished, isLive } from '../api/client';
 import type { Job, JobOptions } from '../api/client';
@@ -25,14 +26,25 @@ export default function JobRow({ job, compact }: { job: Job; compact?: boolean }
   const finished = isFinished(job);
   const incomplete = finished && (job.state !== 'done' || job.errors > 0 || job.done < job.total);
   const ahead = job.state === 'running' && job.lane === 'ahead';
+  // The whole card opens the job's details (except on that page), leaving its own links, buttons and
+  // tooltips alone, and a drag-to-select of the paths doesn't count as a click.
+  const navigate = useNavigate();
+  const href = `/jobs/${job.id}`;
+  const linked = !useMatch(href);
+  const open = (e: MouseEvent) => {
+    if (!linked || (e.target as HTMLElement).closest('a, button, [tabindex]') || window.getSelection()?.toString()) return;
+    if (e.metaKey || e.ctrlKey || e.button === 1) window.open(href, '_blank');
+    else if (e.button === 0) navigate(href);
+  };
   return (
-    <div className="rounded-lg border border-gray-800 bg-gray-900 p-3">
+    <div onClick={open} onAuxClick={open}
+      className={`rounded-lg border border-gray-800 bg-gray-900 p-3 ${linked ? 'cursor-pointer hover:border-gray-700' : ''}`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
-        <Link to={`/jobs/${job.id}`} className="text-gray-500 hover:text-blue-300">#{job.id}</Link>
+        <Link to={href} className="text-gray-500 hover:text-blue-300">#{job.id}</Link>
         <span className={`font-medium ${STATE_CLASS[job.state]}`}>{job.state}</span>
         <span className="text-gray-400">{job.stage}</span>
         {ahead && <Tip tip="Running its local stage ahead of time, while the job in front of it waits on the vision model. It goes back in the queue once local is done (or the model frees up) and resumes from there." className="text-xs text-gray-500">ahead</Tip>}
-        <Link to={`/jobs/${job.id}`} className="text-gray-300 truncate flex-1 min-w-[8rem] basis-40 sm:basis-auto hover:text-blue-300" title={`${job.paths.join('\n')}\n\nOpen job details`}>
+        <Link to={href} className="text-gray-300 truncate flex-1 min-w-[8rem] basis-40 sm:basis-0 hover:text-blue-300" title={`${job.paths.join('\n')}\n\nOpen job details`}>
           {job.paths.map((p) => p.split('/').slice(-2).join('/')).join(', ')}
         </Link>
         <Tip tip={<>Progress of the current stage ({job.stage === 'done' ? 'the last stage that had work' : job.stage}). The local stage counts images analyzed; the vlm stage counts images sent to the vision model. The note below keeps the local stage's summary.</>} className="text-gray-400 tabular-nums">{job.done}/{job.total}</Tip>

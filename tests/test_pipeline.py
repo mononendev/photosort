@@ -66,6 +66,26 @@ def test_revlm_retags_already_tagged_images(tmp_path, monkeypatch):
     assert "nothing new to tag" not in j["message"]
 
 
+def test_verdict_on_an_unlifted_frame_is_stale_and_retagged(tmp_path, monkeypatch):
+    """A local re-run that lifts a dark frame leaves the model's old verdict about the dark one: it goes back in the
+    queue, doesn't count as a disagreement meanwhile, and the new verdict records the lift it saw."""
+    from photosort.db import REVIEW_SQL, VLM_STALE_SQL
+    db, r, photos = _runner(tmp_path, monkeypatch, vlm_rows_done=True)
+    a, b = [row["id"] for row in db.rows("1")]
+    (tmp_path / "cache" / f"{a}.jpg").write_bytes(b"x")
+    db.set_local(a, {"local_tier": 3, "people": [], "exposure": {"ev": 4.0, "source": "raw"}})
+    db.set_local(b, {"local_tier": 3, "people": []})   # disagrees with the model's 2, but on the same frame
+    assert [x["id"] for x in db.rows(VLM_STALE_SQL)] == [a]
+    assert [x["id"] for x in db.rows(REVIEW_SQL)] == [b]
+
+    jid = db.add_job([str(photos)], {"vlm": True})
+    r.run_job(db.job(jid))
+    j = db.job(jid)
+    assert (j["state"], j["done"], j["total"]) == ("done", 1, 1)
+    assert json.loads(db.row(a)["vlm_json"])["seen_ev"] == 4.0
+    assert db.count(VLM_STALE_SQL) == 0
+
+
 def test_vlm_stage_takes_over_counters_and_adds_errors(tmp_path, monkeypatch):
     db, r, photos = _runner(tmp_path, monkeypatch, vlm_rows_done=False)
     jid = db.add_job([str(photos)], {"vlm": True})

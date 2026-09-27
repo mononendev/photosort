@@ -9,7 +9,11 @@ from pathlib import Path
 from tqdm import tqdm
 
 from . import config, images as I
-from .db import DB
+from .db import DB, VLM_TODO_SQL
+
+# Images a batch submit picks up: still to tag, and not in a batch that hasn't come back yet.
+SUBMIT_SQL = (f"local_json IS NOT NULL AND {VLM_TODO_SQL} AND "
+              "(batch_id IS NULL OR batch_id IN (SELECT id FROM batches WHERE fetched=1))")
 
 
 def _ctx(args):
@@ -129,7 +133,7 @@ def _with_crop(rows) -> int:
 def cmd_estimate(args):
     from . import backends
     workdir, cfg, db = _ctx(args)
-    n = db.count("local_json IS NOT NULL AND vlm_json IS NULL AND batch_id IS NULL") or db.count()
+    n = db.count(SUBMIT_SQL) or db.count()
     rows = db.rows("local_json IS NOT NULL")
     with_crop = _with_crop(rows) if rows else int(n * 0.9)
     without = (len(rows) - with_crop) if rows else n - with_crop
@@ -153,7 +157,7 @@ def cmd_submit(args):
     bname = args.backend or cfg["backend"]
     backend = backends.get(bname, args.base_url or cfg.get("base_url"))
     model = args.model or cfg.get("model") or backend.default_model
-    rows = db.rows("local_json IS NOT NULL AND vlm_json IS NULL AND batch_id IS NULL" + ("" if args.retry_errors else " AND error IS NULL"))
+    rows = db.rows(SUBMIT_SQL + ("" if args.retry_errors else " AND error IS NULL"))
     if args.skip_local_tier0:
         rows = [r for r in rows if json.loads(r["local_json"])["local_tier"] > 0]
     if args.sample:

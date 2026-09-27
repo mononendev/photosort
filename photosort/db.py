@@ -84,9 +84,18 @@ def final_tier_sql(source: str) -> str:
     return FOCUS_SOURCES.get(source, FINAL_TIER_SQL)
 
 
-# Whether the two stages disagree.
+# The model's verdict was made on a different frame than the local stage now has: the exposure lift it saw (stamped
+# into vlm_json as seen_ev when stored) no longer matches the local stage's. Results from before the lift carry no
+# stamp, which reads as 0: they saw the unlifted frame.
+_EV = "IFNULL(json_extract(local_json,'$.exposure.ev'), 0)"
+VLM_STALE_SQL = f"(vlm_json IS NOT NULL AND IFNULL(json_extract(vlm_json,'$.seen_ev'), 0) != {_EV})"
+# Images the vision model still has to (re)tag: never tagged, or tagged on a stale frame.
+VLM_TODO_SQL = f"(vlm_json IS NULL OR {VLM_STALE_SQL})"
+
+# Whether the two stages disagree (a stale verdict doesn't count: the model judged another frame).
 REVIEW_SQL = ("local_json IS NOT NULL AND vlm_json IS NOT NULL AND "
-              "json_extract(local_json,'$.local_tier') != json_extract(vlm_json,'$.focus_tier')")
+              "json_extract(local_json,'$.local_tier') != json_extract(vlm_json,'$.focus_tier')"
+              f" AND NOT {VLM_STALE_SQL}")
 
 
 def _four_tiers(c: sqlite3.Connection):
@@ -207,8 +216,10 @@ class DB:
                       (json.dumps(data) if data else None, error, time.time() if data else None, img_id))
 
     def set_vlm(self, img_id: int, data: Optional[dict], usage: Optional[dict], error: Optional[str]):
+        """Store the model's result, stamped with the exposure lift of the frame it was sent (see VLM_STALE_SQL)."""
         with self.lock, self.conn as c:
-            c.execute("UPDATE images SET vlm_json=?, vlm_usage=?, error=?, vlm_at=?, vlm_skip=NULL WHERE id=?",
+            c.execute(f"UPDATE images SET vlm_json=json_set(?, '$.seen_ev', {_EV}), vlm_usage=?, error=?, vlm_at=?, "
+                      "vlm_skip=NULL WHERE id=?",
                       (json.dumps(data) if data else None, json.dumps(usage) if usage else None, error,
                        time.time() if data else None, img_id))
 
@@ -280,7 +291,7 @@ class DB:
     def clear_batch(self, batch_id: str, errored_too: bool = True):
         """Release a batch's untagged images for resubmission (with errored_too=False, only ones with no error)."""
         with self.lock, self.conn as c:
-            c.execute("UPDATE images SET batch_id=NULL WHERE batch_id=? AND vlm_json IS NULL"
+            c.execute(f"UPDATE images SET batch_id=NULL WHERE batch_id=? AND {VLM_TODO_SQL}"
                       + ("" if errored_too else " AND error IS NULL"), (batch_id,))
 
     # ---- jobs ---------------------------------------------------------------

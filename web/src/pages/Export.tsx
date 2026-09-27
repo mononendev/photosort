@@ -25,7 +25,7 @@ export default function Export() {
   const saveGroups = useMutation({
     mutationFn: () => api.putConfig({ groups: Object.fromEntries(GROUPS.map(({ value: g }) => [g, {
       folder: folderOf(g).trim() || `group_${g}`, keywords: keywordsOf(g).split(',').map((k) => k.trim()).filter(Boolean),
-    }])) }),
+    }])) }, 'export groups'),
     onSuccess: (c) => { qc.setQueryData(['config'], c); setDraft({}); },
   });
   const run = useMutation({

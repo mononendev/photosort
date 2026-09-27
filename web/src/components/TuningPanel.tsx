@@ -118,9 +118,9 @@ export default function TuningPanel() {
   const invalid = Object.values(edits).some((e) => e.value === undefined);
   const save = useMutation({
     mutationFn: async () => {
-      await api.putConfig(nest(Object.fromEntries(pending.map(([k, e]) => [k, e.value]))));
+      await api.putConfig(nest(Object.fromEntries(pending.map(([k, e]) => [k, e.value]))), 'tuning');
       const applies = new Set(pending.map(([k]) => byKey.get(k)?.applies ?? 'reanalyze'));
-      const rescore = applies.has('rescore') ? await api.rescore() : undefined;
+      const rescore = applies.has('rescore') ? await api.rescore('tuning') : undefined;
       return { rescore, later: (['reanalyze', 'retag'] as Applies[]).filter((a) => applies.has(a)) };
     },
     onSuccess: (r) => { setEdits({}); setResult(r); qc.invalidateQueries(); },

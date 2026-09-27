@@ -247,6 +247,24 @@ def test_config_and_rescore(api):
     assert api.get("/api/config/defaults").json()["focus"]["tier3_min"] == 0.03
 
 
+
+def test_config_history_and_rollback(api):
+    api.run([""], vlm=False)
+    orig = api.get("/api/config").json()
+    api.put("/api/config", json={"values": {"focus": {"tier3_min": 1e9}}, "source": "auto-calibrate"})
+    api.put("/api/config", json={"values": {"focus": {"tier3_min": 1e9}}})   # no change: not logged
+    api.post("/api/rescore", json={"source": "auto-calibrate"})
+    h = api.get("/api/config/history").json()
+    assert [e["kind"] for e in h] == ["rescore", "change"] and h[0]["changed"] == 1
+    change = h[1]
+    assert change["source"] == "auto-calibrate" and change["before"] == orig
+    assert change["changes"] == [{"key": "focus.tier3_min", "from": 0.03, "to": 1e9}]
+    assert api.post(f"/api/config/history/{change['id']}/restore").json() == orig
+    assert json.loads((api.work / "config.json").read_text())["focus"]["tier3_min"] == 0.03
+    undo = api.get("/api/config/history").json()[0]   # the rollback is itself a change, so it can be undone
+    assert undo["source"].startswith("restore") and undo["changes"][0]["to"] == 0.03
+    assert api.post("/api/config/history/1/restore").status_code == 404
+
 def test_calibration_and_ground_truth(api):
     api.run([""], vlm=False)
     cal = api.get("/api/calibration", params={"metric": "head"}).json()

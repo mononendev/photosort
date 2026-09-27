@@ -41,6 +41,11 @@ class OverrideIn(BaseModel):
 
 class ConfigIn(BaseModel):
     values: dict
+    source: str = "edit"          # where the save came from, for the change history (e.g. "auto-calibrate")
+
+
+class RescoreIn(BaseModel):
+    source: str = ""
 
 
 class TruthImportIn(BaseModel):
@@ -614,21 +619,49 @@ def create_app(workdir: Path, photos_root: Path, device: Optional[str] = None) -
     def get_config_defaults():
         return config.DEFAULTS
 
+    def snapshot() -> dict:
+        return json.loads(json.dumps(get_config()))
+
+    def save_config(before: dict, source: str):
+        (workdir / "config.json").write_text(json.dumps(cfg, indent=2))
+        config.log_change(workdir, before, snapshot(), source)
+        runner.reload_config.set()
+
     @app.put("/api/config")
     def put_config(c: ConfigIn):
+        before = snapshot()
         for k, v in c.values.items():
             if isinstance(v, dict) and isinstance(cfg.get(k), dict):
                 cfg[k].update(v)
             else:
                 cfg[k] = v
-        (workdir / "config.json").write_text(json.dumps(cfg, indent=2))
-        runner.reload_config.set()
+        save_config(before, c.source)
         return get_config()
 
     @app.post("/api/rescore")
-    def rescore():
+    def rescore(r: Optional[RescoreIn] = None):
         from ..local import rescore as _rescore
-        return _rescore(db, cfg)
+        res = _rescore(db, cfg)
+        config.log_event(workdir, {"kind": "rescore", "source": r.source if r else "", "changed": res["changed"]})
+        return res
+
+    @app.get("/api/config/history")
+    def config_history(limit: int = 100):
+        """Newest first. Each change carries the whole config from just before it, to roll back to."""
+        return config.history(workdir)[::-1][:limit]
+
+    @app.post("/api/config/history/{entry_id}/restore")
+    def config_restore(entry_id: int):
+        """Put every setting back to how it was just before that change (and log the restore, so it can be undone)."""
+        e = next((e for e in config.history(workdir) if e["id"] == entry_id and e.get("kind") == "change"), None)
+        if e is None:
+            raise HTTPException(404, "no such change")
+        before = snapshot()
+        for k in [k for k in cfg if not k.startswith("_")]:
+            del cfg[k]
+        cfg.update(json.loads(json.dumps(e["before"])))
+        save_config(before, f"restore to before {e['at']}")
+        return get_config()
 
     @app.get("/api/calibration")
     def calibration(n: int = 48, metric: str = "eye"):

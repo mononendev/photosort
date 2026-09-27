@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, FOCUS_METRIC_LABEL, TIERS } from '../api/client';
 import type { FocusMetric, TruthMatrixRow, TruthSource, TruthSummary } from '../api/client';
+import ConfigHistory from '../components/ConfigHistory';
 import FocusThresholds from '../components/FocusThresholds';
 import SegButton from '../components/SegButton';
 import TuningPanel from '../components/TuningPanel';
@@ -101,15 +102,18 @@ function GroundTruth({ onApply, applying }: { onApply: (values: Record<string, n
 export default function Calibrate() {
   const qc = useQueryClient();
   const save = useMutation({
-    mutationFn: async (values: Record<string, number>) => { await api.putConfig({ focus: values }); return api.rescore(); },
+    mutationFn: async ({ values, source }: { values: Record<string, number>; source: string }) => {
+      await api.putConfig({ focus: values }, source); return api.rescore(source);
+    },
     onSuccess: () => qc.invalidateQueries(),
   });
   return (
     <div className="space-y-6">
       <h1 className="text-lg font-semibold">Calibrate</h1>
-      <GroundTruth onApply={(values) => save.mutate(values)} applying={save.isPending} />
-      <FocusThresholds onSave={(values) => save.mutate(values)} saving={save.isPending} saved={save.data} error={save.error} />
+      <GroundTruth onApply={(values) => save.mutate({ values, source: 'auto-calibrate' })} applying={save.isPending} />
+      <FocusThresholds onSave={(values) => save.mutate({ values, source: 'focus cuts' })} saving={save.isPending} saved={save.data} error={save.error} />
       <TuningPanel />
+      <ConfigHistory />
     </div>
   );
 }

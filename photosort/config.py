@@ -177,3 +177,54 @@ def load(workdir: Path) -> dict:
         workdir.mkdir(parents=True, exist_ok=True)
         p.write_text(json.dumps(cfg, indent=2))
     return cfg
+
+
+# ---- change history -------------------------------------------------------------------
+# Every save appends one line to config_history.jsonl: what changed, where from, and the whole config as it was
+# just before, so any save (an auto-calibrate included) can be rolled back exactly.
+HISTORY = "config_history.jsonl"
+
+
+def flatten(d: dict, prefix: str = "") -> dict:
+    out = {}
+    for k, v in d.items():
+        if isinstance(v, dict) and v:
+            out.update(flatten(v, f"{prefix}{k}."))
+        else:
+            out[f"{prefix}{k}"] = v
+    return out
+
+
+def diff(before: dict, after: dict) -> list[dict]:
+    a, b = flatten(before), flatten(after)
+    return [{"key": k, "from": a.get(k), "to": b.get(k)} for k in sorted(a.keys() | b.keys()) if a.get(k) != b.get(k)]
+
+
+def log_event(workdir: Path, entry: dict) -> dict:
+    import time
+    entry = {"id": time.time_ns() // 1000, "at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), **entry}
+    with open(workdir / HISTORY, "a") as f:
+        f.write(json.dumps(entry) + "\n")
+    return entry
+
+
+def log_change(workdir: Path, before: dict, after: dict, source: str) -> dict | None:
+    """Record a save; nothing when it changed nothing."""
+    changes = diff(before, after)
+    if not changes:
+        return None
+    return log_event(workdir, {"kind": "change", "source": source, "changes": changes, "before": before})
+
+
+def history(workdir: Path) -> list[dict]:
+    """Oldest first; a torn last line (crash mid-write) is skipped."""
+    p = workdir / HISTORY
+    if not p.exists():
+        return []
+    out = []
+    for line in p.read_text().splitlines():
+        try:
+            out.append(json.loads(line))
+        except ValueError:
+            pass
+    return out

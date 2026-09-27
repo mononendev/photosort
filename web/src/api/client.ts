@@ -97,6 +97,11 @@ export interface AfInfo {
   active: number[]; active_from: 'in_focus' | 'selected' | null;
 }
 
+/** One line of config_history.jsonl: a save (with the whole config from just before it) or a re-score. */
+export type ConfigHistoryEntry = { id: number; at: string; source: string } & (
+  | { kind: 'change'; changes: { key: string; from: unknown; to: unknown }[]; before: Record<string, unknown> }
+  | { kind: 'rescore'; changed: number });
+
 export interface RescoreResult {
   changed: number; exif_backfilled: number; af_backfilled: number; primary_changed: number;
   errors: number; first_error: string | null;
@@ -335,9 +340,12 @@ export const api = {
   overrideJob: (id: number) => request<Job>(`/api/jobs/${id}/override`, { method: 'POST' }),
   config: () => request<Record<string, unknown>>('/api/config'),
   configDefaults: () => request<Record<string, unknown>>('/api/config/defaults'),
-  putConfig: (values: Record<string, unknown>) =>
-    request<Record<string, unknown>>('/api/config', { method: 'PUT', body: JSON.stringify({ values }) }),
-  rescore: () => request<RescoreResult>('/api/rescore', { method: 'POST' }),
+  /** `source` names the save in the change history (Calibrate → history). */
+  putConfig: (values: Record<string, unknown>, source = 'edit') =>
+    request<Record<string, unknown>>('/api/config', { method: 'PUT', body: JSON.stringify({ values, source }) }),
+  rescore: (source = '') => request<RescoreResult>('/api/rescore', { method: 'POST', body: JSON.stringify({ source }) }),
+  configHistory: () => request<ConfigHistoryEntry[]>('/api/config/history'),
+  configRestore: (id: number) => request<Record<string, unknown>>(`/api/config/history/${id}/restore`, { method: 'POST' }),
   calibration: (n = 48, metric: FocusMetric = 'eye') => request<Calibration>(`/api/calibration${qs({ n, metric })}`),
   truth: (source: TruthSource = 'both') => request<TruthSummary>(`/api/truth?source=${source}`),
   truthClear: () => request<{ cleared: number }>('/api/truth', { method: 'DELETE' }),

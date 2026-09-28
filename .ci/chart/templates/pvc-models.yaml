@@ -1,5 +1,5 @@
-{{- /* Model weights (the face model, pose models beyond the image's seed) on Ceph RBD, off k8s-5's small root
-       disk. Kept on uninstall so a redeploy never re-downloads. The library chart has no PVC template, so this lives here. */ -}}
+{{- /* Model weights (the face model, pose models beyond the image's seed) on CephFS, shared by the API and the
+       analyzer pool. Kept on uninstall so a redeploy never re-downloads. The library chart has no PVC template, so this lives here. */ -}}
 {{- $lib := index .Values "mononen-library-chart" -}}
 {{- $mv := .Values.modelsVolume -}}
 apiVersion: v1
@@ -14,7 +14,7 @@ metadata:
     helm.sh/resource-policy: keep
 spec:
   accessModes:
-    - ReadWriteOnce
+    - {{ $mv.accessMode | default "ReadWriteOnce" }}
   storageClassName: {{ $mv.storageClass }}
   resources:
     requests:

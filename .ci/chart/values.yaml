@@ -1,8 +1,11 @@
 # Chart-managed volume for model weights (see templates/pvc-models.yaml): the face model and pose models beyond
-# the ones the analyzer image seeds (~10-180 MB each). The Python deps that used to live here are in the image now.
+# the ones the analyzer image seeds (~10-180 MB each). CephFS, ReadWriteMany: the API and every analyzer pod mount it,
+# so a model installed once is there for the whole pool. (It replaces the RBD claim photosort-models, which the
+# chart keeps on the cluster; delete that once its models are copied over.)
 modelsVolume:
-  name: photosort-models
-  storageClass: csi-rbd-sc
+  name: photosort-models-fs
+  storageClass: csi-fs-sc
+  accessMode: ReadWriteMany
   size: 20Gi
 
 mononen-library-chart:
@@ -135,7 +138,7 @@ mononen-library-chart:
             claimName: photosort-data-claim
         - name: models
           persistentVolumeClaim:
-            claimName: photosort-models
+            claimName: photosort-models-fs
       service:
         port: 8080
         targetPort: 8080
@@ -146,8 +149,8 @@ mononen-library-chart:
     # so any node will do; the pods spread across nodes. They read /photos (confined to it by PHOTOSORT_PHOTOS_ROOT)
     # and write nothing: the frame, thumbnail and crop JPEGs go back to the API in the answers.
     #
-    # Pose models: the image's seed (POSE_MODELS in docker/analyzer.Dockerfile) copied into an emptyDir. The models
-    # PVC is RWO and can't follow the pods around; to run a model the image doesn't carry, add it to POSE_MODELS.
+    # Pose models: the image's seed (POSE_MODELS in docker/analyzer.Dockerfile) plus whatever is installed on the
+    # shared models volume.
     analyzer:
       enabled: true
       fullnameOverride: photosort-analyzer
@@ -241,5 +244,5 @@ mononen-library-chart:
             claimName: photos-ro-claim
             readOnly: true
         - name: models
-          emptyDir:
-            sizeLimit: 2Gi
+          persistentVolumeClaim:
+            claimName: photosort-models-fs

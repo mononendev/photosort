@@ -20,6 +20,7 @@ import sys
 import tempfile
 import threading
 import urllib.request
+import uuid
 import zipfile
 from pathlib import Path
 
@@ -75,7 +76,7 @@ def _record(name: str, file: Path, extra: dict):
         m = json.loads(p.read_text()) if p.exists() else {}
         h = hashlib.sha256(file.read_bytes()).hexdigest()
         m[name] = {**CATALOG.get(name, {}), **extra, "file": file.name, "sha256": h, "bytes": file.stat().st_size}
-        tmp = p.with_suffix(".tmp")
+        tmp = p.with_suffix(f".{uuid.uuid4().hex[:8]}.tmp")  # the volume may be shared between pods
         tmp.write_text(json.dumps(m, indent=1, sort_keys=True))
         tmp.replace(p)
 
@@ -100,7 +101,9 @@ def export(name: str) -> Path:
         finally:
             os.chdir(cwd)
         dest = pose_dir() / f"{name}.onnx"
-        shutil.move(str(onnx), dest)
+        tmp = dest.with_suffix(f".{uuid.uuid4().hex[:8]}.part")
+        shutil.move(str(onnx), tmp)
+        tmp.replace(dest)
         _record(name, dest, {"exported_with": _ultralytics_version()})
         return dest
     finally:
@@ -120,7 +123,9 @@ def pull(name: str) -> Path:
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         member = next(n for n in z.namelist() if n.endswith(".onnx"))
         dest = pose_dir() / f"{name}.onnx"
-        dest.write_bytes(z.read(member))
+        tmp = dest.with_suffix(f".{uuid.uuid4().hex[:8]}.part")
+        tmp.write_bytes(z.read(member))
+        tmp.replace(dest)
     _record(name, dest, {})
     return dest
 

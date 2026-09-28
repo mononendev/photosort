@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 import urllib.request
+import uuid
 from pathlib import Path
 
 SEED_WEIGHTS_DIR = Path(os.environ.get("PHOTOSORT_SEED_WEIGHTS", "/app/weights"))
@@ -27,14 +28,17 @@ def weights_path(name: str) -> Path:
     target = models_dir() / p
     if target.exists():
         return target
+    # The models volume may be shared by several analyzer pods: write beside the target, then rename, so none of
+    # them loads half a file.
+    tmp = target.with_suffix(f"{target.suffix}.{uuid.uuid4().hex[:8]}.part")
     seed = SEED_WEIGHTS_DIR / p
     if seed.exists():
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(seed, target)
+        shutil.copy2(seed, tmp)
+        tmp.replace(target)
         return target
     if p.name in WEIGHT_URLS:
         target.parent.mkdir(parents=True, exist_ok=True)
-        tmp = target.with_suffix(target.suffix + ".part")
         urllib.request.urlretrieve(WEIGHT_URLS[p.name], tmp)
         tmp.replace(target)
     return target

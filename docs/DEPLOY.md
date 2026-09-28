@@ -12,8 +12,8 @@ separate homelab repo owns cluster-level resources (volumes, Ollama).
 - **`photosort-analyzer`**: the pixel stage (decoding, exposure lift, pose detection on CPU ONNX Runtime,
   focus metrics, frame/crop/thumbnail JPEGs) as its own Deployment under an HPA (1-12 pods, 70% of the CPU
   request). Image `photosort-analyzer` (~750 MB unpacked: Python 3.13, ONNX Runtime, OpenCV, Pillow, and a
-  seed of converted pose models). Mounts only the photos, read-only; the pose models are the image's seed,
-  copied into an emptyDir.
+  seed of converted pose models). Mounts the photos read-only and the shared models volume; nothing
+  else, since the JPEGs it makes go back to the API.
 - **Ollama** on the GPU node, reached at `http://ollama.<namespace>.svc.cluster.local:11434`.
 
 ### How the local stage scales
@@ -66,10 +66,19 @@ only).
 - `photosort-data-claim` at `/data`: the SQLite database (unless Postgres is used), the frame/crop/thumbnail
   cache (~0.5 MB/image), `config.json` and its history, and exports. ReadWriteOnce, which is why the API runs
   one replica.
-- `photosort-models` at `/models`, created by the chart ([`templates/pvc-models.yaml`](../.ci/chart/templates/pvc-models.yaml),
-  kept on uninstall). It holds only weights now: the face model and the pose store in `/models/pose`
-  (`manifest.json` plus one `.onnx` per model). The Python dependencies that used to be installed onto it at
-  startup are in the analyzer image; the environments the old entrypoint left on it can be deleted.
+- `photosort-models-fs` at `/models`, created by the chart ([`templates/pvc-models.yaml`](../.ci/chart/templates/pvc-models.yaml),
+  kept on uninstall): CephFS (`csi-fs-sc`), ReadWriteMany, mounted by the API and every analyzer pod. It holds
+  weights only: the face model and the pose store in `/models/pose` (`manifest.json` plus one `.onnx` per
+  model), on top of the seed baked into the analyzer image. A model installed onto it (`photosort models get`
+  in a pod with the analyzer's `ultralytics` extra, or copied in) is there for the whole pool at once; writes
+  go through a temp file and a rename, so a pod never loads a half-written model.
+
+  It replaced `photosort-models` (Ceph RBD, ReadWriteOnce, which only one node can mount). The chart no longer
+  manages that claim but leaves it on the cluster. To carry its models over, once the API has rolled onto the
+  new claim, copy with a one-off pod that mounts both, e.g.
+  `kubectl -n production run models-copy --rm -it --restart=Never --image=busybox --overrides='{"spec":{"securityContext":{"runAsUser":568,"runAsGroup":568,"fsGroup":568},"volumes":[{"name":"old","persistentVolumeClaim":{"claimName":"photosort-models"}},{"name":"new","persistentVolumeClaim":{"claimName":"photosort-models-fs"}}],"containers":[{"name":"c","image":"busybox","command":["sh","-c","cp -a /old/. /new/ && ls -R /new"],"volumeMounts":[{"name":"old","mountPath":"/old"},{"name":"new","mountPath":"/new"}]}]}}'`,
+  then `kubectl -n production delete pvc photosort-models`. Skipping the copy only costs the models that aren't
+  in the image's seed; the face model is re-copied from the seed on first use.
 
 ## Postgres (optional)
 
@@ -125,7 +134,7 @@ Without Kubernetes, the three images run anywhere: see "Build" in the [README](.
 - `photos-ro-claim` already exists in `production` (ROX CephFS of `/photos`, also mounted by Immich).
 - `cluster/apps/production/ollama/helm-release.yaml`: chart ≥ 1.83.0, `ollama.models.pull:
   [qwen3-vl:4b-instruct]`, `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_FLASH_ATTENTION=1`, `OLLAMA_KV_CACHE_TYPE=q8_0`.
-- The chart creates `photosort-models` itself (see Volumes).
+- The chart creates `photosort-models-fs` itself (see Volumes); `csi-fs-sc` must exist.
 
 ## App
 ```bash

@@ -248,6 +248,16 @@ func (d *DB) RunningJob() (int64, error) {
 	return id, err
 }
 
+// BusyJob is the id of a job that is queued or held by a worker, or 0.
+func (d *DB) BusyJob() (int64, error) {
+	var id int64
+	err := d.QueryRow("SELECT id FROM jobs WHERE state IN ('queued','running','preempting','cancelling') ORDER BY id LIMIT 1").Scan(&id)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return id, err
+}
+
 // ---- job items ------------------------------------------------------------------------------------------------------
 
 // StartJobItem records an image going in flight and returns the item's id.

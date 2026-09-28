@@ -448,3 +448,30 @@ func (d *DB) ClearBatch(id string, erroredToo bool) error {
 	_, err := d.Exec(q, id)
 	return err
 }
+
+// DeleteImages forgets images: their rows and their job items. The files on disk are untouched, and a later job over
+// their folder registers them again. Returns how many rows went.
+func (d *DB) DeleteImages(ids []int64) (int, error) {
+	const chunk = 400
+	n := 0
+	err := d.Write(func(tx *Tx) error {
+		for i := 0; i < len(ids); i += chunk {
+			part := ids[i:min(i+chunk, len(ids))]
+			in := strings.TrimSuffix(strings.Repeat("?,", len(part)), ",")
+			a := make([]any, len(part))
+			for j, id := range part {
+				a[j] = id
+			}
+			if _, err := tx.Exec("DELETE FROM job_items WHERE image_id IN ("+in+")", a...); err != nil {
+				return err
+			}
+			k, err := affected(tx.Exec("DELETE FROM images WHERE id IN ("+in+")", a...))
+			if err != nil {
+				return err
+			}
+			n += int(k)
+		}
+		return nil
+	})
+	return n, err
+}

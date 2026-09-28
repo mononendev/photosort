@@ -13,15 +13,17 @@ import (
 
 // jobIn is a new job's request.
 type jobIn struct {
-	Paths       []string `json:"paths"`
-	VLM         *bool    `json:"vlm"`
-	SkipTier0   bool     `json:"skip_tier0"`
-	Rescan      bool     `json:"rescan"` // redo the local stage on images that already have it
-	Revlm       bool     `json:"revlm"`  // re-tag images that already have vision-model tags
-	RetryErrors bool     `json:"retry_errors"`
-	Concurrency *int     `json:"concurrency"`
-	Model       *string  `json:"model"`
-	Detector    pj.Obj   `json:"detector"` // pose model override for this job's local stage
+	Paths     []string `json:"paths"`
+	VLM       *bool    `json:"vlm"`
+	SkipTier0 bool     `json:"skip_tier0"`
+	Rescan    bool     `json:"rescan"` // redo the local stage on images that already have it
+	// only redo the local stage on images that already have it: no scan, nothing new registered
+	AnalyzedOnly bool    `json:"analyzed_only"`
+	Revlm        bool    `json:"revlm"` // re-tag images that already have vision-model tags
+	RetryErrors  bool    `json:"retry_errors"`
+	Concurrency  *int    `json:"concurrency"`
+	Model        *string `json:"model"`
+	Detector     pj.Obj  `json:"detector"` // pose model override for this job's local stage
 }
 
 func nullable[T any](p *T) any {
@@ -100,6 +102,9 @@ func (s *Server) createJob(r *http.Request) (any, error) {
 	}
 	opts := pj.Obj{"vlm": vlm, "skip_tier0": in.SkipTier0, "rescan": in.Rescan, "revlm": in.Revlm,
 		"retry_errors": in.RetryErrors, "concurrency": conc, "model": nullable(in.Model)}
+	if in.AnalyzedOnly {
+		opts["analyzed_only"] = true
+	}
 	if len(in.Detector) > 0 {
 		opts["detector"] = in.Detector
 	}

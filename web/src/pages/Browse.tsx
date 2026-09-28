@@ -6,6 +6,7 @@ import { api, thumbUrl } from '../api/client';
 import type { TreeDir } from '../api/client';
 import useStore from '../hooks/useStore';
 import { useBusy } from '../hooks/useJobs';
+import { useUntrack } from '../hooks/useUntrack';
 import { errMsg, pct } from '../lib/format';
 import { StatusDot, TierBadge, Stars } from '../components/TierBadge';
 import Progress from '../components/Progress';
@@ -86,6 +87,8 @@ export default function Browse() {
     onError: (e) => setMsg(`Failed: ${errMsg(e)}`),
   });
 
+  const untrack = useUntrack((m) => { setMsg(m); clear(); }, (e) => setMsg(`Failed: ${errMsg(e)}`));
+
   const crumbs = path ? path.split('/') : [];
   const allHere = [...(data?.dirs.map((d) => d.path) ?? []), ...(data?.files.map((f) => f.rel) ?? [])];
   const allSelected = allHere.length > 0 && allHere.every((p) => selected.includes(p));
@@ -164,13 +167,22 @@ export default function Browse() {
         <label className="text-sm flex items-center gap-1"><input type="checkbox" checked={defaults.rescan} onChange={(e) => setDefaults({ rescan: e.target.checked })} className="accent-blue-500" /> <Tip tip="Redo local scoring on images that already have it, for example after a metric change. Vision-model tags are kept unless re-tag is also on. Threshold changes alone don't need this; Calibrate's re-score is instant.">re-analyze local</Tip></label>
         <label className={`text-sm flex items-center gap-1 ${defaults.vlm ? '' : 'opacity-40'}`}><input type="checkbox" checked={!!defaults.revlm} disabled={!defaults.vlm} onChange={(e) => setDefaults({ revlm: e.target.checked })} className="accent-blue-500" /> <Tip tip="Send images that already have vision-model tags to the model again, replacing their tags, for example after a prompt or model change. Your own ratings are never touched. Needs run vision model on.">re-tag vision model</Tip></label>
         <DetectorPick value={defaults.detector?.model ?? ''} onChange={(m) => setDefaults({ detector: m ? { model: m } : null })} />
-        <button
-          disabled={selected.length === 0 || start.isPending}
-          onClick={() => start.mutate(selected)}
-          className="w-full sm:w-auto sm:ml-auto px-4 py-2.5 sm:py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.98] transition disabled:opacity-40 text-sm font-medium"
-        >
-          Process selected
-        </button>
+        <div className="w-full sm:w-auto sm:ml-auto flex items-center gap-2">
+          <Tip plain tip="Forget the selected photos and folders: drop their rows, analysis and cached previews so they stop counting as tracked. The files stay on disk. Photos you rated, edited or have ground truth for are kept."><button
+            disabled={selected.length === 0 || untrack.isPending}
+            onClick={() => untrack.mutate({ filters: {}, paths: selected })}
+            className="px-3 py-2.5 sm:py-1.5 rounded-md border border-gray-700 hover:border-red-500 hover:text-red-200 disabled:opacity-40 text-sm"
+          >
+            Untrack selected
+          </button></Tip>
+          <button
+            disabled={selected.length === 0 || start.isPending}
+            onClick={() => start.mutate(selected)}
+            className="flex-1 sm:flex-none px-4 py-2.5 sm:py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.98] transition disabled:opacity-40 text-sm font-medium"
+          >
+            Process selected
+          </button>
+        </div>
         {msg && <span className="text-xs text-gray-400 w-full">{msg}</span>}
       </div>
     </div>

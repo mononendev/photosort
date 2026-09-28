@@ -105,6 +105,7 @@ func (s *Server) Handler() http.Handler {
 
 	route("GET /api/images", s.listImages)
 	route("GET /api/images/facets", s.facets)
+	route("POST /api/images/untrack", s.untrack)
 	route("GET /api/images/{id}", s.getImage)
 	route("PATCH /api/images/{id}", s.patchImage)
 	route("GET /api/images/{id}/trace", s.trace)

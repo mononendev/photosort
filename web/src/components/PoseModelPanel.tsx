@@ -42,8 +42,8 @@ export default function PoseModelPanel() {
     onError: (e) => setMsg(errMsg(e)),
   });
   const rerun = useMutation({
-    mutationFn: () => api.createJob([''], { vlm: false, rescan: true }),
-    onSuccess: (j) => { setMsg(`queued job #${j.id}: re-analyzing every photo with ${model}`); qc.invalidateQueries({ queryKey: ['jobs'] }); },
+    mutationFn: () => api.createJob([''], { vlm: false, rescan: true, analyzed_only: true }),
+    onSuccess: (j) => { setMsg(`queued job #${j.id}: re-analyzing every analyzed photo with ${model}`); qc.invalidateQueries({ queryKey: ['jobs'] }); },
     onError: (e) => setMsg(errMsg(e)),
   });
   const installed = models?.installed ?? [];
@@ -88,7 +88,7 @@ export default function PoseModelPanel() {
             <Link to="/photos?stale_detector=1" className="hover:underline">{stale} analyzed photo{stale === 1 ? '' : 's'}</Link> still have people found by another model.
           </span>
           <button disabled={rerun.isPending || dirty} onClick={() => rerun.mutate()} title={dirty ? 'Save first' : undefined}
-            className="px-2 py-1 rounded border border-gray-700 hover:border-gray-500 disabled:opacity-40 text-xs">Re-analyze all (local stage only)</button>
+            className="px-2 py-1 rounded border border-gray-700 hover:border-gray-500 disabled:opacity-40 text-xs">Re-analyze all analyzed photos (local stage only)</button>
         </div>
       )}
       {msg && <p className="text-xs text-gray-400">{msg}</p>}

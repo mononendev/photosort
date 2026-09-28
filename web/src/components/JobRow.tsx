@@ -79,7 +79,7 @@ export default function JobRow({ job, compact }: { job: Job; compact?: boolean }
       {!compact && (
         <div className="mt-1 text-xs text-gray-500">
           {job.options.vlm === false ? 'local only' : 'local + vision model'}
-          {job.options.skip_tier0 ? ' · skip tier 0' : ''}{job.options.rescan ? ' · re-analyze' : ''}{job.options.revlm && job.options.vlm !== false ? ' · re-tag' : ''}
+          {job.options.skip_tier0 ? ' · skip tier 0' : ''}{job.options.rescan ? ' · re-analyze' : ''}{job.options.analyzed_only ? ' · analyzed only' : ''}{job.options.revlm && job.options.vlm !== false ? ' · re-tag' : ''}
           {job.message ? ` · ${job.message}` : ''}
         </div>
       )}

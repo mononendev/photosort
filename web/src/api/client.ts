@@ -243,6 +243,8 @@ export interface VlmRequest {
 }
 export interface JobOptions {
   vlm?: boolean; skip_tier0?: boolean; rescan?: boolean; revlm?: boolean; retry_errors?: boolean; concurrency?: number; model?: string | null;
+  /** Only redo the local stage on images analyzed already: no scan, no new files registered */
+  analyzed_only?: boolean;
   /** Pose model for this job's local stage, instead of the configured one */
   detector?: { model: string } | null;
 }
@@ -352,6 +354,11 @@ export const api = {
   tree: (path: string) => request<Tree>(`/api/tree${qs({ path })}`),
   images: (f: ImageFilters) => request<ImagesPage>(`/api/images${qs(f as Record<string, unknown>)}`),
   imageFacets: () => request<ImageFacets>('/api/images/facets'),
+  /** Forget the images matching the filters (and under `paths`, if given); rated, edited and ground-truth photos stay.
+   * `dry` only counts. The files on disk are untouched. */
+  untrack: (f: ImageFilters, paths?: string[], dry = false) =>
+    request<{ untracked: number; kept: number }>(`/api/images/untrack${qs({ ...f, offset: undefined, limit: undefined, sort: undefined, dry_run: dry || undefined })}`,
+      { method: 'POST', body: paths ? JSON.stringify({ paths }) : undefined }),
   image: (id: number) => request<ImageDetail>(`/api/images/${id}`),
   trace: (id: number) => request<Trace>(`/api/images/${id}/trace`),
   focusDebug: (id: number) => request<FocusDebug>(`/api/images/${id}/focus-debug`),

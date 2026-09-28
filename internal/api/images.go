@@ -292,7 +292,9 @@ func boolLit(b bool) string {
 	return "FALSE"
 }
 
-func (s *Server) listImages(r *http.Request) (any, error) {
+// imageFilter is the WHERE clause (and its args) for the image filters in r's query: the Photos page's filters, shared
+// by the list and by untrack.
+func (s *Server) imageFilter(r *http.Request) (string, []any, error) {
 	d, x, q := s.DB.D, s.exprs(), r.URL.Query()
 	cfg := s.cfg()
 	var f filter
@@ -300,36 +302,28 @@ func (s *Server) listImages(r *http.Request) (any, error) {
 	ints := map[string]*int{}
 	for _, k := range []string{"tier", "lr_rating", "truth_tier", "rating", "group", "local_tier", "vlm_tier", "people_min", "people_max"} {
 		if ints[k], err = qInt(r, k); err != nil {
-			return nil, err
+			return "", nil, err
 		}
 	}
 	floats := map[string]*float64{}
 	for _, k := range []string{"score_min", "score_max", "eye_min", "eye_max", "iso_min", "iso_max", "f_min", "f_max",
 		"shutter_min", "shutter_max", "focal_min", "focal_max"} {
 		if floats[k], err = qFloat(r, k); err != nil {
-			return nil, err
+			return "", nil, err
 		}
 	}
 	bools := map[string]*bool{}
 	for _, k := range []string{"recursive", "keeper", "review", "split", "truth_mismatch", "reviewed", "stale", "lifted", "overridden", "noted", "stale_detector"} {
 		if bools[k], err = qBool(r, k); err != nil {
-			return nil, err
+			return "", nil, err
 		}
-	}
-	offset, err := qIntDefault(r, "offset", 0, 0)
-	if err != nil {
-		return nil, err
-	}
-	limit, err := qIntDefault(r, "limit", 60, 500)
-	if err != nil {
-		return nil, err
 	}
 	finalTier := d.FinalTier(s.focusSource(cfg))
 
 	if folder := q.Get("folder"); folder != "" {
 		base, err := s.safePath(folder)
 		if err != nil {
-			return nil, err
+			return "", nil, err
 		}
 		if b := bools["recursive"]; b == nil || *b {
 			w, a := d.UnderFolder(base, "folder")
@@ -481,16 +475,32 @@ func (s *Server) listImages(r *http.Request) (any, error) {
 		lk := " " + d.Like() + " ? "
 		f.add("(path"+lk+"OR "+d.AsText("vlm_json")+lk+"OR "+d.AsText("override_json")+lk+")", like, like, like)
 	}
-	order := s.order(q.Get("sort"))
-	w := "1=1"
-	if len(f.where) > 0 {
-		w = strings.Join(f.where, " AND ")
+	if len(f.where) == 0 {
+		return "1=1", nil, nil
 	}
-	total, err := s.DB.Count(w, f.args...)
+	return strings.Join(f.where, " AND "), f.args, nil
+}
+
+func (s *Server) listImages(r *http.Request) (any, error) {
+	w, args, err := s.imageFilter(r)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.DB.Rows(w, f.args, order, limit, offset, "")
+	offset, err := qIntDefault(r, "offset", 0, 0)
+	if err != nil {
+		return nil, err
+	}
+	limit, err := qIntDefault(r, "limit", 60, 500)
+	if err != nil {
+		return nil, err
+	}
+	cfg := s.cfg()
+	order := s.order(r.URL.Query().Get("sort"))
+	total, err := s.DB.Count(w, args...)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.DB.Rows(w, args, order, limit, offset, "")
 	if err != nil {
 		return nil, err
 	}

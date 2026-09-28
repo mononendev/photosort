@@ -136,6 +136,22 @@ func TestRerunWithNothingForVLMKeepsLocalCounts(t *testing.T) {
 	})
 }
 
+func TestAnalyzedOnlyRedoesTrackedImagesWithoutScanning(t *testing.T) {
+	dbtest.Backends(t, func(t *testing.T, d *db.DB) {
+		f := setup(t, d, "a.jpg", "b.jpg", "c.jpg", "d.jpg")
+		f.tagAll() // a and b are tracked and analyzed; c and d exist on disk only
+		id := f.job([]string{f.photos}, pj.Obj{"vlm": false, "rescan": true, "analyzed_only": true})
+		run(t, f.runner(), f.get(id))
+		j := f.get(id)
+		if j.State != "done" || j.Total != 2 || f.locals.Load() != 2 {
+			t.Errorf("%s total=%d locals=%d", j.State, j.Total, f.locals.Load())
+		}
+		if n, _ := d.Count("1=1"); n != 2 {
+			t.Errorf("registered files no job was pointed at: %d rows", n)
+		}
+	})
+}
+
 func TestRevlmRetagsAlreadyTaggedImages(t *testing.T) {
 	dbtest.Backends(t, func(t *testing.T, d *db.DB) {
 		f := setup(t, d, "a.jpg", "b.jpg")

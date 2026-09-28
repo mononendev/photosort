@@ -501,12 +501,17 @@ type localResult struct {
 func (r *Runner) scanLocal(jid int64, cfg pj.Obj, paths []string, opts pj.Obj, shouldStop func() bool) (*localResult, error) {
 	r.stage(jid, "scan", nil)
 
-	// 1) scan
-	files := scan.FindImages(paths, opt(opts, "skip_raw_dupes", true))
-	if _, err := r.DB.AddPaths(files); err != nil {
-		return nil, err
+	// 1) scan. An analyzed-only job (e.g. re-analyzing the library with a new pose model) redoes what's tracked and
+	// analyzed already, so it neither walks the tree nor registers files no job was ever pointed at.
+	analyzedOnly := opt(opts, "analyzed_only", false)
+	var files []string
+	if !analyzedOnly {
+		files = scan.FindImages(paths, opt(opts, "skip_raw_dupes", true))
+		if _, err := r.DB.AddPaths(files); err != nil {
+			return nil, err
+		}
 	}
-	if len(paths) > 0 && r.Ingest != nil {
+	if len(paths) > 0 && r.Ingest != nil && !analyzedOnly {
 		rows, err := r.DB.RowsUnder(paths, "lr_json IS NULL", nil, "")
 		if err != nil {
 			return nil, err
@@ -522,7 +527,9 @@ func (r *Runner) scanLocal(jid int64, cfg pj.Obj, paths []string, opts pj.Obj, s
 
 	// 2) local stage
 	cond := "local_json IS NULL"
-	if opt(opts, "rescan", false) {
+	if analyzedOnly {
+		cond = "local_json IS NOT NULL"
+	} else if opt(opts, "rescan", false) {
 		cond = "1=1"
 	}
 	prior, localErr, err := r.DB.JobFinishedImages(jid, "local")

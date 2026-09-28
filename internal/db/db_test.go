@@ -308,3 +308,34 @@ func TestLegacySQLiteMigrates(t *testing.T) {
 	}
 	time.Sleep(0)
 }
+
+func TestDeleteImages(t *testing.T) {
+	dbtest.Backends(t, func(t *testing.T, d *db.DB) {
+		_, ids := addImages(t, d, "a.jpg", "b.jpg", "c.jpg")
+		jid, err := d.AddJob([]string{""}, pj.Obj{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if busy, _ := d.BusyJob(); busy != jid {
+			t.Fatalf("queued job is busy: %d", busy)
+		}
+		for _, id := range ids {
+			if err := d.AddJobItem(jid, id, "local", 1, 2, nil, nil); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if n, err := d.DeleteImages(ids[:2]); err != nil || n != 2 {
+			t.Fatalf("DeleteImages: %d %v", n, err)
+		}
+		if n, _ := d.Count("1=1"); n != 1 {
+			t.Fatalf("left: %d", n)
+		}
+		if n, _ := d.JobItemCount(jid, "", false); n != 1 {
+			t.Fatalf("job items left: %d", n)
+		}
+		d.CancelJob(jid)
+		if busy, _ := d.BusyJob(); busy != 0 {
+			t.Fatalf("cancelled job still busy: %d", busy)
+		}
+	})
+}

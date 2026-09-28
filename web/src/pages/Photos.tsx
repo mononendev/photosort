@@ -9,6 +9,8 @@ import Pager from '../components/Pager';
 import Tip from '../components/Tip';
 import { splitShort } from '../lib/explain';
 import { useBusy } from '../hooks/useJobs';
+import { useUntrack } from '../hooks/useUntrack';
+import { errMsg } from '../lib/format';
 
 const PAGE = 60;
 
@@ -73,6 +75,8 @@ export default function Photos() {
   const offset = filters.offset ?? 0;
   const sel = 'bg-gray-900 border border-gray-700 rounded px-2 py-1.5 sm:py-1 text-sm';
   const [showFilters, setShowFilters] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const untrack = useUntrack(setMsg, (e) => setMsg(`Failed: ${errMsg(e)}`));
   const nActive = ['folder', 'tier', 'keeper', 'subject', 'status', 'review', 'truth_mismatch', 'lr_rating', 'recursive', 'reviewed', 'rating', 'group'].filter((k) => sp.get(k)).length;
 
   return (
@@ -116,8 +120,13 @@ export default function Photos() {
           <option value="path">by path</option><option value="newest">newest</option><option value="score">by score</option><option value="eye_sharpness">by eye sharpness</option><option value="sharpness">by head sharpness</option><option value="lr">by your LR rating</option>
         </select></Tip>
         <span className="hidden sm:inline ml-auto text-xs text-gray-500">{isFetching ? 'loading…' : `${total} photos`}</span>
+        <Tip plain tip="Forget every photo these filters match (not just this page): drop their rows, analysis and cached previews. The files stay on disk, and a job over their folder registers them again. Photos you rated, edited or have ground truth for are kept.">
+          <button disabled={!total || untrack.isPending} onClick={() => untrack.mutate({ filters })}
+            className="w-full sm:w-auto text-xs px-2 py-1.5 sm:py-1 rounded border border-gray-700 text-gray-400 hover:border-red-500 hover:text-red-200 disabled:opacity-40">untrack these</button>
+        </Tip>
       </div>
       <div className="sm:hidden -mt-2 text-xs text-gray-500">{isFetching ? 'loading…' : `${total} photos`}</div>
+      {msg && <div className="text-xs text-gray-400">{msg}</div>}
 
       <div className="grid gap-2 grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]">
         {items.map((it) => (

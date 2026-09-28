@@ -12,8 +12,8 @@ separate homelab repo owns cluster-level resources (volumes, Ollama).
 - **`photosort-analyzer`**: the pixel stage (decoding, exposure lift, pose detection on CPU ONNX Runtime,
   focus metrics, frame/crop/thumbnail JPEGs) as its own Deployment under an HPA (1-12 pods, 70% of the CPU
   request). Image `photosort-analyzer` (~750 MB unpacked: Python 3.13, ONNX Runtime, OpenCV, Pillow, and a
-  seed of converted pose models). Mounts the photos read-only and the shared models volume; nothing
-  else, since the JPEGs it makes go back to the API.
+  seed of converted pose models). Mounts only the photos, read-only; the pose models are the image's seed,
+  copied into an emptyDir.
 - **Ollama** on the GPU node, reached at `http://ollama.<namespace>.svc.cluster.local:11434`.
 
 ### How the local stage scales
@@ -34,9 +34,9 @@ measured again on another, up to twice. The pods' `preStop` sleep lets them leav
 
 The analyzers read any path they are given, so `PHOTOSORT_PHOTOS_ROOT=/photos` makes them refuse paths outside
 the photos, and a NetworkPolicy ([`templates/analyzer-pool.yaml`](../.ci/chart/templates/analyzer-pool.yaml))
-can admit only the API pod. The policy is off (`analyzerPool.networkPolicy: false`) until the deploying service
-account may manage `networkpolicies` (`get`, `create`, `update`, `patch`, `delete` in the `networking.k8s.io` API
-group) in the namespace; without that permission, `helm upgrade` fails before it changes anything. It only binds
+can admit only the API pod. Deploying it (`analyzerPool.networkPolicy: true`) needs the deploying service account
+to manage `networkpolicies` in the `networking.k8s.io` API group in the namespace; without that permission,
+`helm upgrade` fails before it changes anything. It only binds
 with a CNI that enforces NetworkPolicy (k3s's built-in controller does).
 
 Throughput is roughly linear in pods until something shared gives out: CephFS reads of the originals, the API
@@ -68,19 +68,16 @@ only).
 - `photosort-data-claim` at `/data`: the SQLite database (unless Postgres is used), the frame/crop/thumbnail
   cache (~0.5 MB/image), `config.json` and its history, and exports. ReadWriteOnce, which is why the API runs
   one replica.
-- `photosort-models-fs` at `/models`, created by the chart ([`templates/pvc-models.yaml`](../.ci/chart/templates/pvc-models.yaml),
-  kept on uninstall): CephFS (`csi-fs-sc`), ReadWriteMany, mounted by the API and every analyzer pod. It holds
-  weights only: the face model and the pose store in `/models/pose` (`manifest.json` plus one `.onnx` per
-  model), on top of the seed baked into the analyzer image. A model installed onto it (`photosort models get`
-  in a pod with the analyzer's `ultralytics` extra, or copied in) is there for the whole pool at once; writes
-  go through a temp file and a rename, so a pod never loads a half-written model.
+- `photosort-models` at `/models` in the API pod, created by the chart ([`templates/pvc-models.yaml`](../.ci/chart/templates/pvc-models.yaml),
+  kept on uninstall): Ceph RBD, ReadWriteOnce. It holds weights only: the face model and the pose store in
+  `/models/pose` (`manifest.json` plus one `.onnx` per model). The analyzer pods can't mount it (one node at a
+  time), so they run the models seeded into the image, copied into an emptyDir.
 
-  It replaced `photosort-models` (Ceph RBD, ReadWriteOnce, which only one node can mount). The chart no longer
-  manages that claim but leaves it on the cluster. To carry its models over, once the API has rolled onto the
-  new claim, copy with a one-off pod that mounts both, e.g.
-  `kubectl -n production run models-copy --rm -it --restart=Never --image=busybox --overrides='{"spec":{"securityContext":{"runAsUser":568,"runAsGroup":568,"fsGroup":568},"volumes":[{"name":"old","persistentVolumeClaim":{"claimName":"photosort-models"}},{"name":"new","persistentVolumeClaim":{"claimName":"photosort-models-fs"}}],"containers":[{"name":"c","image":"busybox","command":["sh","-c","cp -a /old/. /new/ && ls -R /new"],"volumeMounts":[{"name":"old","mountPath":"/old"},{"name":"new","mountPath":"/new"}]}]}}'`,
-  then `kubectl -n production delete pvc photosort-models`. Skipping the copy only costs the models that aren't
-  in the image's seed; the face model is re-copied from the seed on first use.
+  To share it with the pool, it has to move to CephFS. `csi-fs-sc` fails to provision today (`subvolume group
+  'csi' does not exist` on the filesystem `fs`); once `ceph fs subvolumegroup create fs csi` has been run, set
+  `modelsVolume` to a new name with `storageClass: csi-fs-sc` and `accessMode: ReadWriteMany`, and mount that
+  claim in the analyzer in place of its emptyDir. Writes to the store go through a temp file and a rename, so pods
+  sharing it never load a half-written model.
 
 ## Postgres (optional)
 
@@ -136,7 +133,7 @@ Without Kubernetes, the three images run anywhere: see "Build" in the [README](.
 - `photos-ro-claim` already exists in `production` (ROX CephFS of `/photos`, also mounted by Immich).
 - `cluster/apps/production/ollama/helm-release.yaml`: chart ≥ 1.83.0, `ollama.models.pull:
   [qwen3-vl:4b-instruct]`, `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_FLASH_ATTENTION=1`, `OLLAMA_KV_CACHE_TYPE=q8_0`.
-- The chart creates `photosort-models-fs` itself (see Volumes); `csi-fs-sc` must exist.
+- The chart creates `photosort-models` itself (see Volumes).
 
 ## App
 ```bash

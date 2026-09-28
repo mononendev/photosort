@@ -1,12 +1,11 @@
 # Chart-managed volume for model weights (see templates/pvc-models.yaml): the face model and pose models beyond
-# the ones the analyzer image seeds (~10-180 MB each). Mounted by the API only: it's RBD (ReadWriteOnce), which the
-# analyzer pods can't share across nodes. To share it with them, set storageClass to a CephFS class that provisions
-# (csi-fs-sc does once the Ceph filesystem "fs" has a "csi" subvolume group), accessMode to ReadWriteMany, give it a
-# new name (a claim's class can't change), and mount it in the analyzer instead of its emptyDir.
+# the ones the analyzer image seeds (~10-180 MB each). CephFS, ReadWriteMany: the API and every analyzer pod mount it,
+# so a model installed once is there for the whole pool. It replaced the RBD claim photosort-models, which the chart
+# leaves on the cluster (see docs/DEPLOY.md to copy its models over).
 modelsVolume:
-  name: photosort-models
-  storageClass: csi-rbd-sc
-  accessMode: ReadWriteOnce
+  name: photosort-models-fs
+  storageClass: csi-fs-sc
+  accessMode: ReadWriteMany
   size: 20Gi
 
 # The analyzer pods read any path under /photos they're asked for. The NetworkPolicy admits only the API pod (deploying
@@ -74,7 +73,7 @@ mononen-library-chart:
       enabled: true
       fullnameOverride: photosort-api
       replicaCount: 1           # the /data volume (cache, exports, SQLite) is RWO: never scale this
-      # Its RBD volumes attach to one node at a time, so a rolling update only works if the new pod lands where the
+      # Its RBD data volume attaches to one node at a time, so a rolling update only works if the new pod lands where the
       # old one runs. The GPU node is where it has always been.
       affinity:
         nodeAffinity:
@@ -153,7 +152,7 @@ mononen-library-chart:
             claimName: photosort-data-claim
         - name: models
           persistentVolumeClaim:
-            claimName: photosort-models
+            claimName: photosort-models-fs
       service:
         port: 8080
         targetPort: 8080
@@ -164,8 +163,8 @@ mononen-library-chart:
     # so any node will do; the pods spread across nodes. They read /photos (confined to it by PHOTOSORT_PHOTOS_ROOT)
     # and write nothing: the frame, thumbnail and crop JPEGs go back to the API in the answers.
     #
-    # Pose models: the image's seed (POSE_MODELS in docker/analyzer.Dockerfile), copied into an emptyDir. To run a
-    # model the image doesn't carry, add it to POSE_MODELS (or share the models volume; see modelsVolume).
+    # Pose models: the image's seed (POSE_MODELS in docker/analyzer.Dockerfile) plus whatever is installed on the
+    # shared models volume.
     analyzer:
       enabled: true
       fullnameOverride: photosort-analyzer
@@ -259,5 +258,5 @@ mononen-library-chart:
             claimName: photos-ro-claim
             readOnly: true
         - name: models
-          emptyDir:
-            sizeLimit: 2Gi
+          persistentVolumeClaim:
+            claimName: photosort-models-fs

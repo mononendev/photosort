@@ -63,11 +63,20 @@ type Deps struct {
 	CacheDir   string
 	// Local runs the local stage on one image and returns its local_json.
 	Local func(ctx context.Context, cfg pj.Obj, id int64, path string) (pj.Obj, error)
+	// Slots, when set, paces the local stage by analyzer capacity instead of the config's workers.
+	Slots Slots
 	// Backend resolves a vision backend by name.
 	Backend func(name, baseURL string) (VLM, error)
 	// Ingest reads Lightroom sidecars for images that have none recorded yet.
 	Ingest func(rows []db.Image) error
 	Log    *slog.Logger
+}
+
+// Slots is analyzer capacity that grows and shrinks (a pool of pods under an HPA). Each image waits for a slot before
+// it starts; the slot travels to Local in the context.
+type Slots interface {
+	Slot(ctx context.Context) (context.Context, func(), error)
+	Max() int // how many images may wait for a slot at once
 }
 
 // Runner is one worker. Start it with Run; stop it with Shutdown.
@@ -564,9 +573,22 @@ func (r *Runner) device() any {
 	return nil
 }
 
-// runLocal analyzes images concurrently (cfg workers) and stores the results; returns how many failed.
+// runLocal analyzes images concurrently (cfg workers, or as many as there are analyzer slots) and stores the results;
+// returns how many failed.
 func (r *Runner) runLocal(cfg pj.Obj, rows []db.Image, prog *progress, shouldStop func() bool) int {
 	workers := max(1, pj.Int(pj.Or(cfg["workers"], 4.0)))
+	if r.Slots != nil {
+		workers = max(1, r.Slots.Max())
+	}
+	stopCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		select {
+		case <-r.stop:
+			cancel()
+		case <-stopCtx.Done():
+		}
+	}()
 	work := make(chan db.Image)
 	var nErr atomic.Int64
 	var wg sync.WaitGroup
@@ -578,8 +600,20 @@ func (r *Runner) runLocal(cfg pj.Obj, rows []db.Image, prog *progress, shouldSto
 				if shouldStop() {
 					continue // stopped: left for whoever resumes the job
 				}
+				ctx, release := context.Background(), func() {}
+				if r.Slots != nil {
+					var err error
+					if ctx, release, err = r.Slots.Slot(stopCtx); err != nil {
+						continue // shutting down
+					}
+					if shouldStop() {
+						release()
+						continue
+					}
+				}
 				prog.start(row.ID)
-				data, err := r.Local(context.Background(), cfg, row.ID, row.Path)
+				data, err := r.Local(ctx, cfg, row.ID, row.Path)
+				release()
 				var msg *string
 				if err == nil {
 					s := pj.Dumps(data)

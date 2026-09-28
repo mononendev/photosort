@@ -504,3 +504,61 @@ func TestProgressTracksInFlight(t *testing.T) {
 		}
 	})
 }
+
+// fakeSlots is analyzer capacity of n slots; it records the most images ever in flight and hands Local its slot.
+type fakeSlots struct {
+	n        int
+	sem      chan struct{}
+	inflight atomic.Int64
+	peak     atomic.Int64
+}
+
+type slotKey struct{}
+
+func (s *fakeSlots) Max() int { return 32 }
+func (s *fakeSlots) Slot(ctx context.Context) (context.Context, func(), error) {
+	select {
+	case s.sem <- struct{}{}:
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
+	}
+	n := s.inflight.Add(1)
+	for p := s.peak.Load(); n > p && !s.peak.CompareAndSwap(p, n); p = s.peak.Load() {
+	}
+	return context.WithValue(ctx, slotKey{}, true), func() { s.inflight.Add(-1); <-s.sem }, nil
+}
+
+func TestLocalStagePacedBySlots(t *testing.T) {
+	dbtest.Backends(t, func(t *testing.T, d *db.DB) {
+		names := make([]string, 12)
+		for i := range names {
+			names[i] = fmt.Sprintf("%02d.jpg", i)
+		}
+		f := setup(t, d, names...)
+		f.cfg["workers"] = 1.0 // ignored: the slots decide
+		slots := &fakeSlots{n: 3, sem: make(chan struct{}, 3)}
+		r := f.runner()
+		r.Slots = slots
+		local := r.Local
+		var noSlot atomic.Int64
+		r.Local = func(ctx context.Context, cfg pj.Obj, id int64, path string) (pj.Obj, error) {
+			if ctx.Value(slotKey{}) == nil {
+				noSlot.Add(1)
+			}
+			time.Sleep(20 * time.Millisecond)
+			return local(ctx, cfg, id, path)
+		}
+		id := f.job([]string{f.photos}, pj.Obj{"vlm": false})
+		run(t, r, f.get(id))
+		j := f.get(id)
+		if j.State != "done" || j.Done != 12 {
+			t.Fatalf("state %s done %d", j.State, j.Done)
+		}
+		if p := slots.peak.Load(); p != 3 {
+			t.Errorf("peak in flight %d, want the 3 slots", p)
+		}
+		if noSlot.Load() != 0 {
+			t.Errorf("%d images ran without their slot in the context", noSlot.Load())
+		}
+	})
+}

@@ -57,7 +57,7 @@ flowchart LR
 The backend is one Go binary, `photosort`: the HTTP API, the job runner, EXIF and AF-point reading, the tier
 rules, the vision backends, export, and the CLI. Everything that touches pixels (decoding, exposure lift, pose
 detection, the focus metrics, face landmarks, the frame, thumbnail and crop JPEGs) runs in a small Python
-service, the analyzer ([`analyzer/`](analyzer)), that listens on loopback only. The split is there because the
+service, the analyzer ([`analyzer/`](analyzer)), which in the cluster scales out as a pool of pods. The split is there because the
 calibrated thresholds depend on OpenCV's and Pillow's exact numerics; `photosort` starts the analyzer itself
 unless `$PHOTOSORT_ANALYZER` points at one already running.
 
@@ -231,7 +231,8 @@ Environment variables:
 | `PHOTOSORT_PHOTOS` | `.` | Photos root the UI browses (`web --photos`) |
 | `PHOTOSORT_MODELS` | current directory (`./models` under `make`) | Face model and the pose model store (`pose/`) |
 | `PHOTOSORT_DB` | `sqlite://<workdir>/photosort.db` | Database URL: `sqlite://PATH` or `postgres://…` |
-| `PHOTOSORT_ANALYZER` | unset | URL of a running analyzer; unset, `photosort` starts one itself |
+| `PHOTOSORT_ANALYZER` | unset | URL of a running analyzer (`dns+http://host:port`: every pod behind a headless Service, as a pool); unset, `photosort` starts one itself |
+| `PHOTOSORT_ANALYZER_MAX_INFLIGHT` | `256` | With a pool: most images in flight at once, however many slots the pods offer |
 | `PHOTOSORT_ANALYZER_DIR` | `./analyzer` | The analyzer project to start it from |
 | `PHOTOSORT_WEB_DIST` | `web/dist` if built | Built UI for `web` to serve |
 | `PORT` | 8080 | `web` listen port |
@@ -289,8 +290,8 @@ thumbnail and crop into `/data/cache`, and copies its seeded models into `/model
 ## Deploy
 
 The reference deployment is a Helm chart in [`.ci/chart`](.ci/chart) on a homelab k3s cluster: one API
-pod (the Go server plus the analyzer as a sidecar) sharing a Quadro RTX 4000 with Ollama, photos mounted
-read-only, state on a persistent volume. CI (`.github/workflows/ci.yml`) tests, builds, pushes to a private
+pod (the Go server) plus a pool of analyzer pods that an HPA scales with the local stage's load, Ollama on a
+Quadro RTX 4000, photos mounted read-only, state on a persistent volume. CI (`.github/workflows/ci.yml`) tests, builds, pushes to a private
 registry, and runs `helm upgrade` on the default branch. The registry, runners, and volume names are specific
 to that cluster; see [docs/DEPLOY.md](docs/DEPLOY.md) for what to change.
 

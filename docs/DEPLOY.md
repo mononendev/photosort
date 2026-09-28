@@ -6,18 +6,40 @@ separate homelab repo owns cluster-level resources (volumes, Ollama).
 ## Shape of the deployment
 
 - **`photosort`** (UI): nginx serving the built React app; proxies `/api` and `/media` to the API service.
-- **`photosort-api`**: one pod, one replica, two containers:
-  - `photosort-api`: the Go server (`photosort web`): HTTP API, job runner, tier rules, vision backends,
-    export. Image `photosort-api` (~146 MB: Alpine, the binary, exiftool). Listens on `:8080`.
-  - `photosort-analyzer`: the pixel stage as a sidecar: decoding, exposure lift, pose detection on ONNX
-    Runtime, focus metrics, frame/crop/thumbnail JPEGs. Image `photosort-analyzer` (~750 MB unpacked:
-    Python 3.13, ONNX Runtime, OpenCV, Pillow, and a seed of converted pose models). It listens on
-    `127.0.0.1:8090` only, since it reads any path it is given; the API reaches it over the pod's loopback
-    (`PHOTOSORT_ANALYZER=http://127.0.0.1:8090`).
+- **`photosort-api`**: one pod, one replica: the Go server (`photosort web`): HTTP API, job runner, EXIF
+  and AF points, tier rules, vision backends, export. Image `photosort-api` (~146 MB: Alpine, the binary,
+  exiftool). Listens on `:8080`. Mounts the photos read-only at `/photos`, state at `/data`, and `/models`.
+- **`photosort-analyzer`**: the pixel stage (decoding, exposure lift, pose detection on CPU ONNX Runtime,
+  focus metrics, frame/crop/thumbnail JPEGs) as its own Deployment under an HPA (1-12 pods, 70% of the CPU
+  request). Image `photosort-analyzer` (~750 MB unpacked: Python 3.13, ONNX Runtime, OpenCV, Pillow, and a
+  seed of converted pose models). Mounts only the photos, read-only; the pose models are the image's seed,
+  copied into an emptyDir.
+- **Ollama** on the GPU node, reached at `http://ollama.<namespace>.svc.cluster.local:11434`.
 
-  Both containers mount the photos read-only at `/photos`, state at `/data` (the analyzer writes each image's
-  frame, thumbnail and crop into `/data/cache`), and model weights at `/models`.
-- **Ollama** on the same GPU node, reached at `http://ollama.<namespace>.svc.cluster.local:11434`.
+### How the local stage scales
+
+The API reaches the analyzers through a headless Service, `photosort-analyzer-pool`
+(`PHOTOSORT_ANALYZER=dns+http://photosort-analyzer-pool.<namespace>.svc.cluster.local:8090`), re-resolved every
+5 s, so it sees each ready pod rather than one virtual IP. Each pod reports its capacity as `slots` on `/health`
+(`ANALYZER_SLOTS`, 3 by default, with `PHOTOSORT_ORT_THREADS=2` per inference to fit a 4-core limit). The job
+runner keeps one image in flight per slot across all pods (the config's `workers` is ignored in this mode, up to
+`PHOTOSORT_ANALYZER_MAX_INFLIGHT`, 256). That keeps every pod near its CPU limit while a local stage runs, which
+is what makes the HPA add pods, and their slots are filled as soon as they are ready. Between jobs, or while a
+job waits on the vision model, the pods idle and the HPA scales back after 5 minutes.
+
+An image's measure and finalize go to the same pod (the decoded image stays in its memory between them), and
+the pod sends the frame, thumbnail and crop JPEGs back in its answers; the API writes them into `/data/cache`,
+so the pods need no shared writable volume. When a pod goes away mid-image (scale-down, eviction), the image is
+measured again on another, up to twice. The pods' `preStop` sleep lets them leave DNS before uvicorn stops.
+
+The analyzers read any path they are given, so a NetworkPolicy
+([`templates/analyzer-pool.yaml`](../.ci/chart/templates/analyzer-pool.yaml)) admits only the API pod, and
+`PHOTOSORT_PHOTOS_ROOT=/photos` makes them refuse paths outside the photos. The policy only binds with a CNI that
+enforces NetworkPolicy.
+
+Throughput is roughly linear in pods until something shared gives out: CephFS reads of the originals, the API
+pod's CPU (EXIF and AF parsing, writing ~0.5 MB of JPEGs per image; its limit is 4 cores), or SQLite's single
+writer (small rows, so this comes last; Postgres removes it). Raise `maxReplicas` to the cores you want to give it.
 
 ## Images
 
@@ -40,7 +62,7 @@ only).
 
 ## Volumes
 
-- `photos-ro-claim` at `/photos`, read-only, in both containers.
+- `photos-ro-claim` at `/photos`, read-only, in the API and every analyzer pod (it's ReadOnlyMany CephFS).
 - `photosort-data-claim` at `/data`: the SQLite database (unless Postgres is used), the frame/crop/thumbnail
   cache (~0.5 MB/image), `config.json` and its history, and exports. ReadWriteOnce, which is why the API runs
   one replica.
@@ -126,19 +148,21 @@ UI: https://photosort.adoah.dev (internal ingress, LAN/tailscale only). API heal
 
 | Field | Meaning |
 |---|---|
-| `analyzer` | `true` when the analyzer answered its last health check (every 30 s) |
+| `analyzer` | `true` when an analyzer pod answered the last health check (every 30 s) |
 | `device` | Where the analyzer runs detection: `cpu` or `cuda`; `null` while the analyzer isn't answering |
+| `analyzer_pods`, `analyzer_slots` | The analyzer pool's size as the API sees it (`null` with a single analyzer) |
 | `database` | `sqlite` or `postgres` |
 | `models_dir` | Where the pose models and face model are read from |
 | `current_job` | The running job's id, if any |
 
-- `"analyzer": false`: check the sidecar's logs (`kubectl -n production logs deploy/photosort-api -c
-  photosort-analyzer`) and its readiness. Until it answers, local-stage images fail with an analyzer error and
+- `"analyzer": false`: no analyzer pod is ready. Check `kubectl -n production get pods -l
+  app.kubernetes.io/name=photosort-analyzer`, their logs, and that the headless Service has endpoints
+  (`kubectl -n production get endpoints photosort-analyzer-pool`). Until it answers, local-stage images fail with an analyzer error and
   the full-size viewer doesn't load; vision-model tagging of already analyzed images still works.
-- `"device": "cpu"` with an `onnxruntime-gpu` image: the GPU isn't visible to the analyzer. Check that
-  `runtimeClassName: nvidia` rendered, the `NVIDIA_*` variables are on the analyzer container, and the pod
-  landed on the GPU node (it follows the `nvidia.com/gpu` node label, as does Ollama). With the default image
-  `cpu` is expected.
+- The pool doesn't grow during a local stage: `kubectl -n production get hpa photosort-analyzer` should show
+  CPU near or over 70%. If it reads `<unknown>`, metrics-server isn't running. If the pods sit well below it,
+  the API is the bottleneck (its CPU, or reading the photos); the API logs `analyzer pool` with the pods and
+  slots it sees whenever that changes.
 - A local-stage error saying a pose model "is not installed": the configured `detect_model` (or a job's
   override) isn't in the image's seed or on the models volume. Pick an installed one on the Calibrate page,
   or add it to `POSE_MODELS` and rebuild the analyzer.

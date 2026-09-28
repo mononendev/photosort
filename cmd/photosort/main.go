@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/spf13/cobra"
@@ -66,11 +67,20 @@ func modelsDir() string {
 	return d
 }
 
-// connectAnalyzer reaches the pixel stage: $PHOTOSORT_ANALYZER when set (the sidecar in the cluster), else a child
-// process started from the analyzer/ project ($PHOTOSORT_ANALYZER_DIR, or ./analyzer).
-func connectAnalyzer(ctx context.Context) (*analyzer.Client, func(), error) {
-	if u := os.Getenv("PHOTOSORT_ANALYZER"); u != "" {
-		return analyzer.New(u), func() {}, nil
+// connectAnalyzer reaches the pixel stage: $PHOTOSORT_ANALYZER when set (dns+http://... for the pods behind a
+// headless Service, http://... for one analyzer sharing this disk), else a child process started from the analyzer/
+// project ($PHOTOSORT_ANALYZER_DIR, or ./analyzer).
+func connectAnalyzer(ctx context.Context) (*analyzer.Pool, func(), error) {
+	if u := os.Getenv("PHOTOSORT_ANALYZER"); strings.HasPrefix(u, analyzer.DNSScheme) {
+		ctx, cancel := context.WithCancel(ctx)
+		p, err := analyzer.Discover(ctx, u)
+		if err != nil {
+			cancel()
+			return nil, nil, err
+		}
+		return p, cancel, nil
+	} else if u != "" {
+		return analyzer.Single(analyzer.New(u)), func() {}, nil
 	}
 	dir := envOr("PHOTOSORT_ANALYZER_DIR", "analyzer")
 	if exe, err := os.Executable(); err == nil {
@@ -86,7 +96,11 @@ func connectAnalyzer(ctx context.Context) (*analyzer.Client, func(), error) {
 		return nil, nil, fmt.Errorf("no analyzer: set PHOTOSORT_ANALYZER to its URL, or PHOTOSORT_ANALYZER_DIR to the analyzer/ project")
 	}
 	slog.Info("starting the analyzer", "dir", abs)
-	return analyzer.Spawn(ctx, abs, []string{"PHOTOSORT_MODELS=" + modelsDir()})
+	c, stop, err := analyzer.Spawn(ctx, abs, []string{"PHOTOSORT_MODELS=" + modelsDir()})
+	if err != nil {
+		return nil, nil, err
+	}
+	return analyzer.Single(c), stop, nil
 }
 
 func fileExists(p string) bool {

@@ -1,6 +1,6 @@
 // Package analyzer talks to the Python pixel stage (analyzer/ in this repo): a loopback HTTP service that decodes
-// images, runs pose detection and measures focus. In the cluster it runs as a sidecar in the API pod; locally, Spawn
-// starts it as a child process.
+// images, runs pose detection and measures focus. Locally, Spawn starts it as a child process; in the cluster it runs
+// as its own Deployment under an HPA, which the backend reaches as a Pool (pool.go).
 package analyzer
 
 import (

@@ -7,8 +7,13 @@ finalize()  given the order the backend picked (primary first, from prominence a
             bands for the first eye_max_people, the focus plane of the primary, and the primary's crop JPEG.
 
 The split keeps every pixel operation here and every decision in Go, while doing exactly the work analyze() used to.
+
+With a cache_dir (the sidecar, the CLI) the JPEGs are written there. Without one (a pooled analyzer that shares no disk
+with the backend) they come back in the answer instead, under "files": name -> base64, or None for a file the backend
+should remove.
 """
 from __future__ import annotations
+import base64
 import logging
 import threading
 import time
@@ -76,9 +81,19 @@ def faces_for(model: str, conf: float) -> Optional[M.FaceLandmarks]:
         return _faces[(model, conf)]
 
 
+def _put(files: dict, cache_dir: Optional[Path], name: str, data: Optional[bytes]):
+    """Write (or, for None, remove) one cached JPEG, or queue it in files for the backend to."""
+    if cache_dir is None:
+        files[name] = base64.b64encode(data).decode("ascii") if data is not None else None
+    elif data is None:
+        (cache_dir / name).unlink(missing_ok=True)
+    else:
+        (cache_dir / name).write_bytes(data)
+
+
 def measure(req: dict, detector=None) -> dict:
     path = Path(req["path"])
-    cache_dir = Path(req["cache_dir"])
+    cache_dir = Path(req["cache_dir"]) if req.get("cache_dir") else None
     img_id = req["id"]
     d = req.get("detect") or {}
     im, exposure = I.load(path, req.get("exposure"))
@@ -120,19 +135,24 @@ def measure(req: dict, detector=None) -> dict:
 
     fr = req.get("frame") or {}
     frame_im = I.resize_long_edge(im, fr.get("long_edge", 1568))
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    (cache_dir / f"{img_id}.jpg").write_bytes(I.to_jpeg(frame_im, fr.get("quality", 82)))
-    (cache_dir / f"{img_id}_thumb.jpg").write_bytes(I.to_jpeg(I.resize_long_edge(frame_im, THUMB_LONG_EDGE), 80))
+    files: dict = {}
+    if cache_dir is not None:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+    _put(files, cache_dir, f"{img_id}.jpg", I.to_jpeg(frame_im, fr.get("quality", 82)))
+    _put(files, cache_dir, f"{img_id}_thumb.jpg", I.to_jpeg(I.resize_long_edge(frame_im, THUMB_LONG_EDGE), 80))
 
     token = sessions.put({"im": im, "gray": gray, "dets": dets, "people": people, "scale": scale, "W": W, "H": H,
                           "id": img_id, "cache_dir": cache_dir})
-    return {
+    out = {
         "token": token, "width": W, "height": H, "exposure": exposure, "detector": getattr(det, "name", None),
         "people": people,
         "bg_sharp": M._rnd(M._ratio(bg_terms)), "global_sharp": M._rnd(M._ratio(global_terms)),
         "bg_terms": M._sig(bg_terms), "global_terms": M._sig(global_terms), "eps": M.EPS,
         "noise_sigma": M._rnd(M.noise_sigma(gray)),
     }
+    if cache_dir is None:
+        out["files"] = files
+    return out
 
 
 def _eye_metrics(det: dict, head, scale: float, rgb, gray, W: int, H: int, faces: Optional[M.FaceLandmarks]) -> dict:
@@ -175,16 +195,18 @@ def finalize(req: dict) -> dict:
     plane = M.focus_plane(st["gray"], primary, W, H) if primary is not None and req.get("plane", True) else None
 
     cache_dir, img_id = st["cache_dir"], st["id"]
-    crop_used = None
-    cp = cache_dir / f"{img_id}_crop.jpg"
+    crop_used, crop = None, None
     if primary is not None:
         c = req.get("crop") or {}
         crop_im, crop_used = I.crop_box(st["im"], primary["upper"], c.get("pad", 0.15), c.get("size", 768))
-        cp.write_bytes(I.to_jpeg(crop_im, c.get("quality", 88)))
-    else:
-        cp.unlink(missing_ok=True)
-    (cache_dir / f"{img_id}_full.jpg").unlink(missing_ok=True)  # the viewer re-renders it from the file on demand
-    return {"eyes": {str(k): v for k, v in eyes.items()}, "plane": plane, "crop_box": list(crop_used) if crop_used else None}
+        crop = I.to_jpeg(crop_im, c.get("quality", 88))
+    files: dict = {}
+    _put(files, cache_dir, f"{img_id}_crop.jpg", crop)
+    _put(files, cache_dir, f"{img_id}_full.jpg", None)  # the viewer re-renders it from the file on demand
+    out = {"eyes": {str(k): v for k, v in eyes.items()}, "plane": plane, "crop_box": list(crop_used) if crop_used else None}
+    if cache_dir is None:
+        out["files"] = files
+    return out
 
 
 def detect(req: dict) -> dict:

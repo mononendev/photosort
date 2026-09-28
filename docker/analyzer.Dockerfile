@@ -1,5 +1,5 @@
-# The pixel stage: decoding, pose detection on ONNX Runtime, focus metrics. Runs as a sidecar of the API pod and
-# listens on loopback only.
+# The pixel stage: decoding, pose detection on ONNX Runtime, focus metrics. Listens on loopback by default; the
+# chart runs it as an HPA-scaled pool on the pod network (ANALYZER_HOST=0.0.0.0, PHOTOSORT_PHOTOS_ROOT=/photos).
 #
 # POSE_MODELS are converted to ONNX in a build-only stage that has torch and ultralytics; neither ships. The image
 # carries them (and the YuNet face model) as a seed the analyzer reads next to the models volume. For more, list them

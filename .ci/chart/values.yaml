@@ -58,11 +58,9 @@ mononen-library-chart:
               hosts:
                 - photosort.adoah.dev
 
-    # API + job runner (Go) with the analyzer (Python: decoding, pose detection, focus metrics) as a sidecar that
-    # only listens on the pod's loopback. Pinned next to Ollama on the GPU node (nodeAffinity) and set up to share the
-    # RTX 4000 cooperatively (runtimeClassName + NVIDIA_VISIBLE_DEVICES on the analyzer, NO nvidia.com/gpu request).
-    # Detection runs on CPU ONNX Runtime; building the analyzer with --build-arg ORT=onnxruntime-gpu moves it to the
-    # GPU. Both images are small (~50 MB and ~250 MB compressed), so nothing big lands on k8s-5's root disk.
+    # API + job runner (Go). The pixel stage runs in the analyzer pool below; the runner finds its pods through the
+    # headless Service in templates/analyzer-pool.yaml and keeps as many images in flight as they have slots, so a
+    # job speeds up as the HPA adds pods. EXIF/AF reading, the rules and the cache JPEGs the pods send back stay here.
     api:
       enabled: true
       fullnameOverride: photosort-api
@@ -80,14 +78,6 @@ mononen-library-chart:
         hpa: false
         pdb: false
         serviceaccount: false
-      runtimeClassName: nvidia
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: nvidia.com/gpu
-                    operator: Exists
       containers:
         - name: photosort-api
           image:
@@ -103,7 +93,7 @@ mononen-library-chart:
             - name: PHOTOSORT_MODELS
               value: "/models"
             - name: PHOTOSORT_ANALYZER
-              value: "http://127.0.0.1:8090"
+              value: "dns+http://photosort-analyzer-pool.production.svc.cluster.local:8090"
             - name: OLLAMA_HOST
               value: "http://ollama.production.svc.cluster.local:11434"
             # State in Postgres instead of /data/photosort.db (copy it over first with `photosort db copy`):
@@ -114,11 +104,11 @@ mononen-library-chart:
             #       key: url
           resources:
             requests:
-              cpu: 50m
-              memory: 64Mi
+              cpu: 100m
+              memory: 128Mi
             limits:
-              cpu: 2000m
-              memory: 1Gi
+              cpu: 4000m
+              memory: 2Gi
           readinessProbe:
             httpGet:
               path: /api/health
@@ -131,39 +121,6 @@ mononen-library-chart:
               mountPath: /photos
               readOnly: true
             # State, frame/crop/thumb cache (~0.5 MB per image) and exports.
-            - name: data
-              mountPath: /data
-            - name: models
-              mountPath: /models
-        - name: photosort-analyzer
-          image:
-            repository: registry.adoah.dev/projects/photosort-analyzer
-          env:
-            - name: PHOTOSORT_MODELS
-              value: "/models"
-            - name: NVIDIA_VISIBLE_DEVICES
-              value: "all"
-            - name: NVIDIA_DRIVER_CAPABILITIES
-              value: "compute,utility"
-          resources:
-            requests:
-              cpu: 500m
-              memory: 1Gi
-            limits:
-              cpu: 8000m
-              memory: 12Gi
-          # It listens on loopback only (it reads any path it is given), so the probe runs inside the container.
-          readinessProbe:
-            exec:
-              command: ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health', timeout=5)"]
-            initialDelaySeconds: 5
-            periodSeconds: 15
-            timeoutSeconds: 10
-          volumeMounts:
-            - name: photos
-              mountPath: /photos
-              readOnly: true
-            # It writes each image's frame, thumbnail and crop into /data/cache.
             - name: data
               mountPath: /data
             - name: models
@@ -182,3 +139,107 @@ mononen-library-chart:
       service:
         port: 8080
         targetPort: 8080
+
+    # The pixel stage (Python: decoding, pose detection, focus metrics) as its own Deployment, scaled on CPU. Each pod
+    # takes ANALYZER_SLOTS images at once; the API's runner fills every slot it finds, so pods run hot while a job's
+    # local stage is going (and the HPA adds more), and go idle between jobs (and it scales back). CPU ONNX Runtime,
+    # so any node will do; the pods spread across nodes. They read /photos (confined to it by PHOTOSORT_PHOTOS_ROOT)
+    # and write nothing: the frame, thumbnail and crop JPEGs go back to the API in the answers.
+    #
+    # Pose models: the image's seed (POSE_MODELS in docker/analyzer.Dockerfile) copied into an emptyDir. The models
+    # PVC is RWO and can't follow the pods around; to run a model the image doesn't carry, add it to POSE_MODELS.
+    analyzer:
+      enabled: true
+      fullnameOverride: photosort-analyzer
+      security:
+        enabled: true
+        podSecurityContext:
+          runAsUser: 568
+          runAsGroup: 568
+          fsGroup: 568
+      generate:
+        deployment: true
+        service: false          # headless instead: templates/analyzer-pool.yaml
+        ingress: false
+        hpa: true
+        pdb: false
+        serviceaccount: false
+      autoscaling:
+        minReplicas: 1
+        maxReplicas: 12
+        targetCPUUtilizationPercentage: 70
+        behavior:
+          scaleUp:
+            stabilizationWindowSeconds: 0
+            policies:
+              - type: Pods
+                value: 4
+                periodSeconds: 30
+          scaleDown:
+            stabilizationWindowSeconds: 300   # a gap between jobs (or the vlm stage) doesn't drop the pool
+            policies:
+              - type: Pods
+                value: 2
+                periodSeconds: 60
+      terminationGracePeriodSeconds: 60
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: photosort-analyzer
+      containers:
+        - name: photosort-analyzer
+          image:
+            repository: registry.adoah.dev/projects/photosort-analyzer
+          ports:
+            - name: http
+              containerPort: 8090
+          env:
+            - name: ANALYZER_HOST
+              value: "0.0.0.0"
+            # Images in flight per pod, and ONNX Runtime threads per inference: together about the CPU limit.
+            - name: ANALYZER_SLOTS
+              value: "3"
+            - name: PHOTOSORT_ORT_THREADS
+              value: "2"
+            - name: PHOTOSORT_PHOTOS_ROOT
+              value: "/photos"
+            - name: PHOTOSORT_MODELS
+              value: "/models"
+          resources:
+            requests:            # the HPA's 70% is of this
+              cpu: 3000m
+              memory: 2Gi
+            limits:
+              cpu: 4000m
+              memory: 6Gi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+          # Leave the Service's DNS before uvicorn stops, so finalize calls for images measured here still land.
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "15"]
+          volumeMounts:
+            - name: photos
+              mountPath: /photos
+              readOnly: true
+            - name: models
+              mountPath: /models
+      volumes:
+        - name: photos
+          persistentVolumeClaim:
+            claimName: photos-ro-claim
+            readOnly: true
+        - name: models
+          emptyDir:
+            sizeLimit: 2Gi

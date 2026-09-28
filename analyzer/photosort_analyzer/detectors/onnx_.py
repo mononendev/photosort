@@ -101,6 +101,8 @@ class OnnxPose:
         self.name, self.family, self.imgsz, self.conf, self.iou = name, family, imgsz, conf, iou
         opts = ort.SessionOptions()
         opts.log_severity_level = 3
+        if threads := int(os.environ.get("PHOTOSORT_ORT_THREADS", "0")):
+            opts.intra_op_num_threads = threads  # a pod with several slots: don't let each run take every core
         self.session = ort.InferenceSession(path, opts, providers=providers())
         self.input = self.session.get_inputs()[0].name
         self.device = device()

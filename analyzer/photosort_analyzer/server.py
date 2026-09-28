@@ -1,5 +1,7 @@
-"""HTTP surface for the Go backend. Loopback only (a sidecar in the API pod, or a child process of the CLI); nothing
-here is exposed to users, and every path it is given was already checked against the photos root by the backend."""
+"""HTTP surface for the Go backend. Nothing here is exposed to users, and every path it is given was already checked
+against the photos root by the backend. It listens on loopback as a sidecar or a child process of the CLI; as a pool
+of pods it listens on the pod network, where $PHOTOSORT_PHOTOS_ROOT confines it to the photos (and a NetworkPolicy to
+the backend)."""
 from __future__ import annotations
 import os
 import platform
@@ -14,7 +16,19 @@ from . import images as I
 app = FastAPI(title="photosort analyzer", version=__version__, docs_url=None, redoc_url=None)
 
 
+PHOTOS_ROOT = os.environ.get("PHOTOSORT_PHOTOS_ROOT")
+
+
+def slots() -> int:
+    """How many images the backend should have in flight here at once: $ANALYZER_SLOTS, else one per usable core."""
+    if n := int(os.environ.get("ANALYZER_SLOTS", "0")):
+        return n
+    return len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else (os.cpu_count() or 1)
+
+
 def _missing(path: str):
+    if PHOTOS_ROOT and not Path(path).resolve().is_relative_to(Path(PHOTOS_ROOT).resolve()):
+        raise HTTPException(403, f"outside the photos root: {path}")
     if not Path(path).is_file():
         raise HTTPException(404, f"no such file: {path}")
 
@@ -38,7 +52,7 @@ def _failed(_, e):
 @app.get("/health")
 def health():
     return {"ok": True, "version": __version__, "python": platform.python_version(), "device": detectors.device(),
-            "models": detectors.installed(), "models_dir": os.environ.get("PHOTOSORT_MODELS", str(Path.cwd()))}
+            "models": detectors.installed(), "slots": slots(), "models_dir": os.environ.get("PHOTOSORT_MODELS", str(Path.cwd()))}
 
 
 @app.post("/measure")

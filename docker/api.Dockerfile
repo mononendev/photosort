@@ -1,4 +1,5 @@
-# API + job runner: the Go server. Pixels go to the analyzer sidecar (docker/analyzer.Dockerfile) over loopback.
+# API + job runner: the Go server. Pixels go to the analyzer (docker/analyzer.Dockerfile); the chart points
+# PHOTOSORT_ANALYZER at its pool.
 FROM golang:1.27-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./

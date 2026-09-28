@@ -71,6 +71,24 @@ def test_nobody_removes_a_stale_crop(client, tmp_path, monkeypatch):
     assert f["crop_box"] is None and not (tmp_path / "7_crop.jpg").exists()
 
 
+def test_without_a_cache_dir_the_jpegs_come_back_in_the_answer(client, tmp_path):
+    import base64
+    r = client.post("/measure", json={"id": 7, "path": str(IMG), "detect_long_edge": 640, "min_person_frac": 0.0015,
+                                      "detect": {"model": "fake"}})
+    assert r.status_code == 200, r.text
+    m = r.json()
+    assert set(m["files"]) == {"7.jpg", "7_thumb.jpg"}
+    assert base64.b64decode(m["files"]["7.jpg"])[:2] == b"\xff\xd8"
+    f = client.post("/finalize", json={"token": m["token"], "order": [0, 1], "use_face": False}).json()
+    assert f["files"]["7_crop.jpg"] and f["files"]["7_full.jpg"] is None   # None: the backend removes its copy
+    assert not list(tmp_path.iterdir())
+
+
+def test_the_photos_root_confines_paths(client, monkeypatch):
+    monkeypatch.setattr(server, "PHOTOS_ROOT", str(ROOT / "analyzer"))
+    assert client.post("/render-full", json={"path": str(IMG)}).status_code == 403
+
+
 def test_render_full_and_focus_debug(client, tmp_path):
     r = client.post("/render-full", json={"path": str(IMG)})
     assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"

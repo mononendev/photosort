@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mononendev/photosort/internal/analyzer"
 	"github.com/mononendev/photosort/internal/api"
 	"github.com/mononendev/photosort/internal/backends"
 	"github.com/mononendev/photosort/internal/db"
@@ -57,10 +58,27 @@ func ingestSidecars(d *db.DB, rows []db.Image) (int, error) {
 }
 
 // localStage binds the analyzer and the file readers into the runner's per-image local stage.
-func localStage(px local.Pixels, cacheDir string) func(ctx context.Context, cfg pj.Obj, id int64, path string) (pj.Obj, error) {
+// localStage runs one image on a slot of the pool (the one the runner holds for it, else its own). An image whose pod
+// went away or forgot the measurement is measured again on another, twice at most.
+func localStage(pool *analyzer.Pool, cacheDir string) func(ctx context.Context, cfg pj.Obj, id int64, path string) (pj.Obj, error) {
 	meta := local.FileMeta()
 	return func(ctx context.Context, cfg pj.Obj, id int64, path string) (pj.Obj, error) {
-		return local.Analyze(ctx, px, meta, cfg, id, path, cacheDir)
+		l, own, err := pool.Lease(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if own {
+			defer l.Release()
+		}
+		for attempt := 0; ; attempt++ {
+			data, err := local.Analyze(ctx, l, meta, cfg, id, path, cacheDir)
+			if err == nil || attempt == 2 || !analyzer.Retryable(err) {
+				return data, err
+			}
+			if err := l.Move(ctx, err); err != nil {
+				return nil, err
+			}
+		}
 	}
 }
 
@@ -111,6 +129,9 @@ func webCmd() *cobra.Command {
 			}
 			if an != nil {
 				deps.Local = localStage(an, cache)
+				if an.Remote() {
+					deps.Slots = an // as many images in flight as the pods have slots, however many pods there are
+				}
 			} else {
 				deps.Local = func(context.Context, pj.Obj, int64, string) (pj.Obj, error) {
 					return nil, errors.New("the analyzer is not running")

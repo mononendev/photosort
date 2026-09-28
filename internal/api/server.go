@@ -26,7 +26,7 @@ import (
 type Server struct {
 	DB         *db.DB
 	Config     *config.Store
-	Analyzer   *analyzer.Client // nil: pixel endpoints answer 503
+	Analyzer   *analyzer.Pool // nil: pixel endpoints answer 503
 	Workdir    string
 	PhotosRoot string
 	CacheDir   string
@@ -322,5 +322,6 @@ func (s *Server) health(*http.Request) (any, error) {
 	h := s.AnalyzerHealth()
 	return pj.Obj{"ok": true, "version": s.Version, "photos_root": s.PhotosRoot, "workdir": s.Workdir,
 		"models_dir": s.ModelsDir, "device": pj.Get(h, "device"), "backend": cfg["backend"], "ollama": cfg["base_url"],
-		"current_job": current, "database": s.DB.Kind(), "analyzer": h != nil}, nil
+		"current_job": current, "database": s.DB.Kind(), "analyzer": h != nil,
+		"analyzer_pods": pj.Get(h, "pods"), "analyzer_slots": pj.Get(h, "slots")}, nil
 }

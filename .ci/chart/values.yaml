@@ -8,6 +8,11 @@ modelsVolume:
   accessMode: ReadWriteMany
   size: 20Gi
 
+# The analyzer pods read any path under /photos they're asked for. The NetworkPolicy admits only the API pod; it's
+# off until the CI runner's service account (development:github-runner) may manage networkpolicies in the namespace.
+analyzerPool:
+  networkPolicy: false
+
 mononen-library-chart:
   global:
     namespace: production

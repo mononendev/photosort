@@ -32,10 +32,12 @@ the pod sends the frame, thumbnail and crop JPEGs back in its answers; the API w
 so the pods need no shared writable volume. When a pod goes away mid-image (scale-down, eviction), the image is
 measured again on another, up to twice. The pods' `preStop` sleep lets them leave DNS before uvicorn stops.
 
-The analyzers read any path they are given, so a NetworkPolicy
-([`templates/analyzer-pool.yaml`](../.ci/chart/templates/analyzer-pool.yaml)) admits only the API pod, and
-`PHOTOSORT_PHOTOS_ROOT=/photos` makes them refuse paths outside the photos. The policy only binds with a CNI that
-enforces NetworkPolicy.
+The analyzers read any path they are given, so `PHOTOSORT_PHOTOS_ROOT=/photos` makes them refuse paths outside
+the photos, and a NetworkPolicy ([`templates/analyzer-pool.yaml`](../.ci/chart/templates/analyzer-pool.yaml))
+can admit only the API pod. The policy is off (`analyzerPool.networkPolicy: false`) until the deploying service
+account may manage `networkpolicies` (`get`, `create`, `update`, `patch`, `delete` in the `networking.k8s.io` API
+group) in the namespace; without that permission, `helm upgrade` fails before it changes anything. It only binds
+with a CNI that enforces NetworkPolicy (k3s's built-in controller does).
 
 Throughput is roughly linear in pods until something shared gives out: CephFS reads of the originals, the API
 pod's CPU (EXIF and AF parsing, writing ~0.5 MB of JPEGs per image; its limit is 4 cores), or SQLite's single

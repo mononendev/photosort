@@ -35,6 +35,10 @@ func TestXMPCaptureOne(t *testing.T) {
 	if doc := XMPCaptureOne(rec, groups); !strings.Contains(doc, "<xmp:Label>Orange</xmp:Label>") {
 		t.Errorf("unrated tier 1 wants the Orange label:\n%s", doc)
 	}
+	rec.FocusTier = nil
+	if doc := XMPCaptureOne(rec, groups); strings.Contains(doc, "xmp:Label") {
+		t.Errorf("unrated with no tier wants no label:\n%s", doc)
+	}
 	if strings.Contains(doc, "dc:subject") || strings.Contains(doc, "\n") {
 		t.Errorf("want one line, keywords only in lr:hierarchicalSubject:\n%s", doc)
 	}

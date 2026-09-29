@@ -70,9 +70,9 @@ func XMPCaptureOne(r *Record, groups pj.Obj) string {
 	}
 	label, ok := py.IntKey(r.Rating)
 	if !ok { // unrated: the focus tier's label (tiers 0-3 share the matching rating's)
-		label, _ = py.IntKey(r.FocusTier)
+		label, ok = py.IntKey(r.FocusTier)
 	}
-	if l, ok := RatingLabels[label]; ok {
+	if l, known := RatingLabels[label]; ok && known {
 		el("xmp:Label", l)
 	}
 	b.WriteString("<lr:hierarchicalSubject><rdf:Bag>")

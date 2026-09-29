@@ -478,29 +478,13 @@ func (s *Server) export(r *http.Request) (any, error) {
 	}
 	cfg := s.cfg()
 	out := filepath.Join(s.Workdir, "exports", filepath.Base(in.Name))
-	where, args := "local_json IS NOT NULL", []any(nil)
-	if in.Folder != "" {
-		base, err := s.safePath(in.Folder)
-		if err != nil {
-			return nil, err
-		}
-		w, a := s.DB.D.UnderFolder(base, "folder")
-		where += " AND " + w
-		args = a
-	}
-	rows, err := s.DB.Rows(where, args, "", -1, 0, "")
-	if err != nil {
-		return nil, err
-	}
 	source := s.focusSource(cfg)
 	if in.FocusSource != nil && *in.FocusSource != "" {
 		source = *in.FocusSource
 	}
-	recs := make([]*export.Record, len(rows))
-	for i, row := range rows {
-		if recs[i], err = export.FinalRecord(exportRow(row), source); err != nil {
-			return nil, err
-		}
+	recs, _, err := s.exportRecords(in.Folder, source)
+	if err != nil {
+		return nil, err
 	}
 	if err := export.Export(recs, out); err != nil {
 		return nil, err
@@ -521,6 +505,66 @@ func (s *Server) export(r *http.Request) (any, error) {
 		}
 	}
 	return pj.Obj{"out": out, "images": len(recs), "tree": counts, "xmp_written": written}, nil
+}
+
+// exportRecords are the final records of the analyzed images under folder (relative to the photos root; "" for all)
+// with the focus source, and folder's absolute path.
+func (s *Server) exportRecords(folder, source string) ([]*export.Record, string, error) {
+	base, err := s.safePath(folder)
+	if err != nil {
+		return nil, "", err
+	}
+	where, args := "local_json IS NOT NULL", []any(nil)
+	if folder != "" {
+		w, a := s.DB.D.UnderFolder(base, "folder")
+		where += " AND " + w
+		args = a
+	}
+	rows, err := s.DB.Rows(where, args, "", -1, 0, "")
+	if err != nil {
+		return nil, "", err
+	}
+	recs := make([]*export.Record, len(rows))
+	for i, row := range rows {
+		if recs[i], err = export.FinalRecord(exportRow(row), source); err != nil {
+			return nil, "", err
+		}
+	}
+	return recs, base, nil
+}
+
+// xmpZip is GET /api/export/xmp.zip?folder=&format=capture_one|lightroom&focus_source=: the sidecars of the images
+// under folder, laid out as the photos are under it, to unzip over that folder.
+func (s *Server) xmpZip(r *http.Request) (any, error) {
+	q := r.URL.Query()
+	folder, format := q.Get("folder"), q.Get("format")
+	if format == "" {
+		format = export.FormatCaptureOne
+	}
+	if format != export.FormatCaptureOne && format != export.FormatLightroom {
+		return nil, errf(422, "format must be capture_one or lightroom")
+	}
+	cfg := s.cfg()
+	source := s.focusSource(cfg)
+	if v := q.Get("focus_source"); v != "" {
+		source = v
+	}
+	recs, base, err := s.exportRecords(folder, source)
+	if err != nil {
+		return nil, err
+	}
+	b, n, err := export.XMPZip(recs, base, format, pj.O(cfg, "groups"))
+	if err != nil {
+		return nil, err
+	}
+	if n == 0 {
+		return nil, errf(404, "no analyzed photos under this folder")
+	}
+	name := "photos"
+	if folder != "" {
+		name = filepath.Base(base)
+	}
+	return download{Name: name + "-xmp-" + strings.ReplaceAll(format, "_", "") + ".zip", Type: "application/zip", Body: b}, nil
 }
 
 func (s *Server) exports(*http.Request) (any, error) {

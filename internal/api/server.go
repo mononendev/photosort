@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -68,11 +69,24 @@ func (s *Server) wrap(h handler) http.HandlerFunc {
 			writeJSON(w, he.Code, map[string]any{"detail": he.Detail})
 			return
 		}
+		if d, ok := v.(download); ok {
+			w.Header().Set("Content-Type", d.Type)
+			w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": d.Name}))
+			w.Header().Set("Content-Length", strconv.Itoa(len(d.Body)))
+			w.Write(d.Body)
+			return
+		}
 		if v == nil {
 			v = json.RawMessage("null")
 		}
 		writeJSON(w, 200, v)
 	}
+}
+
+// download is a handler's result sent as a file rather than JSON.
+type download struct {
+	Name, Type string
+	Body       []byte
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
@@ -134,6 +148,7 @@ func (s *Server) Handler() http.Handler {
 
 	route("POST /api/export", s.export)
 	route("GET /api/exports", s.exports)
+	route("GET /api/export/xmp.zip", s.xmpZip)
 
 	route("/api/", func(*http.Request) (any, error) { return nil, errNotFound })
 	if s.WebDist != "" {

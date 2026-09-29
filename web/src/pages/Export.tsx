@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, GROUPS } from '../api/client';
-import type { ExportResult, GroupsConfig } from '../api/client';
+import type { ExportResult, GroupsConfig, XMPFormat } from '../api/client';
 import { errMsg, fmtTime } from '../lib/format';
 
 export default function Export() {
@@ -12,6 +12,7 @@ export default function Export() {
   const [tree, setTree] = useState(true);
   const [source, setSource] = useState('vlm');
   const [result, setResult] = useState<ExportResult | null>(null);
+  const [xmpFormat, setXmpFormat] = useState<XMPFormat>('capture_one');
   const { data: exports, refetch } = useQuery({ queryKey: ['exports'], queryFn: api.exports });
   // Your sort groups' export folder and keywords live in the config; edits are drafts until saved (or exported).
   const qc = useQueryClient();
@@ -35,6 +36,12 @@ export default function Export() {
     },
     onSuccess: (r) => { setResult(r); refetch(); },
   });
+  const zip = useMutation({
+    mutationFn: async () => {
+      if (dirty) await saveGroups.mutateAsync();
+      return api.xmpZip({ folder, format: xmpFormat, focus_source: source });
+    },
+  });
   const sel = 'bg-gray-900 border border-gray-700 rounded px-2 py-1.5 sm:py-1 text-sm mb-2 sm:mb-0';
   return (
     <div className="max-w-2xl space-y-4">
@@ -49,6 +56,20 @@ export default function Export() {
         <select value={source} onChange={(e) => setSource(e.target.value)} className={sel}><option value="vlm">vision model (your overrides win)</option><option value="local">local sharpness only</option><option value="strict">strict: lower of both</option></select>
         <span className="text-gray-500">options</span>
         <span className="flex flex-wrap gap-4"><label className="flex items-center gap-1"><input type="checkbox" checked={xmp} onChange={(e) => setXmp(e.target.checked)} /> XMP sidecars</label><label className="flex items-center gap-1"><input type="checkbox" checked={tree} onChange={(e) => setTree(e.target.checked)} /> sorted tree</label></span>
+      </div>
+      <div className="rounded-lg border border-gray-800 p-3 space-y-2">
+        <div className="text-xs uppercase tracking-wide text-gray-500">XMP sidecars zip</div>
+        <p className="text-xs text-gray-500">Downloads a <code>&lt;name&gt;.xmp</code> for each analyzed photo under the folder filter, in folders as they are under it (e.g. filter <code>Fest/2024</code> gives <code>September/12/…</code>). Unzip it into that folder and each sidecar lands next to its raw. Uses the focus source above.</p>
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <span className="inline-flex rounded border border-gray-700 overflow-hidden">
+            {([['capture_one', 'Capture One'], ['lightroom', 'Lightroom']] as const).map(([v, l]) => (
+              <button key={v} onClick={() => setXmpFormat(v)} aria-pressed={xmpFormat === v} className={`px-3 py-1 ${xmpFormat === v ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-gray-200'}`}>{l}</button>
+            ))}
+          </span>
+          <button onClick={() => zip.mutate()} disabled={zip.isPending} className="px-3 py-1 rounded border border-gray-700 hover:border-gray-500 disabled:opacity-40">{zip.isPending ? 'building zip…' : 'Download XMP zip'}</button>
+          {zip.data && !zip.isPending && <span className="text-gray-500 break-all">saved {zip.data}</span>}
+        </div>
+        {zip.error && <p className="text-sm text-red-400">{errMsg(zip.error)}</p>}
       </div>
       <div className="rounded-lg border border-gray-800 p-3 space-y-2">
         <div className="text-xs uppercase tracking-wide text-gray-500">Your groups</div>

@@ -310,6 +310,7 @@ export interface ImageFacets {
 }
 
 export interface ExportRequest { name: string; folder?: string; link?: string; xmp?: boolean; focus_source?: string; tree?: boolean }
+export type XMPFormat = 'capture_one' | 'lightroom';
 export interface ExportResult { out: string; images: number; tree: Record<string, number>; xmp_written: number }
 
 // ---------------------------------------------------------------------------
@@ -396,6 +397,21 @@ export const api = {
   },
   exportRun: (e: ExportRequest) => request<ExportResult>('/api/export', { method: 'POST', body: JSON.stringify(e) }),
   exports: () => request<{ name: string; path: string; mtime: number }[]>('/api/exports'),
+  /** The XMP sidecars under folder as a zip laid out like the photos there; saved by the browser. */
+  xmpZip: async (p: { folder?: string; format: XMPFormat; focus_source?: string }) => {
+    const res = await fetch(`/api/export/xmp.zip${qs(p)}`);
+    if (!res.ok) {
+      let msg = res.statusText;
+      try { msg = (await res.json()).detail ?? msg; } catch { /* ignore */ }
+      throw new ApiError(res.status, msg);
+    }
+    const name = /filename="?([^";]+)"?/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? 'xmp.zip';
+    const url = URL.createObjectURL(await res.blob());
+    const a = Object.assign(document.createElement('a'), { href: url, download: name });
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return name;
+  },
   models: () => request<ModelsInfo>('/api/models'),
   detect: (id: number, model: string) => request<DetectResult>(`/api/images/${id}/detect${qs({ model })}`, { method: 'POST' }),
 };

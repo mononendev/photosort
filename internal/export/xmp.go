@@ -54,19 +54,16 @@ func list(v any) []any {
 	return items
 }
 
-// XMPFor renders a record's XMP sidecar: focus/subject/composition (and action, review, banger, group) keywords
-// flat and under PhotoSort|..., the model's keywords and adjectives, stars from the quality score, the color label
-// of your rating, the tiers and notes as photosort:/photoshop: attributes, and the description. groups is the
-// config's "groups": a grouped record gets its group's keywords ("Parent|Child" ones as a hierarchy).
-func XMPFor(r *Record, groups pj.Obj) string {
+// photosortTags are the flat tags (focus-, subject-, comp-, action-, photosort-review/-banger and the group's leaf
+// keywords) and the hierarchical keywords (PhotoSort|Focus|..., ... and the group's keywords) of a record.
+func photosortTags(r *Record, groups pj.Obj) (tags, hier []string) {
 	tn := tierName(r.FocusTier)
-	kws := append(append([]any{}, list(r.Keywords)...), list(r.Adjectives)...)
 	subject, comp := py.Str(r.Subject), py.Str(r.Composition)
-	tags := []string{"focus-" + tn, "subject-" + subject, "comp-" + comp}
+	tags = []string{"focus-" + tn, "subject-" + subject, "comp-" + comp}
 	if py.Truthy(r.Action) && !py.Eq(r.Action, "none") {
 		tags = append(tags, "action-"+py.Str(r.Action))
 	}
-	hier := []string{"PhotoSort|Focus|" + tn, "PhotoSort|Subject|" + subject, "PhotoSort|Composition|" + comp}
+	hier = []string{"PhotoSort|Focus|" + tn, "PhotoSort|Subject|" + subject, "PhotoSort|Composition|" + comp}
 	if r.Review {
 		tags = append(tags, "photosort-review")
 		hier = append(hier, "PhotoSort|Review")
@@ -82,6 +79,16 @@ func XMPFor(r *Record, groups pj.Obj) string {
 			hier = append(hier, k)
 		}
 	}
+	return tags, hier
+}
+
+// XMPFor renders a record's XMP sidecar: focus/subject/composition (and action, review, banger, group) keywords
+// flat and under PhotoSort|..., the model's keywords and adjectives, stars from the quality score, the color label
+// of your rating, the tiers and notes as photosort:/photoshop: attributes, and the description. groups is the
+// config's "groups": a grouped record gets its group's keywords ("Parent|Child" ones as a hierarchy).
+func XMPFor(r *Record, groups pj.Obj) string {
+	tags, hier := photosortTags(r, groups)
+	kws := append(append([]any{}, list(r.Keywords)...), list(r.Adjectives)...)
 	for _, t := range tags {
 		kws = append(kws, t)
 	}

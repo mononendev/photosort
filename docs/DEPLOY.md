@@ -27,6 +27,11 @@ runner keeps one image in flight per slot across all pods (the config's `workers
 is what makes the HPA add pods, and their slots are filled as soon as they are ready. Between jobs, or while a
 job waits on the vision model, the pods idle and the HPA scales back after 5 minutes.
 
+The config's `analyzer_slots` (the "per pod" field on the Jobs page) overrides every pod's `ANALYZER_SLOTS` without
+a redeploy, and takes effect right away, also in a running job; 0 goes back to the pods' own. Each image in flight
+holds a decoded full-resolution frame (roughly 0.3 GB for 45 MP, more while an underexposed frame is lifted), so going
+above the chart's 3 per pod needs the analyzer's memory limit raised with it.
+
 An image's measure and finalize go to the same pod (the decoded image stays in its memory between them), and
 the pod sends the frame, thumbnail and crop JPEGs back in its answers; the API writes them into `/data/cache`,
 so the pods need no shared writable volume. When a pod goes away mid-image (scale-down, eviction), the image is
@@ -161,7 +166,8 @@ UI: https://photosort.adoah.dev (internal ingress, LAN/tailscale only). API heal
 |---|---|
 | `analyzer` | `true` when an analyzer pod answered the last health check (every 30 s) |
 | `device` | Where the analyzer runs detection: `cpu` or `cuda`; `null` while the analyzer isn't answering |
-| `analyzer_pods`, `analyzer_slots` | The analyzer pool's size as the API sees it (`null` with a single analyzer) |
+| `analyzer_pods`, `analyzer_slots` | The analyzer pool's size as the API sees it, live (`null` with a single analyzer) |
+| `analyzer_pod_slots`, `analyzer_slots_per_pod` | A pod's own `ANALYZER_SLOTS`, and the config's `analyzer_slots` override when set |
 | `database` | `sqlite` or `postgres` |
 | `models_dir` | Where the pose models and face model are read from |
 | `current_job` | The running job's id, if any |

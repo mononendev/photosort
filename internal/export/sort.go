@@ -108,9 +108,11 @@ func copy2(src, dst string) error {
 	}
 	if _, err := io.Copy(out, in); err != nil {
 		out.Close()
+		os.Remove(dst) // don't leave a partial copy behind (e.g. a full disk)
 		return err
 	}
 	if err := out.Close(); err != nil {
+		os.Remove(dst)
 		return err
 	}
 	if err := os.Chtimes(dst, atime(fi), fi.ModTime()); err != nil {
@@ -244,6 +246,30 @@ func BuildTree(records []*Record, out, mode string, groups pj.Obj) (Counts, erro
 		}
 	}
 	return counts, nil
+}
+
+// TreeBytes is how many bytes BuildTree would write in mode: the size of every file it copies (each tier copy, plus
+// the review and banger copies), 0 for the linking modes.
+func TreeBytes(records []*Record, mode string) int64 {
+	if mode != "copy" {
+		return 0
+	}
+	var n int64
+	for _, r := range records {
+		fi, err := os.Stat(r.Path)
+		if err != nil || r.FocusTier == nil {
+			continue
+		}
+		copies := int64(1)
+		if r.Review {
+			copies++
+		}
+		if r.Banger {
+			copies++
+		}
+		n += copies * fi.Size()
+	}
+	return n
 }
 
 // CSVColumns are results.csv's columns, in order.

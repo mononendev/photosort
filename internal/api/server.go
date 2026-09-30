@@ -302,6 +302,7 @@ func (s *Server) WatchAnalyzer(ctx context.Context) {
 	if s.Analyzer == nil {
 		return
 	}
+	s.applyAnalyzerSlots()
 	for {
 		hctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		h, err := s.Analyzer.Health(hctx)
@@ -316,6 +317,13 @@ func (s *Server) WatchAnalyzer(ctx context.Context) {
 			return
 		case <-time.After(30 * time.Second):
 		}
+	}
+}
+
+// applyAnalyzerSlots has the analyzer pool take the config's analyzer_slots per pod (0: each pod's own).
+func (s *Server) applyAnalyzerSlots() {
+	if s.Analyzer != nil {
+		s.Analyzer.SetPerPod(pj.Int(pj.Or(s.cfg()["analyzer_slots"], 0.0)))
 	}
 }
 
@@ -338,8 +346,17 @@ func (s *Server) health(*http.Request) (any, error) {
 		current = job
 	}
 	h := s.AnalyzerHealth()
+	pods, slots, perPod := pj.Get(h, "pods"), pj.Get(h, "slots"), pj.Get(h, "slots_per_pod")
+	if h != nil && s.Analyzer.Remote() { // live, not as of the last health poll: the pool scales, the override changes
+		n, m := s.Analyzer.Capacity()
+		pods, slots, perPod = n, m, nil
+		if k := s.Analyzer.PerPod(); k > 0 {
+			perPod = k
+		}
+	}
 	return pj.Obj{"ok": true, "version": s.Version, "photos_root": s.PhotosRoot, "workdir": s.Workdir,
 		"models_dir": s.ModelsDir, "device": pj.Get(h, "device"), "backend": cfg["backend"], "ollama": cfg["base_url"],
 		"current_job": current, "database": s.DB.Kind(), "analyzer": h != nil,
-		"analyzer_pods": pj.Get(h, "pods"), "analyzer_slots": pj.Get(h, "slots")}, nil
+		"analyzer_pods": pods, "analyzer_slots": slots,
+		"analyzer_pod_slots": pj.Get(h, "pod_slots"), "analyzer_slots_per_pod": perPod}, nil
 }

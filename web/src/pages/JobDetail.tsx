@@ -115,10 +115,13 @@ function StageLine({ name, st }: { name: StageName; st: JobStage }) {
     if (st.errors) bits.push(`${st.errors} errors`);
     if (st.skipped) bits.push(`skipped ${fmtNum(st.skipped)} at local tier 0`);
   }
-  if (name === 'local') bits.push(`${st.workers ?? '?'} workers`, st.device ? `on ${st.device}` : '');
+  if (name === 'local') bits.push(`${st.workers ?? '?'} ${st.pods != null ? 'slots' : 'workers'}${podsText(st)}`, st.device ? `on ${st.device}` : '');
   if (name === 'vlm') bits.push(`${st.backend}/${st.model}`, `×${st.concurrency ?? 1} concurrent`);
   return <div className="mt-1 text-xs text-gray-400">{bits.filter(Boolean).join(' · ')}</div>;
 }
+
+/** " across N pods" for a local stage on an analyzer pool, else "". */
+const podsText = (st?: JobStage) => (st?.pods != null ? ` across ${st.pods} ${st.pods === 1 ? 'pod' : 'pods'}` : '');
 
 // ---- KPIs --------------------------------------------------------------------------
 
@@ -163,7 +166,8 @@ function Kpis({ job, stage }: { job: JobDetailT; stage: StageName }) {
         {progress}{timing}{throughput}
         <StatTile compact label="Per image" value={s ? fmtDur(s.p50_s) : '–'} sub={s ? `median · max ${fmtDur(s.max_s)}` : undefined}
           tip="Wall time for one image: decode, person detection and the eye-region focus metrics." />
-        <StatTile compact label="Workers" value={st?.workers ?? '–'} sub={st?.device ? `on ${st.device}` : undefined} />
+        <StatTile compact label="Workers" value={st?.workers ?? '–'} sub={[podsText(st).trim(), st?.device ? `on ${st.device}` : ''].filter(Boolean).join(' · ') || undefined}
+          tip={st?.pods != null ? 'Images in flight: the analyzer pods\' slots in all, kept current as the pool scales and as the slots per pod change (Jobs page).' : undefined} />
         <StatTile compact label="Errors" value={fmtNum(s?.errors ?? 0)} sub={errors ?? 'none'} />
       </div>
     );

@@ -7,7 +7,7 @@ import { errMsg, fmtTime } from '../lib/format';
 export default function Export() {
   const [name, setName] = useState('export');
   const [folder, setFolder] = useState('');
-  const [link, setLink] = useState('copy');
+  const [link, setLink] = useState('symlink');
   const [xmp, setXmp] = useState(true);
   const [tree, setTree] = useState(true);
   const [source, setSource] = useState('vlm');
@@ -51,7 +51,7 @@ export default function Export() {
         <span className="text-gray-500">name</span><input value={name} onChange={(e) => setName(e.target.value)} className={sel} />
         <span className="text-gray-500">folder filter</span><input value={folder} onChange={(e) => setFolder(e.target.value)} placeholder="(all) relative to photos root" className={sel} />
         <span className="text-gray-500">tree files</span>
-        <select value={link} onChange={(e) => setLink(e.target.value)} className={sel}><option value="copy">copy</option><option value="symlink">symlink</option><option value="hardlink">hardlink (same filesystem only)</option></select>
+        <select value={link} onChange={(e) => setLink(e.target.value)} className={sel}><option value="symlink">symlink</option><option value="copy">copy (full-size duplicates on the data volume)</option><option value="hardlink">hardlink (same filesystem only)</option></select>
         <span className="text-gray-500">focus source</span>
         <select value={source} onChange={(e) => setSource(e.target.value)} className={sel}><option value="vlm">vision model (your overrides win)</option><option value="local">local sharpness only</option><option value="strict">strict: lower of both</option></select>
         <span className="text-gray-500">options</span>

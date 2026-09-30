@@ -57,3 +57,12 @@ def test_every_installed_model_runs(tmp_path):
         dets = detectors.get(m["name"])(im)
         assert dets and all(len(d["kp"]) == 17 and len(d["kpc"]) == 17 for d in dets), m["name"]
         assert all(0 <= d["box"][0] < d["box"][2] <= im.size[0] for d in dets), m["name"]
+
+
+def test_sessions_evict_past_max():
+    s = MS._Sessions()
+    s.max = 2
+    toks = [s.put({"n": i}) for i in range(3)]
+    with pytest.raises(MS.Gone):
+        s.pop(toks[0])  # oldest evicted: its finalize never came
+    assert s.pop(toks[2]) == {"n": 2}

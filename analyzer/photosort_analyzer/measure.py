@@ -32,7 +32,7 @@ from . import metrics as M
 log = logging.getLogger(__name__)
 THUMB_LONG_EDGE = 400
 SESSION_TTL_S = 300
-SESSION_MAX = 32
+SESSION_MAX = 32  # lowered to two per slot: at startup (server.py) and by each pooled measure request
 
 
 class Gone(KeyError):
@@ -43,13 +43,14 @@ class _Sessions:
     def __init__(self):
         self._d: OrderedDict[str, tuple[float, dict]] = OrderedDict()
         self._lock = threading.Lock()
+        self.max = SESSION_MAX
 
     def put(self, state: dict) -> str:
         tok = uuid.uuid4().hex
         now = time.monotonic()
         with self._lock:
             self._d[tok] = (now, state)
-            while self._d and (len(self._d) > SESSION_MAX or next(iter(self._d.values()))[0] < now - SESSION_TTL_S):
+            while self._d and (len(self._d) > self.max or next(iter(self._d.values()))[0] < now - SESSION_TTL_S):
                 self._d.popitem(last=False)
         return tok
 
@@ -92,6 +93,8 @@ def _put(files: dict, cache_dir: Optional[Path], name: str, data: Optional[bytes
 
 
 def measure(req: dict, detector=None) -> dict:
+    if n := req.get("slots"):  # a pool's backend says how many it has in flight here (it may override ANALYZER_SLOTS)
+        sessions.max = 2 * int(n)
     path = Path(req["path"])
     cache_dir = Path(req["cache_dir"]) if req.get("cache_dir") else None
     img_id = req["id"]

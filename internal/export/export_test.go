@@ -238,3 +238,23 @@ func TestMovePlacesAndLinksAside(t *testing.T) {
 		t.Fatal("review entry is not a symlink", err)
 	}
 }
+
+func TestTreeBytesCountsEveryCopy(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "x.jpg")
+	if err := os.WriteFile(p, make([]byte, 100), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	recs := []*Record{
+		{Path: p, FocusTier: 3, Review: true, Banger: true},
+		{Path: p, FocusTier: 1},
+		{Path: p},                                            // no tier: not placed
+		{Path: filepath.Join(dir, "gone.jpg"), FocusTier: 2}, // missing: not placed
+	}
+	if n := TreeBytes(recs, "copy"); n != 400 {
+		t.Errorf("copy = %d, want 400", n)
+	}
+	if n := TreeBytes(recs, "symlink"); n != 0 {
+		t.Errorf("symlink = %d, want 0", n)
+	}
+}

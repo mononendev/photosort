@@ -11,6 +11,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"syscall"
 
 	"github.com/mononendev/photosort/internal/config"
 	"github.com/mononendev/photosort/internal/db"
@@ -43,6 +44,7 @@ func (s *Server) putConfig(r *http.Request) (any, error) {
 	}); err != nil {
 		return nil, err
 	}
+	s.applyAnalyzerSlots()
 	return config.Public(s.cfg()), nil
 }
 
@@ -472,9 +474,12 @@ func (s *Server) export(r *http.Request) (any, error) {
 		XMP         *bool   `json:"xmp"`
 		FocusSource *string `json:"focus_source"`
 		Tree        *bool   `json:"tree"`
-	}{Name: "export", Link: "copy"}
+	}{Name: "export", Link: "symlink"}
 	if err := decodeBody(r, &in); err != nil {
 		return nil, err
+	}
+	if in.Link != "copy" && in.Link != "symlink" && in.Link != "hardlink" {
+		return nil, errf(422, "link must be copy, symlink or hardlink")
 	}
 	cfg := s.cfg()
 	out := filepath.Join(s.Workdir, "exports", filepath.Base(in.Name))
@@ -486,12 +491,24 @@ func (s *Server) export(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	tree := in.Tree == nil || *in.Tree
+	if need := export.TreeBytes(recs, in.Link); tree && need > 0 {
+		// Copies land on the data volume, which is far smaller than the photos: refuse rather than fill it.
+		free, err := freeBytes(s.Workdir)
+		if err != nil {
+			return nil, err
+		}
+		if need+exportHeadroom > free {
+			return nil, errf(507, "copying the tree needs %.1f GB but the data volume has %.1f GB free; use symlink",
+				float64(need)/1e9, float64(free)/1e9)
+		}
+	}
 	if err := export.Export(recs, out); err != nil {
 		return nil, err
 	}
 	groups := pj.O(cfg, "groups")
 	var counts any = pj.Obj{}
-	if in.Tree == nil || *in.Tree {
+	if tree {
 		c, err := export.BuildTree(recs, out, in.Link, groups)
 		if err != nil {
 			return nil, err
@@ -505,6 +522,18 @@ func (s *Server) export(r *http.Request) (any, error) {
 		}
 	}
 	return pj.Obj{"out": out, "images": len(recs), "tree": counts, "xmp_written": written}, nil
+}
+
+// exportHeadroom is the space a copy export leaves free on the data volume, for the database and the cache.
+const exportHeadroom = 1 << 30
+
+// freeBytes is the space available to us on the filesystem holding dir.
+func freeBytes(dir string) (int64, error) {
+	var st syscall.Statfs_t
+	if err := syscall.Statfs(dir, &st); err != nil {
+		return 0, err
+	}
+	return int64(st.Bavail) * int64(st.Bsize), nil
 }
 
 // exportRecords are the final records of the analyzed images under folder (relative to the photos root; "" for all)

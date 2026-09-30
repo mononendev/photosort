@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mononendev/photosort/internal/pj"
@@ -29,6 +30,7 @@ type Pool struct {
 	max    int
 	log    *slog.Logger
 
+	perPod  atomic.Int64 // slots per pod when > 0 (config analyzer_slots), instead of each pod's own
 	mu      sync.Mutex
 	eps     map[string]*endpoint
 	changed chan struct{} // closed and replaced when a slot frees up or the pods change
@@ -138,9 +140,40 @@ func (p *Pool) refresh(ctx context.Context, scheme, host, port string) {
 func (p *Pool) slotsLocked() int {
 	n := 0
 	for _, e := range p.eps {
-		n += e.slots
+		n += p.slotsOf(e)
 	}
 	return n
+}
+
+// slotsOf is how many images e takes at once: the per-pod override when set, else what its /health says.
+func (p *Pool) slotsOf(e *endpoint) int {
+	if n := p.perPod.Load(); n > 0 && e.slots > 0 {
+		return int(n)
+	}
+	return e.slots
+}
+
+// SetPerPod has every pod take n images at once instead of its own ANALYZER_SLOTS (0: back to its own). Waiting
+// images move onto slots it frees; above the pod's own count, mind its memory limit.
+func (p *Pool) SetPerPod(n int) {
+	if !p.remote || p.perPod.Swap(int64(max(0, n))) == int64(max(0, n)) {
+		return
+	}
+	p.mu.Lock()
+	pods, slots := len(p.eps), p.slotsLocked()
+	p.broadcastLocked()
+	p.mu.Unlock()
+	p.log.Info("analyzer pool: slots per pod", "per_pod", n, "pods", pods, "slots", slots)
+}
+
+// PerPod is the slots-per-pod override, 0 when each pod goes by its own.
+func (p *Pool) PerPod() int { return int(p.perPod.Load()) }
+
+// Capacity is the pool's size now: its pods and their slots in all.
+func (p *Pool) Capacity() (pods, slots int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return len(p.eps), p.slotsLocked()
 }
 
 func (p *Pool) broadcastLocked() {
@@ -162,10 +195,10 @@ func (p *Pool) pickLocked(free bool) *endpoint {
 		if e.slots == 0 {
 			return float64(e.busy) / 1e6
 		}
-		return float64(e.busy) / float64(e.slots)
+		return float64(e.busy) / float64(p.slotsOf(e))
 	}
 	for _, e := range p.eps {
-		if now.Before(e.badTill) || (free && e.slots > 0 && e.busy >= e.slots) {
+		if now.Before(e.badTill) || (free && e.slots > 0 && e.busy >= p.slotsOf(e)) {
 			continue
 		}
 		if best == nil || load(e) < load(best) {
@@ -254,6 +287,7 @@ func (l *Lease) Measure(ctx context.Context, req pj.Obj) (pj.Obj, error) {
 		req = pj.Clone(req)
 		l.cacheDir = pj.Str(req["cache_dir"])
 		delete(req, "cache_dir")
+		req["slots"] = float64(l.p.slotsOf(l.ep)) // so the pod keeps a measurement per slot until its finalize
 	}
 	m, err := l.ep.c.Measure(ctx, req)
 	if err == nil && l.p.remote {
@@ -301,9 +335,11 @@ func (l *Lease) store(o pj.Obj) error {
 		}
 		tmp := dst + ".part"
 		if err := os.WriteFile(tmp, b, 0o644); err != nil {
+			os.Remove(tmp)
 			return err
 		}
 		if err := os.Rename(tmp, dst); err != nil { // readers never see half a JPEG
+			os.Remove(tmp)
 			return err
 		}
 	}
@@ -376,7 +412,11 @@ func (p *Pool) Health(ctx context.Context) (pj.Obj, error) {
 	}
 	if p.remote {
 		p.mu.Lock()
+		h["pod_slots"] = h["slots"] // the pod's own ANALYZER_SLOTS
 		h["pods"], h["slots"] = len(p.eps), p.slotsLocked()
+		if n := p.perPod.Load(); n > 0 {
+			h["slots_per_pod"] = n
+		}
 		p.mu.Unlock()
 	}
 	return h, nil

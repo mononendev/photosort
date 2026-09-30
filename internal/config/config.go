@@ -57,7 +57,8 @@ func Defaults() pj.Obj {
 		"dedup_iou":      0.6,
 		"dedup_head_iou": 0.25,
 		"dedup_head_tol": 0.1,
-		"workers":        4.0,
+		"workers":        4.0,                                 // local stage concurrency with a single analyzer (a pool goes by its slots)
+		"analyzer_slots": 0.0,                                 // images each pooled analyzer pod takes at once; 0: the pod's own ANALYZER_SLOTS
 		"local_ahead":    true,                                // while a job waits on the vision model, run the local stage of the jobs queued behind it
 		"face_model":     "face_detection_yunet_2023mar.onnx", // OpenCV YuNet: locates the eyes inside the head box
 		"face_conf":      0.6,

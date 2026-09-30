@@ -531,7 +531,9 @@ type fakeSlots struct {
 
 type slotKey struct{}
 
-func (s *fakeSlots) Max() int { return 32 }
+func (s *fakeSlots) Max() int                    { return 32 }
+func (s *fakeSlots) SetPerPod(int)               {}
+func (s *fakeSlots) Capacity() (pods, slots int) { return 1, s.n }
 func (s *fakeSlots) Slot(ctx context.Context) (context.Context, func(), error) {
 	select {
 	case s.sem <- struct{}{}:

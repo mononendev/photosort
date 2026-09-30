@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -22,6 +23,7 @@ type fakeAnalyzer struct {
 	*httptest.Server
 	measured atomic.Int64
 	sawCache atomic.Bool
+	slots    atomic.Int64 // the "slots" the last measure said this pod has
 	tokens   map[string]bool
 }
 
@@ -36,6 +38,7 @@ func newFake(t *testing.T) *fakeAnalyzer {
 			if _, ok := req["cache_dir"]; ok {
 				f.sawCache.Store(true)
 			}
+			f.slots.Store(int64(pj.Int(req["slots"])))
 			tok := f.URL + "/" + pj.Str(req["path"])
 			f.tokens[tok] = true
 			f.measured.Add(1)
@@ -56,7 +59,7 @@ func newFake(t *testing.T) *fakeAnalyzer {
 }
 
 func remotePool(slots map[string]int) *Pool {
-	p := &Pool{remote: true, max: 8, eps: map[string]*endpoint{}, changed: make(chan struct{})}
+	p := &Pool{remote: true, max: 8, eps: map[string]*endpoint{}, changed: make(chan struct{}), log: slog.Default()}
 	for base, n := range slots {
 		p.eps[base] = &endpoint{c: New(base), slots: n}
 	}
@@ -123,6 +126,50 @@ func TestAcquireWaitsForASlot(t *testing.T) {
 	cancel()
 	if _, err := p.Acquire(cctx); !errors.Is(err, context.Canceled) {
 		t.Errorf("full pool, cancelled: %v", err)
+	}
+}
+
+func TestSetPerPodOverridesEachPodsSlots(t *testing.T) {
+	a, b := newFake(t), newFake(t)
+	p := remotePool(map[string]int{a.URL: 2, b.URL: 2})
+	ctx := context.Background()
+	if pods, slots := p.Capacity(); pods != 2 || slots != 4 {
+		t.Fatalf("capacity %d pods %d slots, want 2 and 4", pods, slots)
+	}
+	var held []*Lease
+	for range 4 {
+		l, _ := p.Acquire(ctx)
+		held = append(held, l)
+	}
+	got := make(chan *Lease)
+	go func() { l, _ := p.Acquire(ctx); got <- l }()
+	select {
+	case <-got:
+		t.Fatal("a fifth lease on a four-slot pool")
+	case <-time.After(50 * time.Millisecond):
+	}
+	p.SetPerPod(3) // frees a slot on each pod: the waiter gets one
+	var l *Lease
+	select {
+	case l = <-got:
+	case <-time.After(time.Second):
+		t.Fatal("raising the slots per pod did not hand on a slot")
+	}
+	if _, slots := p.Capacity(); slots != 6 {
+		t.Errorf("capacity %d slots, want 6", slots)
+	}
+	if _, err := l.Measure(ctx, pj.Obj{"path": "x.jpg", "cache_dir": t.TempDir()}); err != nil {
+		t.Fatal(err)
+	}
+	if n := max(a.slots.Load(), b.slots.Load()); n != 3 {
+		t.Errorf("measure told the pod it has %d slots, want 3", n)
+	}
+	p.SetPerPod(0)
+	if _, slots := p.Capacity(); slots != 4 {
+		t.Errorf("back to the pods' own: %d slots, want 4", slots)
+	}
+	for _, l := range append(held, l) {
+		l.Release()
 	}
 }
 

@@ -77,6 +77,10 @@ type Deps struct {
 type Slots interface {
 	Slot(ctx context.Context) (context.Context, func(), error)
 	Max() int // how many images may wait for a slot at once
+	// SetPerPod sets the slots each analyzer takes (config analyzer_slots; 0: each pod's own).
+	SetPerPod(n int)
+	// Capacity is the analyzers there are now and their slots in all: the local stage's real concurrency.
+	Capacity() (pods, slots int)
 }
 
 // Runner is one worker. Start it with Run; stop it with Shutdown.
@@ -550,14 +554,15 @@ func (r *Runner) scanLocal(jid int64, cfg pj.Obj, paths []string, opts pj.Obj, s
 	}
 	total := len(prior) + len(rows)
 	r.job(jid, db.JobFields{"stage": "local", "total": total, "done": len(prior), "errors": localErr})
-	r.stage(jid, "local", pj.Obj{"total": total, "workers": cfg["workers"]})
+	r.stage(jid, "local", pj.Obj{"total": total})
+	r.stage(jid, "local", r.localWorkers(cfg))
 	note := "local: nothing new"
 	if len(prior) > 0 {
 		note = fmt.Sprintf("local %d/%d", len(prior), total)
 	}
 	if len(rows) > 0 {
 		prog := newProgress(r, jid, "local", len(prior))
-		nErr := r.runLocal(cfg, rows, prog, shouldStop)
+		nErr := r.runLocal(jid, cfg, rows, prog, shouldStop)
 		localErr += nErr
 		r.job(jid, db.JobFields{"done": prog.n(), "errors": localErr})
 		note = fmt.Sprintf("local %d/%d", prog.n(), total)
@@ -570,6 +575,9 @@ func (r *Runner) scanLocal(jid int64, cfg pj.Obj, paths []string, opts pj.Obj, s
 	return &localResult{localErr, note}, nil
 }
 
+// localWorkersEvery is how often a running local stage re-reads analyzer_slots and the pool's size.
+var localWorkersEvery = 5 * time.Second
+
 // Device reports where detection runs, when the local stage knows; set by the server from the analyzer's health.
 var Device func() any
 
@@ -580,9 +588,20 @@ func (r *Runner) device() any {
 	return nil
 }
 
+// localWorkers is how many images the local stage has in flight, for its stage info: the config's workers, or with
+// an analyzer pool, its slots now (after applying the config's analyzer_slots) and the pods they are on.
+func (r *Runner) localWorkers(cfg pj.Obj) pj.Obj {
+	if r.Slots == nil {
+		return pj.Obj{"workers": max(1, pj.Int(pj.Or(cfg["workers"], 4.0)))}
+	}
+	r.Slots.SetPerPod(pj.Int(pj.Or(cfg["analyzer_slots"], 0.0)))
+	pods, slots := r.Slots.Capacity()
+	return pj.Obj{"workers": slots, "pods": pods}
+}
+
 // runLocal analyzes images concurrently (cfg workers, or as many as there are analyzer slots) and stores the results;
 // returns how many failed.
-func (r *Runner) runLocal(cfg pj.Obj, rows []db.Image, prog *progress, shouldStop func() bool) int {
+func (r *Runner) runLocal(jid int64, cfg pj.Obj, rows []db.Image, prog *progress, shouldStop func() bool) int {
 	workers := max(1, pj.Int(pj.Or(cfg["workers"], 4.0)))
 	if r.Slots != nil {
 		workers = max(1, r.Slots.Max())
@@ -596,6 +615,21 @@ func (r *Runner) runLocal(cfg pj.Obj, rows []db.Image, prog *progress, shouldSto
 		case <-stopCtx.Done():
 		}
 	}()
+	if r.Slots != nil {
+		// The pool grows and shrinks under its HPA, and analyzer_slots may be changed mid-job: keep both current.
+		go func() {
+			t := time.NewTicker(localWorkersEvery)
+			defer t.Stop()
+			for {
+				select {
+				case <-stopCtx.Done():
+					return
+				case <-t.C:
+					r.stage(jid, "local", r.localWorkers(r.Config()))
+				}
+			}
+		}()
+	}
 	work := make(chan db.Image)
 	var nErr atomic.Int64
 	var wg sync.WaitGroup

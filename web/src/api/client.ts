@@ -206,7 +206,7 @@ export interface Job {
 }
 export interface JobStage {
   started: number; finished?: number; total?: number; done?: number; errors?: number; files?: number;
-  workers?: number; device?: string | null; backend?: string; model?: string; concurrency?: number; base_url?: string | null;
+  workers?: number; pods?: number; device?: string | null; backend?: string; model?: string; concurrency?: number; base_url?: string | null;
   skipped?: number;            // vlm: images left out at local tier 0 (skip nobody-in-focus)
 }
 export interface VlmUsage {
@@ -262,6 +262,9 @@ export interface Health {
   ok: boolean; version: string; photos_root: string; workdir: string; device: string | null;
   backend: string; ollama: string | null; current_job: number | null;
   database?: 'sqlite' | 'postgres'; analyzer?: boolean;
+  /** With a pool of analyzer pods (null with a single analyzer): pods, their slots in all, one pod's own
+   * ANALYZER_SLOTS, and the config's per-pod override when set. */
+  analyzer_pods?: number | null; analyzer_slots?: number | null; analyzer_pod_slots?: number | null; analyzer_slots_per_pod?: number | null;
 }
 
 /** A pose model the analyzer can run (GET /api/models). */

@@ -26,6 +26,12 @@ def slots() -> int:
     return len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else (os.cpu_count() or 1)
 
 
+# Each session holds a decoded full-resolution image (hundreds of MB), and the backend only has `slots` in flight here,
+# so anything past a couple per slot is a measure whose finalize never came (the backend failed in between). Evict
+# those rather than let them pile up to SESSION_MAX and OOM the pod.
+MS.sessions.max = 2 * slots()
+
+
 def _missing(path: str):
     if PHOTOS_ROOT and not Path(path).resolve().is_relative_to(Path(PHOTOS_ROOT).resolve()):
         raise HTTPException(403, f"outside the photos root: {path}")

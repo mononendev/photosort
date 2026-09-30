@@ -16,7 +16,9 @@ RUN uv pip install --system --index-url https://download.pytorch.org/whl/cpu tor
  && uv pip uninstall --system opencv-python \
  && uv pip install --system --reinstall opencv-python-headless  # ultralytics pulls the GUI build; they share cv2/
 WORKDIR /build
-COPY analyzer/photosort_analyzer ./photosort_analyzer
+# Only what the conversion imports, so edits to the rest of the package keep this stage (and torch) cached.
+COPY analyzer/photosort_analyzer/__init__.py analyzer/photosort_analyzer/models.py \
+     analyzer/photosort_analyzer/weights.py ./photosort_analyzer/
 RUN PHOTOSORT_MODELS=/app/weights python -m photosort_analyzer.models get ${POSE_MODELS} \
  && PHOTOSORT_MODELS=/app/weights python -c "from photosort_analyzer.weights import weights_path; \
 print(weights_path('face_detection_yunet_2023mar.onnx'))" \

@@ -5,7 +5,9 @@ go 1.27.1
 require (
 	github.com/anthropics/anthropic-sdk-go v1.75.0
 	github.com/jackc/pgx/v5 v5.11.0
+	github.com/spf13/cobra v1.10.2
 	golang.org/x/image v0.46.0
+	golang.org/x/sync v0.23.0
 	google.golang.org/genai v1.71.0
 	modernc.org/sqlite v1.59.0
 )
@@ -32,7 +34,6 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/standard-webhooks/standard-webhooks/libraries v0.0.1 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
@@ -43,7 +44,6 @@ require (
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	golang.org/x/crypto v0.40.0 // indirect
 	golang.org/x/net v0.41.0 // indirect
-	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect

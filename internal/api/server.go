@@ -39,6 +39,7 @@ type Server struct {
 	debugMu    sync.Mutex
 	debugCache []debugEntry // focus-debug results for a few recent images
 	device     sync.Map     // analyzer health, refreshed in the background
+	fulls      fullCache    // full-resolution renders for the viewer's tiles
 }
 
 // HTTPError is an error with a status; the body is FastAPI's {"detail": ...}.
@@ -131,6 +132,7 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("GET /media/frame/{id}", s.media(""))
 	m.HandleFunc("GET /media/crop/{id}", s.media("_crop"))
 	m.HandleFunc("GET /media/full/{id}", s.full)
+	m.HandleFunc("GET /media/tile/{id}", s.tile)
 
 	route("GET /api/config", s.getConfig)
 	route("GET /api/config/defaults", func(*http.Request) (any, error) { return config.Defaults(), nil })

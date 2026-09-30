@@ -916,38 +916,17 @@ func (s *Server) serveCached(w http.ResponseWriter, r *http.Request, p string) {
 	http.ServeContent(w, r, "", st.ModTime(), f)
 }
 
-// full is the original at native resolution for the zoomable viewer; rendered once, then served from the cache.
+// full is the original at native resolution; the zoomable viewer loads it in tiles (tiles.go) instead.
 func (s *Server) full(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err != nil {
 		writeJSON(w, 422, map[string]any{"detail": err.Error()})
 		return
 	}
-	p := filepath.Join(s.CacheDir, itoa(id)+"_full.jpg")
-	if _, err := os.Stat(p); err != nil {
-		row, err := s.DB.Row(id)
-		if err != nil {
-			writeJSON(w, 404, map[string]any{"detail": "Not Found"})
-			return
-		}
-		if _, err := os.Stat(row.Path); err != nil {
-			writeJSON(w, 404, map[string]any{"detail": "Not Found"})
-			return
-		}
-		if s.Analyzer == nil {
-			writeJSON(w, 503, map[string]any{"detail": "the analyzer is not running"})
-			return
-		}
-		b, err := s.Analyzer.RenderFull(r.Context(), row.Path, s.cfg()["exposure"], 92)
-		if err != nil {
-			writeJSON(w, 502, map[string]any{"detail": err.Error()})
-			return
-		}
-		os.MkdirAll(s.CacheDir, 0o755)
-		tmp := fmt.Sprintf("%s.%d.%d.tmp", p, os.Getpid(), time.Now().UnixNano())
-		if err := os.WriteFile(tmp, b, 0o644); err == nil {
-			os.Rename(tmp, p)
-		}
+	p, err := s.ensureFull(r.Context(), id)
+	if err != nil {
+		writeHTTPError(w, err)
+		return
 	}
 	s.serveCached(w, r, p)
 }

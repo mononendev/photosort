@@ -421,6 +421,9 @@ export const frameUrl = (id: number) => `/media/frame/${id}`;
 export const cropUrl = (id: number) => `/media/crop/${id}`;
 /** The original at native resolution (rendered on first request, then cached). */
 export const fullUrl = (id: number) => `/media/full/${id}`;
+/** A TILE_SIZE-square piece of the full-resolution render, downscaled 2^z (z = 0 is native); see internal/api/tiles.go. */
+export const tileUrl = (id: number, z: number, x: number, y: number) => `/media/tile/${id}?z=${z}&x=${x}&y=${y}`;
+export const TILE_SIZE = 512;
 
 /** Your cull ratings, in key order (q w e r t). 0-3 are the focus tiers; 4 is a banger, which only you give.
  * Exported as these color labels. */

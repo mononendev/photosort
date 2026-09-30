@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { frameUrl, fullUrl } from '../api/client';
+import { frameUrl, tileUrl, TILE_SIZE } from '../api/client';
 import type { DetectResult, FocusDebug, LocalResult } from '../api/client';
 import type { Grade, Layer } from '../lib/pose';
 import useHotkeys from '../hooks/useHotkeys';
@@ -9,7 +9,26 @@ import { HoverBar, OverlaySvg } from './FrameOverlay';
 import type { Hover } from './FrameOverlay';
 
 const MAX_ZOOM = 40;
-const FRAME_LONG_EDGE = 1568;   // the cached frame; past this on screen we swap in the full-resolution render
+const FRAME_LONG_EDGE = 1568;   // the cached frame; past this on screen we lay the full-resolution tiles over it
+const MAX_TILE_Z = 6;           // the server's maxTileZoom
+const TILE_PAD = 128;           // screen px beyond the stage edges whose tiles load too, so a small pan finds them ready
+
+type Tile = { key: string; z: number; left: number; top: number; width: number; height: number; url: string };
+
+/** The tiles of level z (each TILE_SIZE << z native px) that fall within the stage, placed in image-box px. */
+const visibleTiles = (id: number, z: number, W: number, H: number, scale: number, view: View, box: { w: number; h: number }): Tile[] => {
+  const n = TILE_SIZE * 2 ** z;
+  const out: Tile[] = [];
+  const x0 = Math.max(0, Math.floor((-view.ox - TILE_PAD) / scale / n)), x1 = Math.min(Math.ceil(W / n), Math.ceil((box.w - view.ox + TILE_PAD) / scale / n));
+  const y0 = Math.max(0, Math.floor((-view.oy - TILE_PAD) / scale / n)), y1 = Math.min(Math.ceil(H / n), Math.ceil((box.h - view.oy + TILE_PAD) / scale / n));
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+    // Rounded edges, so neighbours meet on the same pixel with no hairline between them.
+    const left = Math.round(x * n * scale), top = Math.round(y * n * scale);
+    out.push({ key: `${z}/${x}/${y}`, z, left, top, url: tileUrl(id, z, x, y),
+      width: Math.round(Math.min(W, (x + 1) * n) * scale) - left, height: Math.round(Math.min(H, (y + 1) * n) * scale) - top });
+  }
+  return out;
+};
 
 // The stage fills the screen; the toolbar and the hover readout float over it (fixed height), so nothing they show can
 // resize the stage and shift the zoom. Fit-to-screen leaves room for them (the toolbar is measured: it wraps on phones).
@@ -47,7 +66,7 @@ export default function FrameViewer({ id, name, l, grades, layers, selected, onS
   const [box, setBox] = useState({ w: 0, h: 0, t: INSET_T });
   const [view, setView] = useState<View>({ zoom: 1, ox: 0, oy: 0 });
   const [hover, setHover] = useState<Hover>(null);
-  const [loadedFor, setLoadedFor] = useState<number | null>(null);
+  const [tileState, setTileState] = useState<{ id: number; m: Map<string, boolean> }>({ id, m: new Map() });   // key → loaded (false: failed)
   const drag = useRef<{ x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
   const dragged = useRef(false);
   const selectUnlessDragged = useCallback((i: number) => { if (!dragged.current) onSelect(i); }, [onSelect]);
@@ -145,7 +164,20 @@ export default function FrameViewer({ id, name, l, grades, layers, selected, onS
   const [fullFor, setFullFor] = useState<number | null>(null);
   if (wantFull && fullFor !== id) setFullFor(id);       // once requested, keep it for this image
   const showFull = fullFor === id;
-  const fullLoaded = loadedFor === id;
+
+  // Only the tiles on screen come down, at the coarsest level that still gives a device pixel per image pixel.
+  const tiles = tileState.id === id ? tileState.m : new Map<string, boolean>();
+  const z = Math.max(0, Math.min(MAX_TILE_Z, Math.floor(Math.log2(1 / (scale * (window.devicePixelRatio || 1))))));
+  const current = showFull && fit > 0 ? visibleTiles(id, z, W, H, scale, view, box) : [];
+  // Loaded tiles of the neighbouring levels stay underneath while this level's arrive, so a zoom doesn't flash blurry.
+  const under = showFull && fit > 0 ? [z + 1, z - 1].filter((k) => k >= 0 && k <= MAX_TILE_Z)
+    .flatMap((k) => visibleTiles(id, k, W, H, scale, view, box).filter((t) => tiles.get(t.key))) : [];
+  const onTile = (key: string, ok: boolean) => setTileState((s) => {
+    const m = new Map(s.id === id ? s.m : []);
+    m.set(key, ok);
+    return { id, m };
+  });
+  const pending = current.filter((t) => !tiles.has(t.key)).length, failed = current.some((t) => tiles.get(t.key) === false);
 
   return createPortal(
     <div ref={root} tabIndex={-1} className="fixed inset-0 z-[60] bg-black/95 outline-none">
@@ -211,8 +243,11 @@ export default function FrameViewer({ id, name, l, grades, layers, selected, onS
         {fit > 0 && (
           <div className="absolute" style={{ left: view.ox, top: view.oy, width: W * scale, height: H * scale }}>
             <img src={frameUrl(id)} alt="" draggable={false} className="absolute inset-0 w-full h-full" />
-            {showFull && <img src={fullUrl(id)} alt="" draggable={false} onLoad={() => setLoadedFor(id)}
-              className={`absolute inset-0 w-full h-full ${fullLoaded ? '' : 'opacity-0'}`} style={{ imageRendering: scale > 2 ? 'pixelated' : 'auto' }} />}
+            {[...under, ...current].map((t) => (
+              <img key={t.key} src={t.url} alt="" draggable={false} onLoad={() => onTile(t.key, true)} onError={() => onTile(t.key, false)}
+                className={`absolute max-w-none ${tiles.get(t.key) ? '' : 'opacity-0'}`}
+                style={{ left: t.left, top: t.top, width: t.width, height: t.height, imageRendering: scale > 2 ? 'pixelated' : 'auto' }} />
+            ))}
             <OverlaySvg l={l} grades={grades} layers={layers} selected={selected} heat={heat} setHover={setHover} compare={compare}
               zoom={0.4 + 0.6 * view.zoom} onSelect={selectUnlessDragged} />
           </div>
@@ -223,7 +258,7 @@ export default function FrameViewer({ id, name, l, grades, layers, selected, onS
         {bar}
         <span className="ml-auto flex items-center gap-2 text-xs text-gray-400">
           <span className="hidden sm:inline font-mono w-32 text-right whitespace-nowrap" title="screen pixels per original pixel">{fit ? `${Math.round(scale * 100)}% of native` : ''}</span>
-          <span className="hidden sm:inline text-gray-500 w-28 whitespace-nowrap">{showFull && !fullLoaded ? 'loading full res…' : showFull ? 'full resolution' : ''}</span>
+          <span className="hidden sm:inline text-gray-500 w-28 whitespace-nowrap">{!showFull ? '' : failed ? 'full res failed' : pending ? 'loading full res…' : 'full resolution'}</span>
           <button onClick={() => zoomAt(1 / 1.5, box.w / 2, box.h / 2)} className="px-2.5 py-1 sm:px-2 sm:py-0 rounded border border-gray-700 hover:border-gray-500 active:bg-gray-800">−</button>
           <button onClick={() => zoomAt(1.5, box.w / 2, box.h / 2)} className="px-2.5 py-1 sm:px-2 sm:py-0 rounded border border-gray-700 hover:border-gray-500 active:bg-gray-800">+</button>
           <button onClick={() => { const el = stage.current; if (el) { const k = 1 / scale; zoomAt(k, el.clientWidth / 2, el.clientHeight / 2); } }}

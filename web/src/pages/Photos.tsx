@@ -89,7 +89,7 @@ export default function Photos() {
         </button>
       </div>
       <div className={`${showFilters ? 'grid' : 'hidden'} grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center animate-[menu-in_120ms_ease-out] sm:animate-none`}>
-        <input value={filters.folder} onChange={(e) => set('folder', e.target.value)} placeholder="folder (relative to photos root)" className={`${sel} col-span-2 sm:w-72`} />
+        <input value={filters.folder} onChange={(e) => set('folder', e.target.value)} placeholder="folder (any part of its name or path)" className={`${sel} col-span-2 sm:w-72`} />
         <label className="order-last sm:order-none text-sm sm:text-xs text-gray-400 flex items-center gap-1.5 sm:gap-1 py-1 sm:py-0"><input type="checkbox" checked={filters.recursive} onChange={(e) => set('recursive', e.target.checked ? undefined : 'false')} /> <Tip tip="Include photos in subfolders of the folder above. Off shows only that folder's own files.">recursive</Tip></label>
         <Tip plain tip="Filters on the tier each tile shows: your call if you set one, otherwise the tier from the focus_source setting (vision model by default, local until the model has run)."><select value={filters.tier ?? ''} onChange={(e) => set('tier', e.target.value)} className={`${sel} w-full sm:w-auto`}>
           <option value="">any focus</option>{[...TIERS].reverse().map((t) => <option key={t} value={t}>{t} · {TIER_LABEL[t]}</option>)}

@@ -217,7 +217,7 @@ export default function Review() {
           ))}
         </div>
         <label className={check}><input type="checkbox" checked={filters.reviewed === false} disabled={!!sp.get('rating')} onChange={(e) => set('rated', e.target.checked ? undefined : 'all')} /> hide photos you've rated</label>
-        <DraftInput value={filters.folder ?? ''} onCommit={(v) => set('folder', v)} placeholder="folder (relative to photos root)" className={sel} />
+        <DraftInput value={filters.folder ?? ''} onCommit={(v) => set('folder', v)} placeholder="folder (any part of its name or path)" className={sel} />
         <label className={check}><input type="checkbox" checked={filters.recursive} onChange={(e) => set('recursive', e.target.checked ? undefined : 'false')} /> include subfolders</label>
         <DraftInput value={filters.q ?? ''} onCommit={(v) => set('q', v)} placeholder="search name, keywords, description, notes" className={sel} />
       </>,

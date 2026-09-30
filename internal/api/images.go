@@ -292,6 +292,81 @@ func boolLit(b bool) string {
 	return "FALSE"
 }
 
+// folderFilter is the WHERE clause for the folder filter. A path that names a tracked folder (or one above tracked
+// folders) selects it exactly, as before. Anything else is a fuzzy match on the tracked folders' paths below the
+// photos root: every word of it must appear, ignoring case and treating _ and - as spaces, so "wedding" or
+// "2024 jen" finds 2024/Jen_Wedding. Without recursive, only the shallowest matching folders count (a match's
+// subfolders match too, since their paths contain it).
+func (s *Server) folderFilter(folder string, recursive bool) (string, []any, error) {
+	d := s.DB.D
+	rows, err := s.DB.Query("SELECT DISTINCT folder FROM images WHERE folder IS NOT NULL")
+	if err != nil {
+		return "", nil, err
+	}
+	var all []string
+	for rows.Next() {
+		var f string
+		if err := rows.Scan(&f); err != nil {
+			rows.Close()
+			return "", nil, err
+		}
+		all = append(all, f)
+	}
+	rows.Close()
+	if base, err := s.safePath(folder); err == nil {
+		for _, f := range all {
+			if f == base || strings.HasPrefix(f, strings.TrimRight(base, "/")+"/") {
+				if recursive {
+					w, a := d.UnderFolder(base, "folder")
+					return w, a, nil
+				}
+				return "folder = ?", []any{base}, nil
+			}
+		}
+	}
+	root := strings.TrimRight(resolve(s.PhotosRoot), "/")
+	if strings.HasPrefix(folder, root+"/") {
+		folder = folder[len(root)+1:]
+	}
+	var args []any
+	for _, f := range fuzzyFolders(folder, root, all, recursive) {
+		args = append(args, f)
+	}
+	if len(args) == 0 {
+		return "FALSE", nil, nil
+	}
+	return "folder IN (" + strings.TrimSuffix(strings.Repeat("?, ", len(args)), ", ") + ")", args, nil
+}
+
+// fuzzyFolders are the folders (absolute) whose path below root contains every word of query; see folderFilter.
+func fuzzyFolders(query, root string, folders []string, recursive bool) []string {
+	norm := strings.NewReplacer("_", " ", "-", " ").Replace
+	words := strings.Fields(norm(strings.ToLower(strings.Trim(query, "/"))))
+	matches := func(rel string) bool {
+		rel = norm(strings.ToLower(rel))
+		for _, w := range words {
+			if !strings.Contains(rel, w) {
+				return false
+			}
+		}
+		return true
+	}
+	var out []string
+	for _, f := range folders {
+		rel := strings.TrimPrefix(strings.TrimPrefix(f, root), "/")
+		if !matches(rel) {
+			continue
+		}
+		if !recursive {
+			if parent := filepath.Dir(rel); parent != "." && parent != "/" && matches(parent) {
+				continue
+			}
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
 // imageFilter is the WHERE clause (and its args) for the image filters in r's query: the Photos page's filters, shared
 // by the list and by untrack.
 func (s *Server) imageFilter(r *http.Request) (string, []any, error) {
@@ -320,17 +395,12 @@ func (s *Server) imageFilter(r *http.Request) (string, []any, error) {
 	}
 	finalTier := d.FinalTier(s.focusSource(cfg))
 
-	if folder := q.Get("folder"); folder != "" {
-		base, err := s.safePath(folder)
+	if folder := strings.TrimSpace(q.Get("folder")); folder != "" {
+		w, a, err := s.folderFilter(folder, bools["recursive"] == nil || *bools["recursive"])
 		if err != nil {
 			return "", nil, err
 		}
-		if b := bools["recursive"]; b == nil || *b {
-			w, a := d.UnderFolder(base, "folder")
-			f.add(w, a...)
-		} else {
-			f.add("folder = ?", base)
-		}
+		f.add(w, a...)
 	}
 	switch q.Get("status") {
 	case "pending":

@@ -129,3 +129,63 @@ def test_dedup_keeps_overlapping_people_with_distinct_heads():
     behind = _det((600, 250, 1100, 1300), 0.8, [(850, 330), (830, 320), (870, 320)])
     assert len(local.dedup_detections([front, behind], {})) == 2
 
+
+
+def _pose(**kps):
+    """A pose detection with the given COCO keypoints as name=(x, y, conf); the rest unseen."""
+    names = ["nose", "leye", "reye", "lear", "rear", "lsho", "rsho", "lelb", "relb", "lwri", "rwri",
+             "lhip", "rhip", "lkne", "rkne", "lank", "rank"]
+    kp, kpc = [[0.0, 0.0] for _ in names], [0.0] * len(names)
+    for n, (x, y, c) in kps.items():
+        kp[names.index(n)], kpc[names.index(n)] = [x, y], c
+    return {"box": [0, 0, 100, 100], "conf": 0.9, "kp": kp, "kpc": kpc}
+
+
+# IMG_1061: rider's head turned down and to the side, one eye under the helmet brim (scale 1, full-res pixels).
+SIDE_ON = dict(nose=(1297, 574, 0.973), leye=(1314, 499, 0.961), reye=(1252, 532, 0.155),
+               lear=(1432, 358, 0.893), rear=(1291, 441, 0.005))
+SIDE_ON_FACE = {"eyes": [(1358, 460), (1434, 458)]}   # YuNet's frontal-template eyes, both on the cheek
+
+
+def test_head_view_side_on_from_one_hidden_eye():
+    hv = local.head_view(_pose(**SIDE_ON), 1.0)
+    assert hv["view"] == "profile" and hv["near"] == (1314, 499)
+    assert 120 < hv["iod"] < 160   # from eye-ear and eye-nose distances
+
+
+def test_head_view_side_on_when_the_nose_is_past_an_eye():
+    # The pose model places the hidden eye with confidence, but the nose sits beyond it: side-on all the same.
+    hv = local.head_view(_pose(nose=(95, 110, 0.9), reye=(100, 100, 0.8), leye=(140, 100, 0.9), lear=(190, 105, 0.9)), 1.0)
+    assert hv["view"] == "profile" and hv["near"] == (140, 100)
+
+
+def test_head_view_frontal_and_three_quarter():
+    eyes = dict(reye=(100, 100, 0.9), leye=(140, 100, 0.9))
+    assert local.head_view(_pose(**eyes, nose=(120, 120, 0.9), lear=(160, 105, 0.9), rear=(80, 105, 0.9)), 1.0)["view"] == "frontal"
+    assert local.head_view(_pose(**eyes, nose=(128, 120, 0.9), lear=(160, 105, 0.9), rear=(80, 105, 0.05)), 1.0)["view"] == "turned"
+    assert local.head_view(_pose(**eyes, nose=(133, 120, 0.9)), 1.0)["view"] == "turned"
+    assert local.head_view(_pose(nose=(120, 120, 0.9)), 1.0) is None   # no eye seen: nothing to say
+
+
+def test_face_eyes_must_sit_on_the_pose_eyes_unless_the_face_is_sure():
+    pose = _pose(reye=(100, 100, 0.9), leye=(140, 100, 0.9))
+    assert local.face_agrees({"eyes": [(110, 120), (148, 118)], "score": 0.7}, pose, 1.0)    # off, but within an IOD
+    vents = {"eyes": [(100, 40), (140, 42)], "score": 0.7}                                  # helmet vents above the eyes
+    assert not local.face_agrees(vents, pose, 1.0)
+    assert local.face_agrees({**vents, "score": 0.9}, pose, 1.0)        # a confident face wins: pose eyes slid down
+    assert local.face_agrees(vents, _pose(reye=(30, 30, 0.2), leye=(10, 10, 0.1)), 1.0)   # unconfident pose: no evidence
+
+
+def test_eye_metrics_judge_a_side_on_head_on_its_visible_eye():
+    from photosort_analyzer import measure as MS
+
+    class Faces:
+        def face(self, *a):
+            return {"eyes": SIDE_ON_FACE["eyes"], "score": 0.7, "lm": SIDE_ON_FACE["eyes"] + [(1398, 557)] * 3,
+                    "box": [1248, 288, 1532, 665], "search": [398, 0, 2297, 1426]}
+    rng = np.random.default_rng(0)
+    gray = rng.random((800, 1800)).astype(np.float32)
+    e = MS._eye_metrics(_pose(**SIDE_ON), (1031, 160, 1664, 793), 1.0, None, gray, 1800, 800, Faces())
+    assert e["eye_view"] == "profile" and e["eye_src"] == "pose" and e["eyes"] == [[1314, 499]]
+    x0, y0, x1, y1 = e["eye"]
+    assert x0 < 1314 < x1 and y0 < 499 < y1 and e["face"]["rejected"] == "profile"

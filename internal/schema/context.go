@@ -108,7 +108,11 @@ func ContextText(local pj.Obj) (string, error) {
 			if p["eye_src"] == "face" {
 				src = "face landmarks"
 			}
-			lines = append(lines, fmt.Sprintf("Eye band (both eyes, located by %s): sharpness %s, fine-detail energy ratio %s. This is what decides focus.",
+			what := "Eye band (both eyes, located by %s)"
+			if eyes, _ := p["eyes"].([]any); len(eyes) == 1 {
+				what = "Eye box (one eye, the head is side-on; located by %s)"
+			}
+			lines = append(lines, fmt.Sprintf(what+": sharpness %s, fine-detail energy ratio %s. This is what decides focus.",
 				src, py.Str(p["sharp_eye"]), py.Str(p["hf_eye"])))
 		} else {
 			lines = append(lines, "Eyes not located (helmet, visor, turned away, or too small); judge the head.")

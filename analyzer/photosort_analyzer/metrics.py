@@ -265,11 +265,97 @@ def eye_band(e1, e2, W: int, H: int) -> Optional[tuple]:
     return _clamp_box((min(xs) - 0.5 * iod, min(ys) - 0.4 * iod, max(xs) + 0.5 * iod, max(ys) + 0.4 * iod), W, H)
 
 
+def eye_box(e, iod: float, W: int, H: int) -> Optional[tuple]:
+    """Box over one eye, lids and lashes, for a head turned so only that eye shows: as wide as the two-eye band is
+    tall less a little (0.7 of an inter-eye distance): enough that the pose keypoint's slop still lands it on the
+    eye, small enough to keep a helmet brim or hairline out of the corners."""
+    if iod < 8:
+        return None
+    r = 0.35 * iod
+    return _clamp_box((e[0] - r, e[1] - r, e[0] + r, e[1] + r), W, H)
+
+
 def _pose_eyes(det: dict, scale: float, min_conf: float = 0.5):
     kp, kpc = det.get("kp"), det.get("kpc")
     if kp is None or kpc is None or kpc[LEYE] < min_conf or kpc[REYE] < min_conf:
         return None
     return (kp[REYE][0] * scale, kp[REYE][1] * scale), (kp[LEYE][0] * scale, kp[LEYE][1] * scale)
+
+
+SEEN, HIDDEN = 0.5, 0.3   # pose keypoint confidence: at or above SEEN it's visible, below HIDDEN it's occluded
+
+
+def head_view(det: dict, scale: float) -> Optional[dict]:
+    """How far the head is turned from the camera, from the pose keypoints, or None when the pose model doesn't see
+    an eye (the back of the head, or too small to say). {"view": "frontal" | "turned" | "profile", "near": the eye
+    nearest the camera as (x, y) in full-res pixels, "iod": an inter-eye distance estimate in px, or None}.
+
+    profile  one eye seen and the other hidden; or both "seen" (the pose model often places the hidden eye) but the
+             nose sits at or past one of them along the eye line, which a face only does side-on. Then the far eye
+             is behind the nose bridge, so only the near one can be judged.
+    turned   both eyes seen, but one ear hidden or the nose well off-center between the eyes: a three-quarter view.
+             Both eyes show, so a two-eye band still works.
+    frontal  everything else with two seen eyes.
+
+    The face landmark model can't tell this itself: on a side-on face it still places its five points in the
+    frontal layout it was trained on."""
+    kp, kpc = det.get("kp"), det.get("kpc")
+    if kp is None or kpc is None:
+        return None
+    pt = lambda i: (kp[i][0] * scale, kp[i][1] * scale)
+    seen = lambda i: kpc[i] >= SEEN
+    hidden = lambda i: kpc[i] < HIDDEN
+    dist = lambda a, b: float(np.hypot(a[0] - b[0], a[1] - b[1]))
+
+    def one_eye(eye, ear):
+        # Side-on, eye to ear (tragus) is about 1.2 inter-eye distances and eye to nose tip about 0.6.
+        ests = ([dist(pt(eye), pt(ear)) / 1.2] if seen(ear) else []) + ([dist(pt(eye), pt(NOSE)) / 0.6] if seen(NOSE) else [])
+        return {"view": "profile", "near": pt(eye), "iod": float(np.median(ests)) if ests else None}
+
+    for eye, other, ear in ((LEYE, REYE, LEAR), (REYE, LEYE, REAR)):
+        if seen(eye) and hidden(other):
+            return one_eye(eye, ear)
+    if not (seen(LEYE) and seen(REYE)):
+        return None
+    r, l = np.array(pt(REYE)), np.array(pt(LEYE))
+    iod = float(np.linalg.norm(l - r))
+    if iod < 1:
+        return None
+    t = None
+    if seen(NOSE):
+        # Where the nose falls along the eye line: 0 at the right eye, 1 at the left, 0.5 square-on.
+        t = float(np.dot(np.array(pt(NOSE)) - r, l - r) / iod ** 2)
+        if t < 0.1 or t > 0.9:
+            near, ear = (LEYE, LEAR) if t < 0.5 else (REYE, REAR)   # the far eye is the one by the nose
+            return one_eye(near, ear)
+    ears_lopsided = (seen(LEAR) and hidden(REAR)) or (seen(REAR) and hidden(LEAR))
+    view = "turned" if ears_lopsided or (t is not None and not 0.25 <= t <= 0.75) else "frontal"
+    return {"view": view, "near": None, "iod": iod}
+
+
+FACE_TRUST = 0.85   # a face scored this high keeps its eyes even where the pose model disagrees
+
+
+def face_agrees(face: dict, det: dict, scale: float, trust: float = FACE_TRUST) -> bool:
+    """Whether to take the face landmark eyes over the pose model's. They're kept when each eye the pose model is
+    confident of has a landmark eye within one inter-eye distance (or a few detector pixels, the keypoints' own
+    resolution): closer than that, the two agree and the landmarks are the finer of them.
+
+    Further apart, one of them is wrong, and the face score says which. On a library sample, faces scored 0.85 and
+    up were real (the pose eyes had slid down to a cheek, chin or chest), while below that the "face" was mostly
+    helmet vents or someone else in the background, with the pose eyes on the real ones. With no confident pose
+    eye there's nothing to check against."""
+    kp, kpc = det.get("kp"), det.get("kpc")
+    if kp is None or kpc is None or face.get("score", 0) >= trust:
+        return True
+    (ax, ay), (bx, by) = face["eyes"]
+    tol = max(float(np.hypot(ax - bx, ay - by)), 3 * scale)
+    for i in (LEYE, REYE):
+        if kpc[i] >= SEEN:
+            x, y = kp[i][0] * scale, kp[i][1] * scale
+            if min(np.hypot(ax - x, ay - y), np.hypot(bx - x, by - y)) > tol:
+                return False
+    return True
 
 
 def _iou(a, b) -> float:

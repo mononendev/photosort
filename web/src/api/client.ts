@@ -57,11 +57,13 @@ export interface Person {
   area_frac: number; center: number[]; center_dist: number;
   sharp_head: number | null; sharp_torso: number | null; sharp_body: number | null;
   eyes?: number[][] | null; eye_src?: 'face' | 'pose' | null; eye?: number[] | null;
+  /** How far the head is turned, from the pose keypoints; side-on ("profile") heads are judged on one eye */
+  eye_view?: 'frontal' | 'turned' | 'profile' | null;
   sharp_eye?: number | null; hf_eye?: number | null;
   /** COCO-17 pose keypoints [x, y, confidence] in full-res pixels (images analyzed after the overlay landed) */
   kp?: number[][] | null;
   /** YuNet face: box, 5 landmarks (right eye, left eye, nose, right/left mouth corner), the window it searched */
-  face?: { box: number[]; search: number[]; score: number; lm: number[][] } | null;
+  face?: { box: number[]; search: number[]; score: number; lm: number[][]; rejected?: 'profile' | 'off_pose' | null } | null;
   priority?: number;
   /** How strongly the camera's active AF points land on this person (head hit 2, torso 1.5, body 1 per point) */
   af_score?: number | null;

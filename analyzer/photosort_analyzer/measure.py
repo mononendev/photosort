@@ -159,27 +159,50 @@ def measure(req: dict, detector=None) -> dict:
 
 
 def _eye_metrics(det: dict, head, scale: float, rgb, gray, W: int, H: int, faces: Optional[M.FaceLandmarks]) -> dict:
-    """Locate the eyes (face landmarks first, then confident pose eye keypoints) and score the eye band."""
+    """Locate the eyes and score the region around them. A head side-on to the camera (see head_view) gets a box
+    over its one visible eye, from the pose keypoint. Otherwise a band over both: from the face landmarks when they
+    agree with the pose model's eyes, else from confident pose eye keypoints."""
     found = faces.face(rgb, head, W, H) if faces is not None else None
-    if found:
-        e1, e2, src = found["eyes"][0], found["eyes"][1], "face"
+    hv = M.head_view(det, scale)
+    view = hv["view"] if hv else None
+    eyes, src, band, why = [], None, None, None
+    if view == "profile":
+        near, src = hv["near"], "pose"
+        if found and found["score"] >= M.FACE_TRUST:
+            # A confident face places its eyes better than the pose keypoint does; take the one on the near side.
+            near = min(found["eyes"], key=lambda e: np.hypot(e[0] - near[0], e[1] - near[1]))
+            src = "face"
+        elif found:
+            why = "profile"
+        if hv["iod"]:
+            eyes = [near]
+            band = M.eye_box(near, hv["iod"], W, H)
+    elif found and M.face_agrees(found, det, scale):
+        eyes, src = list(found["eyes"]), "face"
     else:
+        if found:
+            why = "off_pose"
         pe = M._pose_eyes(det, scale)
-        e1, e2, src = (pe[0], pe[1], "pose") if pe else (None, None, None)
-    band = M.eye_band(e1, e2, W, H) if e1 else None
+        if pe:
+            eyes, src = list(pe), "pose"
+    if src and band is None and len(eyes) == 2:
+        band = M.eye_band(eyes[0], eyes[1], W, H)
     region = gray[band[1]:band[3], band[0]:band[2]] if band else None
     lt = M.sharpness_parts(region, M.EYE_MIN_PX) if band else None
     ht = M.hf_parts(region) if lt else None
     lap = M._ratio(lt)
     return {
-        "eyes": [[round(e1[0]), round(e1[1])], [round(e2[0]), round(e2[1])]] if lap is not None else None,
+        "eyes": [[round(x), round(y)] for x, y in eyes] if lap is not None else None,
         "eye_src": src if lap is not None else None, "eye": band if lap is not None else None,
+        "eye_view": view,
         "sharp_eye": lap, "hf_eye": ht["band_e"] / ht["total_e"] if ht else None,
         "terms_eye": M._sig({**lt, **(ht or {})}) if lt else None,
         # What the face model saw, kept for the UI overlay even when the band ended up unusable.
         "face": None if not found else {
             "box": [round(v) for v in found["box"]], "search": list(found["search"]), "score": round(found["score"], 3),
-            "lm": [[round(x), round(y)] for x, y in found["lm"]]},
+            "lm": [[round(x), round(y)] for x, y in found["lm"]],
+            # Why its eyes weren't used: "profile" (head side-on), "off_pose" (not where the pose model sees eyes).
+            "rejected": why},
     }
 
 

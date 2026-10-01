@@ -612,6 +612,12 @@ func eyesStage(local, cfg pj.Obj, people []pj.Obj, primary pj.Obj) *py.Object {
 	if pj.Truthy(face) {
 		faceIn = []any{kv("score", pj.Get(face, "score"))}
 		faceNote = nil
+		switch pj.Get(face, "rejected") {
+		case "profile":
+			faceNote = "not used: the head is side-on (pose keypoints), and there the face model's landmarks follow a frontal template; judged on the one visible eye"
+		case "off_pose":
+			faceNote = "not used: its eyes aren't where the pose model sees eyes; falls back to the pose eye keypoints"
+		}
 	}
 	ch.ask("Face model found this head's face?", face != nil, opts{rule: "face_conf = " + s(cget(cfg, "", "face_conf")),
 		inputs: faceIn, note: faceNote})

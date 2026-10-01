@@ -128,6 +128,9 @@ func Assemble(m, fin pj.Obj, people []pj.Obj, primaryBy string, af pj.Obj, afNot
 		for _, k := range []string{"eyes", "eye_src", "eye", "sharp_eye", "hf_eye", "face"} {
 			p[k] = e[k]
 		}
+		if v, ok := e["eye_view"]; ok { // analyzers before the head-turn check don't send it
+			p["eye_view"] = v
+		}
 		terms := pj.O(p, "terms")
 		if terms == nil {
 			terms = pj.Obj{}

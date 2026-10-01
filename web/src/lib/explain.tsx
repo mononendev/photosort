@@ -77,7 +77,7 @@ export function explainLocal(l: LocalResult, cfg: Cfg): ReactNode {
       <div><b>Local tier {l.local_tier}</b> ({l.local_reason}): {reason}.</div>
       <div className="text-gray-400">
         {onEyes
-          ? <>Judged on the band across both eyes, found by {p.eye_src === 'face' ? 'the face-landmark model' : "the pose model's eye keypoints (no face found)"}. Both metrics must clear a threshold for that tier.
+          ? <>{p.eyes?.length === 1 ? <>Judged on the one visible eye (the head is side-on), found by {p.eye_src === 'face' ? 'the face-landmark model' : "the pose model's eye keypoint"}.</> : <>Judged on the band across both eyes, found by {p.eye_src === 'face' ? 'the face-landmark model' : "the pose model's eye keypoints"}.</>} Both metrics must clear a threshold for that tier.
             {isEyewear(p, thr) && <> The band reads over {String(thr.eyewear_ratio)}× sharper than the head around it, which is what sunglasses or goggles do (their hard frame edges pass even when soft), so the head box must clear the tier as well.</>}</>
           : <>No eyes located (helmet, visor, turned away, or too small), so the head box decides on its own thresholds.</>}
       </div>
@@ -185,7 +185,7 @@ export const METRIC_TIPS = {
   fft: <>Share of the eye band's spectral energy in the upper-middle frequencies (0.25–0.75 of Nyquist). It drops faster than the Laplacian for the first bit of missed focus. The very top of the spectrum, where high-ISO noise lives, is left out.</>,
   eyeSrc: {
     face: <>The eyes were located by a face-landmark model (OpenCV YuNet), run on a native-resolution window around the head. This is the precise path.</>,
-    pose: <>The face model found no face, so the eyes come from the pose model's eye keypoints (confidence ≥ 0.5), mapped from the detection size. Coarser, but still the right area.</>,
+    pose: <>The face model found no face, or its eyes disagreed with the pose model's, or the head is side-on, so the eyes come from the pose model's eye keypoints (confidence ≥ 0.5), mapped from the detection size. Coarser, but still the right area.</>,
   } as Record<string, ReactNode>,
   noEyes: <>No eyes were located: helmet or visor, head turned away, sunglasses plus a small face, or the face too small (inter-eye distance &lt; 8 px). The head box decides instead.</>,
   head: <>Same Laplacian metric on a square box around the head keypoints. It includes hair, helmet, ears and background, so at shallow depth of field it can read soft even when the eyes are sharp, or the reverse.</>,

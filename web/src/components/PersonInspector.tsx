@@ -84,7 +84,7 @@ export const PersonInspector = memo(function PersonInspector({ l, cfg, grades, l
             </div>
           </Tip>
           <div className="text-[11px] text-gray-500">
-            head box via {p.head_src} · eyes via {p.eye_src ?? 'nothing (not located)'}{p.face ? ` · face score ${fmt(p.face.score)}` : ''}
+            head box via {p.head_src} · eyes via {p.eye_src ?? 'nothing (not located)'}{p.eye_view ? ` · head ${p.eye_view}` : ''}{p.face ? ` · face score ${fmt(p.face.score)}${p.face.rejected ? ` (not used: ${p.face.rejected === 'profile' ? 'side-on' : 'off the pose eyes'})` : ''}` : ''}
           </div>
           <div className="text-xs">
             grade <b style={{ color: TIER_COLOR[g.grade ?? 'none'] }}>{g.grade ?? '–'}</b>
@@ -162,7 +162,7 @@ export function FocusMath({ d, p, loading, error }: { d?: FocusDebug['people'][n
     <div className="space-y-4">
       {d.eye ? (
         <div className="space-y-2">
-          <div className="text-xs text-gray-300">Eye band <span className="text-gray-500">({p.eye_src === 'face' ? 'face landmarks' : 'pose keypoints'}, native pixels)</span></div>
+          <div className="text-xs text-gray-300">{p.eyes?.length === 1 ? 'Eye box' : 'Eye band'} <span className="text-gray-500">({p.eye_src === 'face' ? 'face landmarks' : 'pose keypoints'}, native pixels)</span></div>
           <div className="flex flex-wrap gap-3 items-start">
             <figure><img src={d.eye.img} alt="eye band" className="h-28 w-auto rounded" style={{ imageRendering: 'pixelated' }} /><figcaption className="text-[10px] text-gray-500">pixels</figcaption></figure>
             {d.eye.laplacian && <figure><img src={d.eye.laplacian.img} alt="laplacian" className="h-28 w-auto rounded" style={{ imageRendering: 'pixelated' }} /><figcaption className="text-[10px] text-gray-500">|Laplacian|: bright = edges</figcaption></figure>}

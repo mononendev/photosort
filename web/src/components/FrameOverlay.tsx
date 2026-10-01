@@ -73,7 +73,7 @@ export const OverlaySvg = memo(function OverlaySvg({ l, grades, layers, selected
         {on('eyes') && p.face && <>
           <rect x={p.face.search[0]} y={p.face.search[1]} width={boxW(p.face.search)} height={boxH(p.face.search)} stroke="#f9a8d4" {...stroke(1)} strokeDasharray="1 4" pointerEvents="none" />
           <rect x={p.face.box[0]} y={p.face.box[1]} width={boxW(p.face.box)} height={boxH(p.face.box)} stroke="#f472b6" {...stroke(1.25)}
-            {...hv(`Face · person #${i + 1}`, <>YuNet face score {fmt(p.face.score)}, found inside the dotted search window (head box × 3). Its eye landmarks place the eye band.</>)} />
+            {...hv(`Face · person #${i + 1}`, <>YuNet face score {fmt(p.face.score)}, found inside the dotted search window (head box × 3). {p.face.rejected === 'profile' ? 'Not used: the head is side-on, and on a side-on face its landmarks follow a frontal template.' : p.face.rejected === 'off_pose' ? "Not used: its eyes aren't where the pose model sees eyes." : 'Its eye landmarks place the eye band.'}</>)} />
           {p.face.lm.map(([x, y], j) => (
             <circle key={j} cx={x} cy={y} r={3.5 * u} fill="#f472b6" stroke="#000" {...{ vectorEffect: 'non-scaling-stroke' }} strokeWidth={1}
               {...hv(`Face landmark: ${FACE_LM[j]}`, <>({x}, {y}) px · person #{i + 1}</>)} />
@@ -81,11 +81,11 @@ export const OverlaySvg = memo(function OverlaySvg({ l, grades, layers, selected
         </>}
         {on('eyes') && p.eye && <>
           <rect x={p.eye[0]} y={p.eye[1]} width={boxW(p.eye)} height={boxH(p.eye)} stroke={gc} {...stroke(2)}
-            {...hv(`Eye band · person #${i + 1}`, <>
-              {boxW(p.eye)}×{boxH(p.eye)} px at native resolution, eyes from {p.eye_src === 'face' ? 'face landmarks' : 'pose keypoints'}<br />
+            {...hv(`${p.eyes?.length === 1 ? 'Eye box' : 'Eye band'} · person #${i + 1}`, <>
+              {boxW(p.eye)}×{boxH(p.eye)} px at native resolution, {p.eyes?.length === 1 ? `the one visible eye (head side-on), from ${p.eye_src === 'face' ? 'face landmarks' : 'the pose keypoint'}` : `eyes from ${p.eye_src === 'face' ? 'face landmarks' : 'pose keypoints'}`}<br />
               Laplacian {fmt(p.sharp_eye)} · FFT ratio {fmt(p.hf_eye)} → grade {g.onEyes ? g.grade ?? '–' : '– (not used)'}
             </>)} />
-          {p.eyes && <line x1={p.eyes[0][0]} y1={p.eyes[0][1]} x2={p.eyes[1][0]} y2={p.eyes[1][1]} stroke={gc} {...stroke(1)} strokeDasharray="3 3" pointerEvents="none" />}
+          {p.eyes?.length === 2 && <line x1={p.eyes[0][0]} y1={p.eyes[0][1]} x2={p.eyes[1][0]} y2={p.eyes[1][1]} stroke={gc} {...stroke(1)} strokeDasharray="3 3" pointerEvents="none" />}
         </>}
         {on('skeleton') && kp && <>
           {SKELETON.map(([a, b]) => {

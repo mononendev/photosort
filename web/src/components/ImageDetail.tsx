@@ -91,6 +91,8 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
   // Groups: a/s/d/f put the photo in group 1-4; the same key again takes it back out. Neither moves on.
   const myGroup = data?.group ?? null;
   const group = useCallback((g: number | null) => save({ id, o: g ? { group: g } : { clear_group: true } }), [save, id]);
+  // Keep: c marks a keeper, v a cull. Neither moves on.
+  const keep = useCallback((k: boolean) => save({ id, o: { keeper: k } }), [save, id]);
   useHotkeys({
     ...(onClose && { Escape: onClose }),
     ...(onNav && { ArrowRight: () => onNav(1), ArrowLeft: () => onNav(-1) }),
@@ -99,6 +101,8 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
     ...Object.fromEntries(STARS.map((n) => [String(n), (e: KeyboardEvent) => { if (!e.repeat) star(n); }])),
     '6': (e) => { if (!e.repeat && myStars != null) star(null); },
     ...Object.fromEntries(GROUPS.map((g) => [g.key, (e: KeyboardEvent) => { if (!e.repeat) group(myGroup === g.value ? null : g.value); }])),
+    c: (e) => { if (!e.repeat) keep(true); },
+    v: (e) => { if (!e.repeat) keep(false); },
   });
   const v = data?.vlm;
   const l = data?.local;
@@ -274,9 +278,9 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
                 ))}
               </div>
               <div className="flex flex-wrap gap-1 text-xs items-center">
-                <span className="text-gray-500 w-14">keep</span>
-                <button onClick={() => ov.mutate({ keeper: true })} className={`px-3 py-2 sm:px-2 sm:py-1 rounded border transition active:scale-95 ${data?.keeper === true ? 'border-emerald-500 bg-emerald-900/30' : 'border-gray-700'}`}>keeper</button>
-                <button onClick={() => ov.mutate({ keeper: false })} className={`px-3 py-2 sm:px-2 sm:py-1 rounded border transition active:scale-95 ${data?.keeper === false ? 'border-red-500 bg-red-900/30' : 'border-gray-700'}`}>cull</button>
+                <span className="text-gray-500 w-14"><Tip tip="Your verdict: keeper or cull. It overrides the model's everywhere, including the keeper filter and exports. Keys c (keeper) and v (cull). Doesn't move on to the next photo.">keep</Tip></span>
+                <button onClick={() => keep(true)} title="Keeper (c)" className={`px-3 py-2 sm:px-2 sm:py-1 rounded border transition active:scale-95 ${data?.keeper === true ? 'border-emerald-500 bg-emerald-900/30' : 'border-gray-700 hover:border-gray-500'}`}>keeper <kbd className="hidden sm:inline text-[10px] text-gray-500">c</kbd></button>
+                <button onClick={() => keep(false)} title="Cull (v)" className={`px-3 py-2 sm:px-2 sm:py-1 rounded border transition active:scale-95 ${data?.keeper === false ? 'border-red-500 bg-red-900/30' : 'border-gray-700 hover:border-gray-500'}`}>cull <kbd className="hidden sm:inline text-[10px] text-gray-500">v</kbd></button>
                 {data?.overridden && <button onClick={() => ov.mutate({ clear: true })} className="ml-auto text-gray-400 hover:text-white">reset</button>}
               </div>
               <div className="flex gap-1 text-xs">

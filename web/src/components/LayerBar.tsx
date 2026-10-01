@@ -4,14 +4,19 @@ import { LAYERS } from '../lib/pose';
 import type { Layer } from '../lib/pose';
 
 /** Overlay layer toggles, plus the sharpness-map legend when that layer is on. */
-export default function LayerBar({ layers, toggle, heat, heatLoading }: {
-  layers: Set<Layer>; toggle: (k: Layer) => void; heat?: FocusDebug['heatmap']; heatLoading?: boolean;
+export default function LayerBar({ layers, toggle, hidden, toggleHidden, heat, heatLoading }: {
+  layers: Set<Layer>; toggle: (k: Layer) => void; hidden: boolean; toggleHidden: () => void; heat?: FocusDebug['heatmap']; heatLoading?: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-1 text-xs">
+      <Tip plain tip="Hide or show every overlay at once (g). The layers you had on come back as they were.">
+        <button onClick={toggleHidden} className={`px-2 py-0.5 rounded border ${hidden ? 'border-amber-600 bg-amber-900/30 text-amber-200' : 'border-gray-700 text-gray-400 hover:border-gray-500'}`}>
+          {hidden ? 'overlays off' : 'overlays'} <kbd className="hidden sm:inline text-[10px] text-gray-500">g</kbd>
+        </button>
+      </Tip>
       {LAYERS.map((ly) => (
         <Tip key={ly.key} plain tip={ly.tip}>
-          <button onClick={() => toggle(ly.key)} className={`px-2 py-0.5 rounded border ${layers.has(ly.key) ? 'border-blue-500 bg-blue-900/40 text-gray-100' : 'border-gray-700 text-gray-500 hover:border-gray-500'}`}>{ly.label}</button>
+          <button onClick={() => toggle(ly.key)} className={`px-2 py-0.5 rounded border ${layers.has(ly.key) ? 'border-blue-500 bg-blue-900/40 text-gray-100' : 'border-gray-700 text-gray-500 hover:border-gray-500'} ${hidden ? 'opacity-40' : ''}`}>{ly.label}</button>
         </Tip>
       ))}
       {layers.has('heatmap') && (heatLoading ? <span className="text-gray-500 ml-1">computing…</span> : heat && (

@@ -11,6 +11,7 @@ import CompareBar from './CompareBar';
 import RatingsStrip from './RatingsStrip';
 import { FocusMath, PersonInspector } from './PersonInspector';
 import { gradePerson } from '../lib/pose';
+import type { Layer } from '../lib/pose';
 import useHotkeys from '../hooks/useHotkeys';
 import useStore from '../hooks/useStore';
 import { METRIC_TIPS, TIER_MEANING, explainDisagree, explainLocal, explainNoise, explainPrior, explainSplit, splitShort } from '../lib/explain';
@@ -51,6 +52,9 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
   const layerList = useStore((s) => s.layers);
   const layers = useMemo(() => new Set(layerList), [layerList]);
   const toggle = useStore((s) => s.toggleLayer);
+  const overlaysHidden = useStore((s) => s.overlaysHidden);
+  const toggleOverlays = useStore((s) => s.toggleOverlays);
+  const shown = useMemo(() => overlaysHidden ? new Set<Layer>() : layers, [overlaysHidden, layers]);   // what the frame draws
   const [full, setFull] = useState(false);
   const zoomRef = useRef(0);   // the fullscreen viewer's magnification, kept while stepping between photos
   const openFull = useCallback((s: number) => { zoomRef.current = s; setFull(true); }, []);
@@ -68,7 +72,7 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
   const [sel, setSel] = useState({ id, person: 0 });   // the inspected person resets when navigating to another image
   const person = sel.id === id ? sel.person : 0;
   const setPerson = useCallback((i: number) => setSel({ id, person: i }), [id]);
-  const needDebug = (layers.has('heatmap') || showMath) && !!data?.local;
+  const needDebug = (shown.has('heatmap') || showMath) && !!data?.local;
   const dbg = useQuery({ queryKey: ['focus-debug', id], queryFn: () => api.focusDebug(id), enabled: needDebug, staleTime: 5 * 60_000, retry: false });
   // The id travels with the mutation: rating advances to the next photo before the save lands.
   const ovm = useMutation({
@@ -103,6 +107,7 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
     ...Object.fromEntries(GROUPS.map((g) => [g.key, (e: KeyboardEvent) => { if (!e.repeat) group(myGroup === g.value ? null : g.value); }])),
     c: (e) => { if (!e.repeat) keep(true); },
     v: (e) => { if (!e.repeat) keep(false); },
+    g: (e) => { if (!e.repeat) toggleOverlays(); },
   });
   const v = data?.vlm;
   const l = data?.local;
@@ -130,7 +135,7 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
   const cmp = useQuery({ queryKey: ['detect', id, compareModel], queryFn: () => api.detect(id, compareModel!),
     enabled: !!compareModel && !!l, staleTime: Infinity, retry: false });
   const compare = compareModel ? cmp.data ?? null : null;
-  const layerBar = <div className="space-y-1"><LayerBar layers={layers} toggle={toggle} heat={heat} heatLoading={dbg.isFetching} />
+  const layerBar = <div className="space-y-1"><LayerBar layers={layers} toggle={toggle} hidden={overlaysHidden} toggleHidden={toggleOverlays} heat={heat} heatLoading={dbg.isFetching} />
     {l && <CompareBar l={l} result={compare} loading={cmp.isFetching} error={cmp.error ? String(cmp.error.message) : undefined} />}</div>;
   return (
     <div className={inline ? '' : 'fixed inset-0 z-50 flex'}>
@@ -166,8 +171,8 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
               Inline on a wide screen, people and focus math move to a left column and the frame grows. */}
           <div className={`space-y-3 min-w-0 md:col-start-1 md:row-start-1 ${inline ? WIDE.frame : ''}`}>
             {l && layerBar}
-            <FrameOverlay id={id} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} compare={compare} onOpen={() => openFull(0)} />
-            {full && l && <FrameViewer id={id} name={data?.rel ?? String(id)} l={l} grades={grades} layers={layers} selected={person} onSelect={setPerson} heat={heat} compare={compare} bar={layerBar}
+            <FrameOverlay id={id} l={l} grades={grades} layers={shown} selected={person} onSelect={setPerson} heat={heat} compare={overlaysHidden ? null : compare} onOpen={() => openFull(0)} />
+            {full && l && <FrameViewer id={id} name={data?.rel ?? String(id)} l={l} grades={grades} layers={shown} selected={person} onSelect={setPerson} heat={heat} compare={overlaysHidden ? null : compare} bar={layerBar}
               ratings={ratings} zoomRef={zoomRef} onClose={closeFull} onNav={onNav} />}
             {data?.has_crop && (
               <div className="flex flex-col sm:flex-row gap-3 items-start">

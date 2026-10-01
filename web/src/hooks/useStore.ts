@@ -12,6 +12,8 @@ interface AppState {
   setJobDefaults: (d: Partial<AppState['jobDefaults']>) => void;
   layers: Layer[];                         // overlay layers shown in the photo view
   toggleLayer: (k: Layer) => void;
+  overlaysHidden: boolean;                 // g hides every overlay layer at once; `layers` is kept for when they come back
+  toggleOverlays: () => void;
   showMath: boolean;                       // the photo view's focus-math panel is open
   setShowMath: (v: boolean) => void;
   compareModel: string | null;             // another pose model to draw over each photo, or none
@@ -28,7 +30,12 @@ const useStore = create<AppState>()(
       jobDefaults: { vlm: true, skip_tier0: false, rescan: false, revlm: false },
       setJobDefaults: (d) => set((s) => ({ jobDefaults: { ...s.jobDefaults, ...d } })),
       layers: DEFAULT_LAYERS,
-      toggleLayer: (k) => set((s) => ({ layers: s.layers.includes(k) ? s.layers.filter((x) => x !== k) : [...s.layers, k] })),
+      // While hidden, clicking a layer brings the overlays back with that layer on rather than toggling it unseen.
+      toggleLayer: (k) => set((s) => s.overlaysHidden
+        ? { overlaysHidden: false, layers: s.layers.includes(k) ? s.layers : [...s.layers, k] }
+        : { layers: s.layers.includes(k) ? s.layers.filter((x) => x !== k) : [...s.layers, k] }),
+      overlaysHidden: false,
+      toggleOverlays: () => set((s) => ({ overlaysHidden: !s.overlaysHidden })),
       showMath: false,
       setShowMath: (v) => set({ showMath: v }),
       compareModel: null,

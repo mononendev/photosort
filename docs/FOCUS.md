@@ -38,8 +38,10 @@ subject at native resolution, and falls back to the head when the eyes can't be 
    each active point scores 2 on a person's head, 1.5 on the torso, 1 elsewhere on the body, and the
    person with the highest score (at least `af.min_score`) becomes the primary, whatever their size or
    sharpness. A point just beside a region earns up to half its weight, fading to nothing `af.near` (2)
-   point-widths away: spot AF often sits a point-width off the head it focused on. CR3 needs `exiftool`
-   installed for this.
+   point-widths away: spot AF often sits a point-width off the head it focused on. A point inside the
+   body box of someone at least `af.occlude` (2) times another person's size (square root of box area)
+   goes to that bigger, nearer person: the smaller figure behind them gets no credit for it, unless the
+   point sits squarely on their head (`0` turns this off). CR3 needs `exiftool` installed for this.
 3. **Eyes.** OpenCV's [YuNet](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet)
    face detector runs on a native-resolution window around each head box (the four most prominent
    people). If it finds a face, its eye landmarks are used; otherwise the pose model's eye keypoints are,

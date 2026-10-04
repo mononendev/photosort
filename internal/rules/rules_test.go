@@ -185,7 +185,13 @@ func TestLocalTierSoftPersonInFrontCapsSharpAtTwo(t *testing.T) {
 }
 
 func TestPickPrimaryPrefersAFThenPriority(t *testing.T) {
-	score := func(af, p pj.Obj, near float64) float64 { return pj.F(p["hit"]) }
+	score := func(af pj.Obj, ps []pj.Obj, near, occlude float64) []float64 {
+		out := make([]float64, len(ps))
+		for i, p := range ps {
+			out[i] = pj.F(p["hit"])
+		}
+		return out
+	}
 	people := func() []pj.Obj {
 		return []pj.Obj{{"id": "a", "priority": 0.1}, {"id": "b", "priority": 0.3, "hit": 0.4}, {"id": "c", "priority": 0.2, "hit": 1.0}}
 	}

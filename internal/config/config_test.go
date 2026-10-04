@@ -18,8 +18,9 @@ func TestDefaultsMatchPython(t *testing.T) {
 	if err := json.Unmarshal(b, &py); err != nil {
 		t.Fatal(err)
 	}
-	// Changed on purpose with the move to ONNX pose models, and added for the analyzer pool; everything else must match.
-	want := map[string]bool{"detect_model": true, "detect_iou": true, "analyzer_slots": true}
+	// Changed on purpose with the move to ONNX pose models, and added since (analyzer pool, AF occlusion); everything
+	// else must match.
+	want := map[string]bool{"detect_model": true, "detect_iou": true, "analyzer_slots": true, "af.occlude": true}
 	for _, d := range Diff(py, Defaults()) {
 		if !want[pj.Str(d["key"])] {
 			t.Errorf("default differs from Python's: %v", pj.Dumps(d))

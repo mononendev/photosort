@@ -15,7 +15,7 @@ func FileMeta() Meta {
 	return Meta{
 		Exif:  exif.Read,
 		AF:    af.ReadWithNote,
-		Score: af.PersonScore,
+		Score: af.Scores,
 		Prior: exif.Prior,
 		NoisePrior: func(e pj.Obj, ev, sigma any, cfg pj.Obj) pj.Obj {
 			var s *float64

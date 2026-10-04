@@ -291,20 +291,26 @@ func LocalTier(primary pj.Obj, others []pj.Obj, thr, prior pj.Obj, size *Size, n
 	return 0, "nothing_sharp"
 }
 
-// Scorer scores how well a camera's AF points land on one person (see package af).
-type Scorer func(af, person pj.Obj, near float64) float64
+// Scorer scores how well a camera's AF points land on each person, nearer people occluding farther ones (see
+// package af).
+type Scorer func(af pj.Obj, people []pj.Obj, near, occlude float64) []float64
 
 // PickPrimary orders people in place, primary first, and says what chose the primary ("af" or "priority").
 //
 // People are ranked by prominence (size, centering, confidence). When the camera's active AF points land on someone,
 // that person is who the photographer meant, so they lead even if smaller or softer than a bystander. A point just
-// beside someone counts too, for less (af.near).
+// beside someone counts too, for less (af.near). A point inside a much bigger person's box goes to them, not to a
+// small figure behind (af.occlude).
 func PickPrimary(people []pj.Obj, af, cfg pj.Obj, score Scorer) string {
 	acfg := pj.O(cfg, "af")
 	near := pj.F(pj.Or(acfg["near"], 0.0))
-	for _, p := range people {
-		if pj.Truthy(af) {
-			p["af_score"] = score(af, p, near)
+	var scores []float64
+	if pj.Truthy(af) {
+		scores = score(af, people, near, pj.F(pj.Or(acfg["occlude"], 0.0)))
+	}
+	for i, p := range people {
+		if scores != nil {
+			p["af_score"] = scores[i]
 		} else {
 			p["af_score"] = nil
 		}

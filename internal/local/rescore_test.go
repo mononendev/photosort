@@ -43,11 +43,14 @@ func TestRescoreOldRowsWithoutPriority(t *testing.T) {
 			}
 			return nil, "no AF info in file"
 		}
-		meta.Score = func(af, p pj.Obj, near float64) float64 {
-			if pj.Equal(p["head"], []any{1500.0, 700.0, 1950.0, 1150.0}) {
-				return 2
+		meta.Score = func(af pj.Obj, ps []pj.Obj, near, occlude float64) []float64 {
+			out := make([]float64, len(ps))
+			for i, p := range ps {
+				if pj.Equal(p["head"], []any{1500.0, 700.0, 1950.0, 1150.0}) {
+					out[i] = 2
+				}
 			}
-			return 0
+			return out
 		}
 		res, err := Rescore(d, meta, config.Defaults(), true)
 		if err != nil {

@@ -560,10 +560,14 @@ func primaryStage(local, cfg pj.Obj, people, picked []pj.Obj, by string) (*py.Ob
 		}
 		minScore := cgetd(acfg, p, "min_score", 0.5)
 		bn := pid(people, best)
+		rule := fmt.Sprintf("af.min_score = %s · af.near = %s", s(minScore), s(cgetd(acfg, p, "near", int64(0))))
+		note := "head hit 2, torso 1.5, body 1 per point; up to half that just beside them"
+		if occ := cgetd(acfg, p, "occlude", int64(0)); pj.F(occ) > 0 {
+			rule += " · af.occlude = " + s(occ)
+			note += "; none for a point inside the box of someone af.occlude times their size"
+		}
 		ch.ask("Best AF hit score reaches min_score?", ge(or(best["af_score"], 0.0), minScore), opts{decides: true, gate: gate,
-			rule: fmt.Sprintf("af.min_score = %s · af.near = %s", s(minScore), s(cgetd(acfg, p, "near", int64(0)))),
-			inputs: []any{kv(fmt.Sprintf("person #%d", bn), best["af_score"],
-				"head hit 2, torso 1.5, body 1 per point; up to half that just beside them")},
+			rule: rule, inputs: []any{kv(fmt.Sprintf("person #%d", bn), best["af_score"], note)},
 			effect: fmt.Sprintf("person #%d is the primary (AF)", bn)})
 	}
 	prom := maxBy(picked, func(q pj.Obj) [2]float64 { return [2]float64{pj.F(or(q["priority"], 0.0)), 0} })
@@ -1221,7 +1225,7 @@ func Trace(row db.Image, cfg pj.Obj, rel string) (any, error) {
 	by := "priority"
 	if len(people) > 0 {
 		afObj, _ := local["af"].(pj.Obj)
-		by = rules.PickPrimary(picked, afObj, cfg, af.PersonScore)
+		by = rules.PickPrimary(picked, afObj, cfg, af.Scores)
 	}
 	var primary pj.Obj
 	var others []pj.Obj

@@ -102,8 +102,10 @@ func Defaults() pj.Obj {
 		// Camera AF points (Canon maker notes): the person the active points land on becomes the primary subject,
 		// whatever their size or sharpness, when their score (head hit 2, torso 1.5, body 1 per point) >= min_score.
 		// A point beside a region earns up to half its weight, falling to 0 at `near` point-widths away (0 = off).
+		// occlude: a point inside a person's box goes to them, not to anyone they're this many times the size of
+		// (square root of box area; bigger is nearer, so they block the view behind). 0 = off.
 		// y_up: AF y offsets count upward from center (flip if boxes draw mirrored top-to-bottom on your body).
-		"af": pj.Obj{"use": true, "min_score": 0.5, "near": 2.0, "y_up": true},
+		"af": pj.Obj{"use": true, "min_score": 0.5, "near": 2.0, "occlude": 2.0, "y_up": true},
 		// Cloud stage
 		"backend":               "ollama", // ollama (local, free) | gemini | anthropic
 		"model":                 nil,      // nil = backend default

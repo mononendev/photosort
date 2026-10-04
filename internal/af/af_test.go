@@ -164,6 +164,42 @@ func TestPickPrimaryAFPointBesideAHead(t *testing.T) {
 	}
 }
 
+func TestScoresNearerPersonOccludes(t *testing.T) {
+	// IMG_1074 (boxes read off the overlay): a centre spot point between a rider's legs, just beside the head and
+	// torso of a seated kid behind. Alone, the kid's near-credit beats the rider's loose body-box hit.
+	rider := pj.Obj{"box": []any{918, 1042, 2587, 3069}, "head": []any{1697, 1098, 2201, 1602},
+		"torso": []any{1434, 1417, 2106, 2089}}
+	kid := pj.Obj{"box": []any{1355, 2313, 1702, 2890}, "head": []any{1490, 2324, 1658, 2481},
+		"torso": []any{1434, 2453, 1686, 2677}}
+	pts := pj.Obj{"points": []any{pj.Obj{"i": 0, "box": []any{1641, 2509, 1809, 2677}}}, "active": []any{0}}
+	ppl := []pj.Obj{rider, kid}
+	if s := Scores(pts, ppl, 2.0, 0); s[1] <= s[0] {
+		t.Fatalf("without occlusion the kid should outscore the rider: %v", s)
+	}
+	s := Scores(pts, ppl, 2.0, 2.0)
+	if s[1] != 0 || s[0] < 0.5 {
+		t.Fatalf("the rider is in front, so the point is theirs: %v", s)
+	}
+	// A point squarely on the small one's head still counts: their face is what's visible there.
+	onHead := pj.Obj{"points": []any{pj.Obj{"i": 0, "box": []any{1530, 2360, 1620, 2450}}}, "active": []any{0}}
+	if s := Scores(onHead, ppl, 2.0, 2.0); s[1] <= s[0] {
+		t.Fatalf("head hit behind should still win: %v", s)
+	}
+	// Similar sizes don't occlude.
+	twin := pj.Obj{"box": []any{1300, 2200, 1800, 2900}}
+	if s := Scores(pts, []pj.Obj{twin, kid}, 2.0, 2.0); s[1] == 0 {
+		t.Fatalf("a similar-sized box shouldn't block: %v", s)
+	}
+	// IMG_1055: the bigger rider is off to the side, so the spectator keeps the point.
+	spectator := pj.Obj{"box": []any{1464, 2354, 1696, 3124}, "head": []any{1502, 2359, 1630, 2487},
+		"torso": []any{1464, 2514, 1696, 2766}}
+	far := pj.Obj{"box": []any{3090, 3671, 3450, 4779}, "head": []any{3111, 3705, 3266, 3860}}
+	p55 := pj.Obj{"points": []any{pj.Obj{"i": 30, "box": []any{1644, 2506, 1812, 2678}}}, "active": []any{30}}
+	if s := Scores(p55, []pj.Obj{far, spectator}, 2.0, 2.0); s[1] != 0.943 {
+		t.Fatalf("spectator score = %v", s)
+	}
+}
+
 func TestPersonScoreValues(t *testing.T) {
 	// Python: af.person_score for the IMG_1055 scene.
 	spectator := pj.Obj{"box": []any{1464, 2354, 1696, 3124}, "head": []any{1502, 2359, 1630, 2487},

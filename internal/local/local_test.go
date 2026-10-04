@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/mononendev/photosort/internal/pj"
+	"github.com/mononendev/photosort/internal/rules"
 )
 
 // replay answers measure/finalize from a golden fixture, checking the order the rules picked is the one the old
@@ -37,7 +38,7 @@ func storedMeta(local pj.Obj, prior, noise func(pj.Obj, pj.Obj) pj.Obj) Meta {
 	return Meta{
 		Exif: func(string) pj.Obj { return pj.O(local, "exif") },
 		AF:   func(string, int, int, bool) (pj.Obj, string) { return pj.O(local, "af"), pj.Str(local["af_note"]) },
-		Score: func(af, p pj.Obj, near float64) float64 {
+		Score: func(pj.Obj, []pj.Obj, float64, float64) []float64 {
 			panic("no AF points in the fixtures that reach here")
 		},
 		Prior:      func(pj.Obj, pj.Obj) pj.Obj { return pj.O(local, "exif_prior") },
@@ -88,14 +89,18 @@ func TestAnalyzeReproducesThePythonStage(t *testing.T) {
 }
 
 // afScoreFromStored replays the af_score Python stored for each person (matched by box).
-func afScoreFromStored(local pj.Obj) func(af, p pj.Obj, near float64) float64 {
-	return func(af, p pj.Obj, near float64) float64 {
-		for _, q := range pj.A(local, "people") {
-			if pj.Equal(pj.Get(q, "box"), p["box"]) {
-				return pj.F(pj.Get(q, "af_score"))
+func afScoreFromStored(local pj.Obj) rules.Scorer {
+	return func(af pj.Obj, ps []pj.Obj, near, occlude float64) []float64 {
+		out := make([]float64, len(ps)) // beyond the six stored: 0, never the AF pick in the fixtures
+		for i, p := range ps {
+			for _, q := range pj.A(local, "people") {
+				if pj.Equal(pj.Get(q, "box"), p["box"]) {
+					out[i] = pj.F(pj.Get(q, "af_score"))
+					break
+				}
 			}
 		}
-		return 0 // beyond the six stored: never the AF pick in the fixtures
+		return out
 	}
 }
 

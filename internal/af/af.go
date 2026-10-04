@@ -281,35 +281,73 @@ func floats(v any) []float64 {
 // point-widths away. Spot AF lands a point-width off a head (focus-and-recompose, a subject turning) often enough,
 // and the focus plane still runs through that person.
 func PersonScore(af pj.Obj, person pj.Obj, near float64) float64 {
+	return Scores(af, []pj.Obj{person}, near, 0)[0]
+}
+
+// Scores is PersonScore for everyone in the frame at once, so people can be weighed against each other per point.
+//
+// With occlude > 0, a nearer person blocks the view of anyone behind them: when a point lies inside someone's box
+// and that person is at least occlude times another's size (square root of box area; a bigger figure is nearer the
+// camera), the point most likely landed on the near person's body, so the smaller one gets no credit for it. A point
+// squarely on the smaller one's head still counts: their face is what's visible there.
+func Scores(af pj.Obj, people []pj.Obj, near, occlude float64) []float64 {
+	out := make([]float64, len(people))
 	if len(af) == 0 || !pj.Truthy(af["active"]) {
-		return 0.0
+		return out
 	}
 	byI := map[float64][]float64{}
 	for _, pv := range pj.A(af, "points") {
 		byI[pj.F(pj.Get(pv, "i"))] = floats(pj.Get(pv, "box"))
 	}
-	s := 0.0
+	size := make([]float64, len(people))
+	for k, p := range people {
+		if bx := floats(p["box"]); len(bx) == 4 {
+			size[k] = math.Sqrt(math.Max(0, (bx[2]-bx[0])*(bx[3]-bx[1])))
+		}
+	}
+	hits := make([]float64, len(people))
 	for _, i := range pj.A(af, "active") {
 		b, ok := byI[pj.F(i)]
 		if !ok {
 			continue
 		}
 		reach := near * math.Max(1, b[2]-b[0])
-		best := 0.0
-		for _, r := range []struct {
-			key string
-			wgt float64
-		}{{"head", 2.0}, {"torso", 1.5}, {"box", 1.0}} {
-			if !pj.Truthy(person[r.key]) {
-				continue
+		for k, person := range people {
+			best := 0.0
+			for _, r := range []struct {
+				key string
+				wgt float64
+			}{{"head", 2.0}, {"torso", 1.5}, {"box", 1.0}} {
+				if !pj.Truthy(person[r.key]) {
+					continue
+				}
+				reg := floats(person[r.key])
+				best = math.Max(best, r.wgt*overlap(b, reg)*centering(b, reg))
+				if reach != 0 {
+					best = math.Max(best, r.wgt*0.5*math.Max(0.0, 1-gap(b, reg)/reach))
+				}
 			}
-			reg := floats(person[r.key])
-			best = math.Max(best, r.wgt*overlap(b, reg)*centering(b, reg))
-			if reach != 0 {
-				best = math.Max(best, r.wgt*0.5*math.Max(0.0, 1-gap(b, reg)/reach))
+			hits[k] = best
+		}
+		if occlude > 0 {
+			for k, person := range people {
+				if hits[k] == 0 || size[k] == 0 || (pj.Truthy(person["head"]) && overlap(b, floats(person["head"])) >= 0.5) {
+					continue
+				}
+				for j, front := range people {
+					if j != k && size[j] > 0 && size[j] >= occlude*size[k] && overlap(b, floats(front["box"])) >= 0.5 {
+						hits[k] = 0
+						break
+					}
+				}
 			}
 		}
-		s += best
+		for k := range people {
+			out[k] += hits[k]
+		}
 	}
-	return pj.Round(s, 3)
+	for k := range out {
+		out[k] = pj.Round(out[k], 3)
+	}
+	return out
 }

@@ -48,25 +48,6 @@ func (s *Server) putConfig(r *http.Request) (any, error) {
 	return config.Public(s.cfg()), nil
 }
 
-func (s *Server) rescore(r *http.Request) (any, error) {
-	var in struct {
-		Source string `json:"source"`
-	}
-	if r.ContentLength > 0 {
-		if err := decodeBody(r, &in); err != nil {
-			return nil, err
-		}
-	}
-	res, err := local.Rescore(s.DB, local.FileMeta(), s.cfg(), true)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := config.LogEvent(s.Workdir, pj.Obj{"kind": "rescore", "source": in.Source, "changed": res.Changed}); err != nil {
-		return nil, err
-	}
-	return res, nil
-}
-
 // history is newest first. Each change carries the whole config from just before it, to roll back to.
 func (s *Server) history(r *http.Request) (any, error) {
 	limit, err := qIntDefault(r, "limit", 100, 0)

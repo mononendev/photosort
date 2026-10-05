@@ -40,6 +40,7 @@ type Server struct {
 	debugCache []debugEntry // focus-debug results for a few recent images
 	device     sync.Map     // analyzer health, refreshed in the background
 	fulls      fullCache    // full-resolution renders for the viewer's tiles
+	rescores   rescorer     // the background rescore and who's waiting on it
 }
 
 // HTTPError is an error with a status; the body is FastAPI's {"detail": ...}.
@@ -138,6 +139,7 @@ func (s *Server) Handler() http.Handler {
 	route("GET /api/config/defaults", func(*http.Request) (any, error) { return config.Defaults(), nil })
 	route("PUT /api/config", s.putConfig)
 	route("POST /api/rescore", s.rescore)
+	route("GET /api/rescore", s.rescoreState)
 	route("GET /api/config/history", s.history)
 	route("POST /api/config/history/{id}/restore", s.restore)
 	route("GET /api/calibration", s.calibration)

@@ -109,6 +109,9 @@ export interface RescoreResult {
   errors: number; first_error: string | null;
 }
 
+/** A rescore request's progress: the server runs it in the background and answers within ~20 s either way. */
+export interface RescoreStatus { run: number; running: boolean; done: boolean; result?: RescoreResult; error?: string }
+
 /** local.metric_split(): each metric's own tier; `odd` sits `gap` tiers from the nearest other. */
 export interface MetricSplit { grades: Partial<Record<'eye' | 'fft' | 'head', number>>; odd: 'eye' | 'fft' | 'head'; gap: number }
 
@@ -332,10 +335,14 @@ export class ApiError extends Error {
   }
 }
 
+/** HTTP/2 has no status text, and a proxy's error page isn't JSON: fall back to the code. */
+const statusText = (res: Response) =>
+  res.statusText || `HTTP ${res.status}${res.status === 504 ? ' (gateway timeout)' : ''}`;
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...init });
   if (!res.ok) {
-    let msg = res.statusText;
+    let msg = statusText(res);
     try {
       const body = await res.json();
       msg = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail ?? body);
@@ -353,6 +360,14 @@ function qs(params: Record<string, unknown>): string {
   }
   const s = p.toString();
   return s ? `?${s}` : '';
+}
+
+/** Starts a rescore (or joins the one running) and resolves when a pass covering it finishes. */
+async function rescore(source = ''): Promise<RescoreResult> {
+  let st = await request<RescoreStatus>('/api/rescore', { method: 'POST', body: JSON.stringify({ source }) });
+  while (!st.done) st = await request<RescoreStatus>(`/api/rescore?run=${st.run}`);
+  if (st.error !== undefined || !st.result) throw new Error(st.error || 'rescore failed');
+  return st.result;
 }
 
 export const api = {
@@ -386,7 +401,8 @@ export const api = {
   /** `source` names the save in the change history (Settings → history). */
   putConfig: (values: Record<string, unknown>, source = 'edit') =>
     request<Record<string, unknown>>('/api/config', { method: 'PUT', body: JSON.stringify({ values, source }) }),
-  rescore: (source = '') => request<RescoreResult>('/api/rescore', { method: 'POST', body: JSON.stringify({ source }) }),
+  rescore,
+  rescoreStatus: () => request<RescoreStatus>('/api/rescore'),
   configHistory: () => request<ConfigHistoryEntry[]>('/api/config/history'),
   configRestore: (id: number) => request<Record<string, unknown>>(`/api/config/history/${id}/restore`, { method: 'POST' }),
   calibration: (n = 48, metric: FocusMetric = 'eye') => request<Calibration>(`/api/calibration${qs({ n, metric })}`),
@@ -407,7 +423,7 @@ export const api = {
   xmpZip: async (p: { folder?: string; format: XMPFormat; focus_source?: string }) => {
     const res = await fetch(`/api/export/xmp.zip${qs(p)}`);
     if (!res.ok) {
-      let msg = res.statusText;
+      let msg = statusText(res);
       try { msg = (await res.json()).detail ?? msg; } catch { /* ignore */ }
       throw new ApiError(res.status, msg);
     }

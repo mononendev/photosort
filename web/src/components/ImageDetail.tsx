@@ -137,6 +137,15 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
   const compare = compareModel ? cmp.data ?? null : null;
   const layerBar = <div className="space-y-1"><LayerBar layers={layers} toggle={toggle} hidden={overlaysHidden} toggleHidden={toggleOverlays} heat={heat} heatLoading={dbg.isFetching} />
     {l && <CompareBar l={l} result={compare} loading={cmp.isFetching} error={cmp.error ? String(cmp.error.message) : undefined} />}</div>;
+  // The left column inline on a wide screen; the fullscreen viewer keeps it beside the stage (Review tab only).
+  const people = l && <PersonInspector l={l} cfg={cfg} grades={grades} localTip={localTip} selected={person} onSelect={setPerson} />;
+  const math = l && l.people?.length > 0 && <>
+    <button onClick={() => setShowMath(!showMath)} className="text-xs uppercase tracking-wide text-gray-500 hover:text-gray-300">
+      {showMath ? '▾' : '▸'} focus math · person #{person + 1}
+    </button>
+    {showMath && <FocusMath d={dbg.data?.people?.[person]} p={l.people[person]} loading={dbg.isFetching && !dbg.data} error={dbg.error ? String(dbg.error.message) : undefined} />}
+  </>;
+  const side = inline && l ? <>{people}{math && <div className="rounded-lg border border-gray-800 p-3 space-y-2">{math}</div>}</> : undefined;
   return (
     <div className={inline ? '' : 'fixed inset-0 z-50 flex'}>
       {!inline && <div className="absolute inset-0 bg-black/70 animate-[fade-in_150ms_ease-out]" onClick={onClose} />}
@@ -173,7 +182,7 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
             {l && layerBar}
             <FrameOverlay id={id} l={l} grades={grades} layers={shown} selected={person} onSelect={setPerson} heat={heat} compare={overlaysHidden ? null : compare} onOpen={() => openFull(0)} />
             {full && l && <FrameViewer id={id} name={data?.rel ?? String(id)} l={l} grades={grades} layers={shown} selected={person} onSelect={setPerson} heat={heat} compare={overlaysHidden ? null : compare} bar={layerBar}
-              ratings={ratings} zoomRef={zoomRef} onClose={closeFull} onNav={onNav} />}
+              ratings={ratings} side={side} zoomRef={zoomRef} onClose={closeFull} onNav={onNav} />}
             {data?.has_crop && (
               <div className="flex flex-col sm:flex-row gap-3 items-start">
                 <img src={cropUrl(id)} alt="head crop" onClick={l ? () => openFull(1) : undefined} title={l ? 'Open at 1:1 on the head' : undefined}
@@ -197,15 +206,8 @@ export default function ImageDetail({ id, onClose, onNav, toolbar }: {
               </div>
             )}
           </div>
-          {l && <div className={`min-w-0 md:col-span-2 ${inline ? WIDE.people : ''}`}><PersonInspector l={l} cfg={cfg} grades={grades} localTip={localTip} selected={person} onSelect={setPerson} /></div>}
-          {l && l.people?.length > 0 && (
-            <div className={`rounded-lg border border-gray-800 p-3 space-y-2 min-w-0 md:col-span-2 ${inline ? WIDE.math : ''}`}>
-              <button onClick={() => setShowMath(!showMath)} className="text-xs uppercase tracking-wide text-gray-500 hover:text-gray-300">
-                {showMath ? '▾' : '▸'} focus math · person #{person + 1}
-              </button>
-              {showMath && <FocusMath d={dbg.data?.people?.[person]} p={l.people[person]} loading={dbg.isFetching && !dbg.data} error={dbg.error ? String(dbg.error.message) : undefined} />}
-            </div>
-          )}
+          {l && <div className={`min-w-0 md:col-span-2 ${inline ? WIDE.people : ''}`}>{people}</div>}
+          {math && <div className={`rounded-lg border border-gray-800 p-3 space-y-2 min-w-0 md:col-span-2 ${inline ? WIDE.math : ''}`}>{math}</div>}
           <div className={`space-y-4 min-w-0 md:col-start-2 md:row-start-1 ${inline ? WIDE.side : ''}`}>
             {v ? (
               <div>

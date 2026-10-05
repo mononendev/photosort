@@ -36,6 +36,17 @@ export function fmtFinishAt(s: N): string {
   return `${at.toLocaleDateString([], { weekday: 'short', ...(s > 6 * 86400 ? { month: 'short', day: 'numeric' } : {}) })} ${time}`;
 }
 
+/** A shutter speed in seconds as a photographer writes it ("1/500", "2s"). */
+export const fmtShutter = (s: number) => (s >= 1 ? `${+s.toFixed(1)}s` : `1/${Math.round(1 / s)}`);
+
+/** Shutter · aperture · ISO · focal length from EXIF, skipping what's missing ("1/500 · f/2.8 · ISO 400 · 85mm"). */
+export function fmtExposure(e?: { shutter_s?: number; f_number?: number; iso?: number; focal_mm?: number; focal_35mm?: number }): string {
+  if (!e) return '';
+  const focal = e.focal_mm ?? e.focal_35mm;
+  return [e.shutter_s && fmtShutter(e.shutter_s), e.f_number && `f/${+e.f_number.toFixed(1)}`, e.iso && `ISO ${e.iso}`, focal && `${Math.round(focal)}mm`]
+    .filter(Boolean).join(' · ');
+}
+
 /** done/total as a whole percentage, 0 when there is no total. */
 export const pct = (done: number, total: number) => (total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0);
 

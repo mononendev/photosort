@@ -9,6 +9,7 @@ import Loading from '../components/Loading';
 import SegButton from '../components/SegButton';
 import { RatingBadge, TierBadge } from '../components/TierBadge';
 import useHotkeys from '../hooks/useHotkeys';
+import { fmtShutter } from '../lib/format';
 
 // Which photos the queue starts from: the needs-review flag (local ≠ model), or everything.
 const QUEUES = [['', 'needs review'], ['all', 'all']] as const;
@@ -34,7 +35,6 @@ function seconds(s: string): number {
   const m = s.trim().match(/^(\d*\.?\d+)\s*\/\s*(\d*\.?\d+)\s*s?$/);
   return m ? Number(m[1]) / Number(m[2]) : Number(s.trim().replace(/s$/, ''));
 }
-const fmtShutter = (s: number) => (s >= 1 ? `${+s.toFixed(1)}s` : `1/${Math.round(1 / s)}`);
 const exifDate = (d: string | null) => d?.slice(0, 10).replaceAll(':', '-');
 
 /** Text field that writes back once typing pauses, so the URL (and the query) don't change on every keystroke. */

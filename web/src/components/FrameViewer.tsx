@@ -5,6 +5,7 @@ import { frameUrl, tileUrl, TILE_SIZE } from '../api/client';
 import type { DetectResult, FocusDebug, LocalResult } from '../api/client';
 import type { Grade, Layer } from '../lib/pose';
 import useHotkeys from '../hooks/useHotkeys';
+import { fmtExposure } from '../lib/format';
 import { HoverBar, OverlaySvg } from './FrameOverlay';
 import type { Hover } from './FrameOverlay';
 
@@ -53,10 +54,11 @@ const subjectCenter = (l: LocalResult): [number, number] => {
  * `zoomRef` holds the magnification (screen px per native px) while zoomed in, 0 at fit. Every photo opens at it,
  * centered on the subject's head, so stepping on (or rating) keeps the zoom; it lives with the caller because the
  * viewer remounts while the next photo loads. Set it to 1 before opening for 1:1 on the head.
+ * `side` (people, focus math) stays in a column on the left on a wide screen; the stage takes the rest.
  */
-export default function FrameViewer({ id, name, l, grades, layers, selected, onSelect, heat, bar, ratings, zoomRef, onClose, onNav, compare }: {
+export default function FrameViewer({ id, name, l, grades, layers, selected, onSelect, heat, bar, ratings, side, zoomRef, onClose, onNav, compare }: {
   id: number; name: string; l: LocalResult; grades: Grade[]; layers: Set<Layer>; selected: number; onSelect: (i: number) => void;
-  heat?: FocusDebug['heatmap']; compare?: DetectResult | null; bar: ReactNode; ratings?: ReactNode; zoomRef: RefObject<number>; onClose: () => void; onNav?: (dir: 1 | -1) => void;
+  heat?: FocusDebug['heatmap']; compare?: DetectResult | null; bar: ReactNode; ratings?: ReactNode; side?: ReactNode; zoomRef: RefObject<number>; onClose: () => void; onNav?: (dir: 1 | -1) => void;
 }) {
   const W = l.width, H = l.height;
   const stage = useRef<HTMLDivElement>(null);
@@ -177,102 +179,111 @@ export default function FrameViewer({ id, name, l, grades, layers, selected, onS
     m.set(key, ok);
     return { id, m };
   });
+  const exposure = fmtExposure(l.exif);
   const pending = current.filter((t) => !tiles.has(t.key)).length, failed = current.some((t) => tiles.get(t.key) === false);
 
   return createPortal(
-    <div ref={root} tabIndex={-1} className="fixed inset-0 z-[60] bg-black/95 outline-none">
-      <div ref={stage} className="absolute inset-0 overflow-hidden select-none touch-none cursor-grab active:cursor-grabbing"
-        onDoubleClick={(e) => {
-          if (lastType.current !== 'mouse') return;
-          const r = stageRect();
-          if (Math.abs(scale - 1) > 0.01) zoomAt(1 / scale, e.clientX - r.left, e.clientY - r.top); else reset();
-        }}
-        onPointerDown={(e) => {
-          lastType.current = e.pointerType;
-          if (e.pointerType === 'mouse' && e.button !== 0) return;
-          pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-          if (pts.current.size === 2) {
-            const [a, b] = [...pts.current.values()], r = stageRect();
-            pinch.current = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2 - r.left, my: (a.y + b.y) / 2 - r.top, v: view };
-            drag.current = null;
+    <div ref={root} tabIndex={-1} className="fixed inset-0 z-[60] flex bg-black/95 outline-none">
+      {side && (
+        <aside className="hidden xl:block w-[340px] 2xl:w-[420px] shrink-0 overflow-y-auto overscroll-contain border-r border-gray-800 bg-gray-950 p-3 space-y-3">
+          {side}
+        </aside>
+      )}
+      <div className="relative flex-1 min-w-0">
+        <div ref={stage} className="absolute inset-0 overflow-hidden select-none touch-none cursor-grab active:cursor-grabbing"
+          onDoubleClick={(e) => {
+            if (lastType.current !== 'mouse') return;
+            const r = stageRect();
+            if (Math.abs(scale - 1) > 0.01) zoomAt(1 / scale, e.clientX - r.left, e.clientY - r.top); else reset();
+          }}
+          onPointerDown={(e) => {
+            lastType.current = e.pointerType;
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            if (pts.current.size === 2) {
+              const [a, b] = [...pts.current.values()], r = stageRect();
+              pinch.current = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2 - r.left, my: (a.y + b.y) / 2 - r.top, v: view };
+              drag.current = null;
+              dragged.current = true;
+              return;
+            }
+            if (pts.current.size > 2) return;
+            drag.current = { x: e.clientX, y: e.clientY, ox: view.ox, oy: view.oy, moved: false };
+            dragged.current = false;
+          }}
+          onPointerMove={(e) => {
+            if (pts.current.has(e.pointerId)) pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            const pc = pinch.current;
+            if (pc && pts.current.size >= 2) {
+              const [a, b] = [...pts.current.values()], r = stageRect();
+              const d = Math.hypot(a.x - b.x, a.y - b.y), mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top;
+              const zoom = Math.min(MAX_ZOOM, Math.max(1, pc.v.zoom * (d / pc.d))), k = zoom / pc.v.zoom;
+              setView({ zoom, ox: mx - (pc.mx - pc.v.ox) * k, oy: my - (pc.my - pc.v.oy) * k });
+              return;
+            }
+            const d = drag.current;
+            if (!d) return;
+            if (e.buttons === 0) { drag.current = null; return; }   // released outside the window
+            const dx = e.clientX - d.x, dy = e.clientY - d.y;
+            if (!d.moved && Math.hypot(dx, dy) < 4) return;
+            if (!d.moved) { d.moved = true; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); }
             dragged.current = true;
-            return;
-          }
-          if (pts.current.size > 2) return;
-          drag.current = { x: e.clientX, y: e.clientY, ox: view.ox, oy: view.oy, moved: false };
-          dragged.current = false;
-        }}
-        onPointerMove={(e) => {
-          if (pts.current.has(e.pointerId)) pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-          const pc = pinch.current;
-          if (pc && pts.current.size >= 2) {
-            const [a, b] = [...pts.current.values()], r = stageRect();
-            const d = Math.hypot(a.x - b.x, a.y - b.y), mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top;
-            const zoom = Math.min(MAX_ZOOM, Math.max(1, pc.v.zoom * (d / pc.d))), k = zoom / pc.v.zoom;
-            setView({ zoom, ox: mx - (pc.mx - pc.v.ox) * k, oy: my - (pc.my - pc.v.oy) * k });
-            return;
-          }
-          const d = drag.current;
-          if (!d) return;
-          if (e.buttons === 0) { drag.current = null; return; }   // released outside the window
-          const dx = e.clientX - d.x, dy = e.clientY - d.y;
-          if (!d.moved && Math.hypot(dx, dy) < 4) return;
-          if (!d.moved) { d.moved = true; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); }
-          dragged.current = true;
-          setView((v) => ({ ...v, ox: d.ox + dx, oy: d.oy + dy }));
-        }}
-        onPointerUp={(e) => {
-          pts.current.delete(e.pointerId);
-          if (pinch.current) {
-            if (pts.current.size >= 2) return;
-            pinch.current = null;
-            const rest = [...pts.current.values()][0];   // the finger still down carries on panning
-            drag.current = rest ? { x: rest.x, y: rest.y, ox: view.ox, oy: view.oy, moved: true } : null;
-            if (view.zoom <= 1) reset();
-            return;
-          }
-          drag.current = null;
-          if (e.pointerType !== 'touch' || dragged.current) return;
-          const r = stageRect(), x = e.clientX - r.left, y = e.clientY - r.top, now = performance.now(), lt = lastTap.current;
-          if (lt && now - lt.t < 320 && Math.hypot(x - lt.x, y - lt.y) < 40) {
-            lastTap.current = null;
-            if (view.zoom > 1) reset(); else zoomAt(3, x, y);
-          } else lastTap.current = { t: now, x, y };
-        }}
-        onPointerCancel={(e) => { pts.current.delete(e.pointerId); pinch.current = null; drag.current = null; }}>
-        {fit > 0 && (
-          <div className="absolute" style={{ left: view.ox, top: view.oy, width: W * scale, height: H * scale }}>
-            <img src={frameUrl(id)} alt="" draggable={false} className="absolute inset-0 w-full h-full" />
-            {[...under, ...current].map((t) => (
-              <img key={t.key} src={t.url} alt="" draggable={false} onLoad={() => onTile(t.key, true)} onError={() => onTile(t.key, false)}
-                className={`absolute max-w-none ${tiles.get(t.key) ? '' : 'opacity-0'}`}
-                style={{ left: t.left, top: t.top, width: t.width, height: t.height, imageRendering: scale > 2 ? 'pixelated' : 'auto' }} />
-            ))}
-            <OverlaySvg l={l} grades={grades} layers={layers} selected={selected} heat={heat} setHover={setHover} compare={compare}
-              zoom={0.4 + 0.6 * view.zoom} onSelect={selectUnlessDragged} />
-          </div>
-        )}
-      </div>
-      <div ref={toolbar} className="absolute inset-x-0 top-0 z-10 flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 sm:px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] border-b border-gray-800 bg-black/80 backdrop-blur-sm">
-        <span className="font-mono text-sm text-gray-300 truncate max-w-[40vw]">{name}</span>
-        {bar}
-        <span className="ml-auto flex items-center gap-2 text-xs text-gray-400">
-          <span className="hidden sm:inline font-mono w-32 text-right whitespace-nowrap" title="screen pixels per original pixel">{fit ? `${Math.round(scale * 100)}% of native` : ''}</span>
-          <span className="hidden sm:inline text-gray-500 w-28 whitespace-nowrap">{!showFull ? '' : failed ? 'full res failed' : pending ? 'loading full res…' : 'full resolution'}</span>
-          <button onClick={() => zoomAt(1 / 1.5, box.w / 2, box.h / 2)} className="px-2.5 py-1 sm:px-2 sm:py-0 rounded border border-gray-700 hover:border-gray-500 active:bg-gray-800">−</button>
-          <button onClick={() => zoomAt(1.5, box.w / 2, box.h / 2)} className="px-2.5 py-1 sm:px-2 sm:py-0 rounded border border-gray-700 hover:border-gray-500 active:bg-gray-800">+</button>
-          <button onClick={() => { const el = stage.current; if (el) { const k = 1 / scale; zoomAt(k, el.clientWidth / 2, el.clientHeight / 2); } }}
-            className="px-2.5 py-1 sm:px-2 sm:py-0 rounded border border-gray-700 hover:border-gray-500 active:bg-gray-800" title="one screen pixel per original pixel">1:1</button>
-          <button onClick={reset} className="px-2.5 py-1 sm:px-2 sm:py-0 rounded border border-gray-700 hover:border-gray-500 active:bg-gray-800">fit</button>
-          <button onClick={onClose} aria-label="Close" className="px-2 text-lg text-gray-400 hover:text-white active:bg-gray-800 rounded">✕</button>
-        </span>
-        {ratings && <div className="basis-full">{ratings}</div>}
-      </div>
-      <div className="absolute inset-x-0 bottom-0 z-10 flex items-start gap-4 px-4 py-1 border-t border-gray-800 bg-black/80 backdrop-blur-sm overflow-hidden"
-        style={{ height: `calc(${INSET_B}px + env(safe-area-inset-bottom))`, paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <div className="flex-1 min-w-0"><HoverBar hover={hover} l={l} /></div>
-        <div className="hidden sm:block [@media(hover:none)]:hidden text-[11px] text-gray-600 pt-0.5">scroll to zoom · drag to pan · double-click for 1:1 / fit · 0 to fit · Esc to close · ←/→ next image</div>
-        <div className="hidden [@media(hover:none)]:block text-[11px] text-gray-600 pt-0.5 shrink-0">pinch to zoom · double-tap to fit</div>
+            setView((v) => ({ ...v, ox: d.ox + dx, oy: d.oy + dy }));
+          }}
+          onPointerUp={(e) => {
+            pts.current.delete(e.pointerId);
+            if (pinch.current) {
+              if (pts.current.size >= 2) return;
+              pinch.current = null;
+              const rest = [...pts.current.values()][0];   // the finger still down carries on panning
+              drag.current = rest ? { x: rest.x, y: rest.y, ox: view.ox, oy: view.oy, moved: true } : null;
+              if (view.zoom <= 1) reset();
+              return;
+            }
+            drag.current = null;
+            if (e.pointerType !== 'touch' || dragged.current) return;
+            const r = stageRect(), x = e.clientX - r.left, y = e.clientY - r.top, now = performance.now(), lt = lastTap.current;
+            if (lt && now - lt.t < 320 && Math.hypot(x - lt.x, y - lt.y) < 40) {
+              lastTap.current = null;
+              if (view.zoom > 1) reset(); else zoomAt(3, x, y);
+            } else lastTap.current = { t: now, x, y };
+          }}
+          onPointerCancel={(e) => { pts.current.delete(e.pointerId); pinch.current = null; drag.current = null; }}>
+          {fit > 0 && (
+            <div className="absolute" style={{ left: view.ox, top: view.oy, width: W * scale, height: H * scale }}>
+              <img src={frameUrl(id)} alt="" draggable={false} className="absolute inset-0 w-full h-full" />
+              {[...under, ...current].map((t) => (
+                <img key={t.key} src={t.url} alt="" draggable={false} onLoad={() => onTile(t.key, true)} onError={() => onTile(t.key, false)}
+                  className={`absolute max-w-none ${tiles.get(t.key) ? '' : 'opacity-0'}`}
+                  style={{ left: t.left, top: t.top, width: t.width, height: t.height, imageRendering: scale > 2 ? 'pixelated' : 'auto' }} />
+              ))}
+              <OverlaySvg l={l} grades={grades} layers={layers} selected={selected} heat={heat} setHover={setHover} compare={compare}
+                zoom={0.4 + 0.6 * view.zoom} onSelect={selectUnlessDragged} />
+            </div>
+          )}
+        </div>
+        <div ref={toolbar} className="absolute inset-x-0 top-0 z-10 flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 sm:px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] border-b border-gray-800 bg-black/80 backdrop-blur-sm">
+          <span className="font-mono text-sm text-gray-300 truncate max-w-[40vw]">{name}</span>
+          {exposure && <span className="hidden sm:inline font-mono text-xs text-gray-400 whitespace-nowrap">{exposure}</span>}
+          {bar}
+          <span className="ml-auto flex items-center gap-2 text-xs text-gray-400">
+            <span className="hidden sm:inline font-mono w-32 text-right whitespace-nowrap" title="screen pixels per original pixel">{fit ? `${Math.round(scale * 100)}% of native` : ''}</span>
+            <span className="hidden sm:inline text-gray-500 w-28 whitespace-nowrap">{!showFull ? '' : failed ? 'full res failed' : pending ? 'loading full res…' : 'full resolution'}</span>
+            <button onClick={() => zoomAt(1 / 1.5, box.w / 2, box.h / 2)} className="px-2.5 py-1 sm:px-2 sm:py-0 rounded border border-gray-700 hover:border-gray-500 active:bg-gray-800">−</button>
+            <button onClick={() => zoomAt(1.5, box.w / 2, box.h / 2)} className="px-2.5 py-1 sm:px-2 sm:py-0 rounded border border-gray-700 hover:border-gray-500 active:bg-gray-800">+</button>
+            <button onClick={() => { const el = stage.current; if (el) { const k = 1 / scale; zoomAt(k, el.clientWidth / 2, el.clientHeight / 2); } }}
+              className="px-2.5 py-1 sm:px-2 sm:py-0 rounded border border-gray-700 hover:border-gray-500 active:bg-gray-800" title="one screen pixel per original pixel">1:1</button>
+            <button onClick={reset} className="px-2.5 py-1 sm:px-2 sm:py-0 rounded border border-gray-700 hover:border-gray-500 active:bg-gray-800">fit</button>
+            <button onClick={onClose} aria-label="Close" className="px-2 text-lg text-gray-400 hover:text-white active:bg-gray-800 rounded">✕</button>
+          </span>
+          {ratings && <div className="basis-full">{ratings}</div>}
+        </div>
+        <div className="absolute inset-x-0 bottom-0 z-10 flex items-start gap-4 px-4 py-1 border-t border-gray-800 bg-black/80 backdrop-blur-sm overflow-hidden"
+          style={{ height: `calc(${INSET_B}px + env(safe-area-inset-bottom))`, paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <div className="flex-1 min-w-0"><HoverBar hover={hover} l={l} /></div>
+          <div className="hidden sm:block [@media(hover:none)]:hidden text-[11px] text-gray-600 pt-0.5">scroll to zoom · drag to pan · double-click for 1:1 / fit · 0 to fit · Esc to close · ←/→ next image</div>
+          <div className="hidden [@media(hover:none)]:block text-[11px] text-gray-600 pt-0.5 shrink-0">pinch to zoom · double-tap to fit</div>
+        </div>
       </div>
     </div>,
     document.body,

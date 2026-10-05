@@ -1,6 +1,7 @@
 package local
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -109,4 +110,33 @@ func TestRescoreOfGoldenRowsIsANoOp(t *testing.T) {
 			t.Errorf("%s: %s", filepath.Base(r.Path), d)
 		}
 	}
+}
+
+// Paging must reach every row exactly once across page boundaries.
+func TestRescorePagesThroughEveryRow(t *testing.T) {
+	defer func(n int) { rescorePage = n }(rescorePage)
+	rescorePage = 2
+	dbtest.Backends(t, func(t *testing.T, d *db.DB) {
+		dir := t.TempDir()
+		var paths []string
+		for i := range 5 {
+			paths = append(paths, filepath.Join(dir, fmt.Sprintf("%d.jpg", i)))
+			os.WriteFile(paths[i], nil, 0o644)
+		}
+		d.AddPaths(paths)
+		rows, _ := d.Rows("", nil, "", -1, 0, "id, path")
+		for _, r := range rows {
+			s := pj.Dumps(pj.Obj{"width": 10, "height": 10, "people": []any{}, "exif": pj.Obj{}, "local_tier": 3})
+			d.SetLocal(r.ID, &s, nil)
+		}
+		meta := FileMeta()
+		meta.AF = func(string, int, int, bool) (pj.Obj, string) { return nil, "no AF info in file" }
+		res, err := Rescore(d, meta, config.Defaults(), true)
+		if err != nil || res.Changed != 5 || res.Errors != 0 {
+			t.Fatalf("rescore: %+v %v", res, err)
+		}
+		if res, _ := Rescore(d, meta, config.Defaults(), true); res.Changed != 0 {
+			t.Fatalf("second pass changed %d", res.Changed)
+		}
+	})
 }

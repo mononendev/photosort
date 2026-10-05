@@ -41,13 +41,32 @@ type RescoreResult struct {
 //
 // Rows analyzed before the EXIF prior or AF points existed get them read from the file (header only, fast), and the
 // primary person is re-picked from the AF points.
+//
+// Rows go a page at a time, each page written before the next is read, so memory stays flat however large the
+// library: holding every local_json at once ran the API container out of memory.
 func Rescore(d *db.DB, meta Meta, cfg pj.Obj, backfillExif bool) (RescoreResult, error) {
 	var res RescoreResult
-	rows, err := d.Rows("local_json IS NOT NULL", nil, "", -1, 0, "id, path, local_json")
-	if err != nil {
-		return res, err
-	}
 	focus := pj.O(cfg, "focus")
+	for after := int64(-1); ; {
+		rows, err := d.Rows("local_json IS NOT NULL AND id > ?", []any{after}, "id", rescorePage, 0, "id, path, local_json")
+		if err != nil {
+			return res, err
+		}
+		if len(rows) == 0 {
+			return res, nil
+		}
+		after = rows[len(rows)-1].ID
+		if err := d.SetLocalMany(rescoreRows(rows, meta, cfg, focus, backfillExif, &res)); err != nil {
+			return res, err
+		}
+	}
+}
+
+// rescorePage is how many rows a rescore holds at once.
+var rescorePage = 500
+
+// rescoreRows re-derives one page of rows, counting into res, and returns the rows that changed.
+func rescoreRows(rows []db.Image, meta Meta, cfg, focus pj.Obj, backfillExif bool, res *RescoreResult) []db.LocalUpdate {
 	var updates []db.LocalUpdate
 	for _, r := range rows {
 		func() {
@@ -146,5 +165,5 @@ func Rescore(d *db.DB, meta Meta, cfg pj.Obj, backfillExif bool) (RescoreResult,
 			}
 		}()
 	}
-	return res, d.SetLocalMany(updates)
+	return updates
 }

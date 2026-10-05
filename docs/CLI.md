@@ -90,7 +90,7 @@ tier. Find where a miss turns soft, soft turns slightly soft, and slightly soft 
 | `--metric eye\|hf\|head` | Eye-band Laplacian (default), eye-band FFT ratio, or head box |
 | `--tiles N` | Crops on the sheet (default 64) |
 
-The web UI's Calibrate page does the same thing interactively, and can also import your own Lightroom
+The web UI's Settings page does the same thing interactively, and can also import your own Lightroom
 verdicts to suggest thresholds.
 
 ### `rescore`

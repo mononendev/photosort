@@ -151,7 +151,7 @@ function TraceView({ id }: { id: number }) {
       )}
       {check.engine && check.stored && !same(check.engine, check.stored) && (
         <div className="rounded border border-amber-700 bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
-          Traced with the current config: local {check.engine.join(' · ')}. The stored result is still {check.stored.join(' · ')} from the last re-score; saving the config on the Calibrate page re-scores.
+          Traced with the current config: local {check.engine.join(' · ')}. The stored result is still {check.stored.join(' · ')} from the last re-score; saving the config on the Settings page re-scores.
         </div>
       )}
 

@@ -122,11 +122,11 @@ resolution).
 
 **From your own picks (best).** Rate or color-label a few hundred frames in Lightroom, save the metadata
 to XMP, and upload the sidecars (or a `.zip`, or a CSV with `name,rating,label,focus_tier`) on the
-Calibrate page. It matches them to tracked images by filename and suggests thresholds for each metric,
+Settings page. It matches them to tracked images by filename and suggests thresholds for each metric,
 with "use all + re-score" to apply them. A `focus:3` keyword or explicit CSV column wins; otherwise color
 labels (Blue/Green 3, Yellow 2, Orange 1, Red 0), then stars (4-5 → 3, 3 → 2, 2 → 1, 1 → 0) are used.
 
-**By eye.** The Calibrate page (or `photosort calibrate --metric eye|hf|head`) shows primary subjects
+**By eye.** The Settings page (or `photosort calibrate --metric eye|hf|head`) shows primary subjects
 ordered softest to sharpest with their values. Pick the values where a miss becomes soft, soft
 becomes slightly soft, and slightly soft becomes sharp, enter them, and re-score. On the page, every metric
 is higher-is-sharper: a cut is the minimum score for its tier, so raising it is stricter. Each cut shows the

@@ -12,9 +12,15 @@ const NAV = [
   { label: 'Review', to: '/review' },
   { label: 'Trace', to: '/trace' },
   { label: 'Jobs', to: '/jobs' },
-  { label: 'Calibrate', to: '/calibrate' },
   { label: 'Export', to: '/export' },
 ];
+
+const gear = (cls: string) => (
+  <svg viewBox="0 0 24 24" className={cls} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+);
 
 export default function Layout() {
   const selected = useStore((s) => s.selected);
@@ -67,6 +73,10 @@ export default function Layout() {
             )}
             <span className="hidden lg:inline">{healthText}</span>
           </div>
+          <NavLink to="/settings" aria-label="Settings" title="Settings"
+            className={({ isActive }) => `hidden md:block p-1.5 rounded-md transition-colors ${isActive ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-gray-100 hover:bg-gray-800/60'}`}>
+            {gear('w-5 h-5')}
+          </NavLink>
           <button onClick={() => setMenuAt(menu ? null : pathname)} aria-label="Menu" aria-expanded={menu}
             className="md:hidden -mr-1 p-2 rounded-md text-gray-300 active:bg-gray-800">
             <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
@@ -77,6 +87,10 @@ export default function Layout() {
         {menu && (
           <nav className="md:hidden border-t border-gray-800 px-3 py-2 grid grid-cols-2 gap-1 animate-[menu-in_120ms_ease-out]">
             {links(true)}
+            <NavLink to="/settings"
+              className={({ isActive }) => `rounded-md px-3 py-2.5 text-base flex items-center gap-2 active:bg-gray-700 ${isActive ? 'bg-gray-800 text-white' : 'text-gray-400'}`}>
+              {gear('w-5 h-5')} Settings
+            </NavLink>
             {health && <div className="col-span-2 px-3 pt-2 text-xs text-gray-500">{healthText}</div>}
           </nav>
         )}

@@ -28,7 +28,7 @@ export default function Dashboard() {
         <p className="text-sm text-amber-300">
           <Link to="/photos?stale_detector=1" className="hover:underline">{stats.detector_stale} analyzed photo{stats.detector_stale === 1 ? '' : 's'}</Link>{' '}
           had their people found by another pose model than the current one ({stats.detector}).{' '}
-          <Link to="/calibrate" className="text-blue-400 hover:underline">Re-analyze them →</Link>
+          <Link to="/settings" className="text-blue-400 hover:underline">Re-analyze them →</Link>
         </p>
       )}
 

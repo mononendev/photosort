@@ -33,7 +33,7 @@ At f/1.4-f/2 focus varies across a body, so the question that matters most is "d
 - **Show the math.** The detail view overlays detections, keypoints, the eye band, and a per-tile
   sharpness heat map, and every number has a tooltip that explains it.
 - **Calibrate against your own picks.** Upload XMP sidecars you already rated in Lightroom and the
-  Calibrate page suggests thresholds and shows how often photosort agrees with you.
+  Settings page suggests thresholds and shows how often photosort agrees with you.
 - **Export where you already work.** XMP sidecars (keywords, caption, rating, `PhotoSort|…` hierarchy),
   CSV/JSONL, and a `focus_N/<subject>/<composition>/` folder tree. Or download the sidecars for a folder as a
   zip, in Capture One or Lightroom format, laid out to unzip straight over the shoot folder.
@@ -85,7 +85,7 @@ The focus scoring, including how the thresholds work and why there are two metri
 <table>
   <tr>
     <td width="50%"><img src="docs/images/detail-sharpmap.jpg" alt="Sharpness heat map over the frame"><br><sub><b>Sharpness map.</b> Per-tile Laplacian, soft (red) to sharp (green). Here the background is sharper than the subject, so the frame is tier 0.</sub></td>
-    <td width="50%"><img src="docs/images/calibrate.jpg" alt="Calibrate page with ground-truth upload and threshold contact sheet"><br><sub><b>Calibrate.</b> Primary subjects ordered softest to sharpest by the chosen metric, with ground-truth import from Lightroom XMP.</sub></td>
+    <td width="50%"><img src="docs/images/calibrate.jpg" alt="Settings page with ground-truth upload and threshold contact sheet"><br><sub><b>Settings.</b> Primary subjects ordered softest to sharpest by the chosen metric, with ground-truth import from Lightroom XMP.</sub></td>
   </tr>
   <tr>
     <td colspan="2"><img src="docs/images/photos.jpg" alt="Photos grid with focus tier badges and filters"><br><sub><b>Photos.</b> Filter by focus tier, subject, keeper, review status, keywords or Lightroom rating.</sub></td>
@@ -212,9 +212,9 @@ likely to touch:
 | `exif.crop_factor` | 1.0 | Set to 1.5/1.6 for APS-C bodies without a 35 mm-equivalent tag |
 | `focus_source` | `vlm` | Which tier sorting uses: `vlm`, `local`, or `strict` (the lower of both) |
 
-The focus thresholds that ship are placeholders. Set real ones from your own camera on the Calibrate page,
+The focus thresholds that ship are placeholders. Set real ones from your own camera on the Settings page,
 or with `photosort calibrate`, and then re-score; no re-analysis is needed. Changing the pose model does need
-one: the Calibrate page's **Pose model** panel sets `detect_model`, `detect_conf` and `detect_iou`, counts the
+one: the Settings page's **Pose model** panel sets `detect_model`, `detect_conf` and `detect_iou`, counts the
 photos analyzed by a different model, and re-analyzes them. To try a model first, open a photo and pick it
 under **compare detector**: its detections are drawn in cyan over the stored ones, and nothing is saved. A
 job can also run with its own pose model (Browse, when processing). Which model agrees best with your own
@@ -318,7 +318,7 @@ image:
 
 `yolo11n-pose` finds exactly what the old PyTorch model did on every test image. Ultralytics reports up to
 +7.2 pose AP for YOLO26 over YOLO11. Whether that helps with helmets and fast lenses shows only on your own
-photos: compare models on a photo and on the Calibrate page against your ratings.
+photos: compare models on a photo and on the Settings page against your ratings.
 
 On a first real run of 200 CR2 files, the local and model focus tiers agreed on 193. At ~10 s/image the
 local model takes about two days for 20k frames, so "skip nobody-in-focus" is worth turning on. Concurrency

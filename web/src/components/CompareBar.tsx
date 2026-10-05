@@ -22,7 +22,7 @@ export default function CompareBar({ l, result, loading, error }: {
   const found = l.mask_boxes?.length ?? l.n_people;
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
-      <Tip tip={<>The people on this photo were found by <b>{stored}</b>. Pick another pose model to run it on this frame and draw what it finds in cyan, dashed; nothing is stored. To analyze photos with a model, set it on the Calibrate page and re-analyze them.</>}>
+      <Tip tip={<>The people on this photo were found by <b>{stored}</b>. Pick another pose model to run it on this frame and draw what it finds in cyan, dashed; nothing is stored. To analyze photos with a model, set it on the Settings page and re-analyze them.</>}>
         <span className="text-gray-500">compare detector</span>
       </Tip>
       <select value={model ?? ''} onChange={(e) => setModel(e.target.value || null)}

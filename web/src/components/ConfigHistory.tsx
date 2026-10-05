@@ -20,12 +20,12 @@ export default function ConfigHistory() {
     mutationFn: async (id: number) => { await api.configRestore(id); return api.rescore('rollback'); },
     onSuccess: () => qc.invalidateQueries(),
   });
-  // A re-score is shown on the save it followed rather than as its own row.
+  // A re-score is shown on the save it followed rather than as its own row; a manual one followed no save.
   const rows = useMemo(() => {
     const out: { e: Extract<ConfigHistoryEntry, { kind: 'change' }>; rescored?: number }[] = [];
     let pending: number | undefined;
     for (const e of data ?? []) {
-      if (e.kind === 'rescore') { pending ??= e.changed; continue; }
+      if (e.kind === 'rescore') { if (e.source !== 'manual') pending ??= e.changed; continue; }
       out.push({ e, rescored: pending }); pending = undefined;
     }
     return out;

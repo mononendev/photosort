@@ -1,5 +1,5 @@
 /**
- * Every tuning knob in config.json that the Calibrate page edits, with what it does, which way is stricter and when
+ * Every tuning knob in config.json that the Settings page edits, with what it does, which way is stricter and when
  * a change takes effect. The focus tier cuts (tier*_min, eye_tier*_min, hf_tier*_min) have their own panel; any
  * config key not listed here or there still shows under "other settings", so nothing is hidden.
  */

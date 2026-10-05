@@ -58,7 +58,7 @@ export default function RatingsStrip({ d, cfg, localTip }: { d: ImageDetail; cfg
         {d.keeper ? <span className="text-[11px] text-emerald-300">keeper</span> : d.keeper === false ? <span className="text-[11px] text-gray-500">cull</span> : null}
       </Item>
       {d.truth_tier != null && (
-        <Item k="truth" tip={<>Ground truth you imported on the Calibrate page{d.truth_rating ? `, ${d.truth_rating}★` : ''}{d.truth_label ? `, ${d.truth_label} label` : ''}. The tier comes from a focus:N keyword or CSV column first, then the color label, then the star rating.</>}>
+        <Item k="truth" tip={<>Ground truth you imported on the Settings page{d.truth_rating ? `, ${d.truth_rating}★` : ''}{d.truth_label ? `, ${d.truth_label} label` : ''}. The tier comes from a focus:N keyword or CSV column first, then the color label, then the star rating.</>}>
           <Tier t={d.truth_tier} />
         </Item>
       )}

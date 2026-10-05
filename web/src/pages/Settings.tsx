@@ -100,7 +100,7 @@ function GroundTruth({ onApply, applying }: { onApply: (values: Record<string, n
   );
 }
 
-export default function Calibrate() {
+export default function Settings() {
   const qc = useQueryClient();
   const save = useMutation({
     mutationFn: async ({ values, source }: { values: Record<string, number>; source: string }) => {
@@ -108,9 +108,19 @@ export default function Calibrate() {
     },
     onSuccess: () => qc.invalidateQueries(),
   });
+  const rescore = useMutation({ mutationFn: () => api.rescore('manual'), onSuccess: () => qc.invalidateQueries() });
+  const r = rescore.data;
   return (
     <div className="space-y-6">
-      <h1 className="text-lg font-semibold">Calibrate</h1>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h1 className="text-lg font-semibold">Settings</h1>
+        <Tip plain tip="Re-apply the current settings to every analyzed photo without changing any: re-picks the primary, re-tiers from the stored numbers, and reads AF points and EXIF where missing. Needed after an update changes the rules. Crops and pixel metrics stay as analyzed.">
+          <button disabled={rescore.isPending} onClick={() => rescore.mutate()}
+            className="px-3 py-1 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-40 text-sm">{rescore.isPending ? 're-scoring…' : 're-score all'}</button>
+        </Tip>
+        {r && <span className="text-sm text-gray-400">{r.changed} photos changed tier · AF points read on {r.af_backfilled} · primary re-picked on {r.primary_changed}{r.errors > 0 && <span className="text-amber-400" title={r.first_error ?? ''}> · {r.errors} failed</span>}</span>}
+        {rescore.error && <span className="text-sm text-red-400">re-score failed: {errMsg(rescore.error)}</span>}
+      </div>
       <GroundTruth onApply={(values) => save.mutate({ values, source: 'auto-calibrate' })} applying={save.isPending} />
       <FocusThresholds onSave={(values) => save.mutate({ values, source: 'focus cuts' })} saving={save.isPending} saved={save.data} error={save.error} />
       <TuningPanel />

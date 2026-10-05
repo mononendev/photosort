@@ -97,7 +97,7 @@ export function explainLocal(l: LocalResult, cfg: Cfg): ReactNode {
           ? <>Someone else, confidently detected, grades sharp, so focus landed on a person: the frame is raised to tier {l.local_tier} (focus.floor_tier) whatever the primary graded.</>
           : <>Another person graded tier 3, but the tier grades the primary subject, so the frame is still a miss.</>}</div>
       )}
-      <div className="text-gray-500">Thresholds are set on the Calibrate page. The primary subject is the largest, most central, most confident person.</div>
+      <div className="text-gray-500">Thresholds are set on the Settings page. The primary subject is the largest, most central, most confident person.</div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
@@ -7,7 +7,7 @@ import Photos from './pages/Photos';
 import Jobs from './pages/Jobs';
 import JobDetail from './pages/JobDetail';
 import Export from './pages/Export';
-import Calibrate from './pages/Calibrate';
+import Settings from './pages/Settings';
 import Review from './pages/Review';
 import Trace from './pages/Trace';
 
@@ -28,7 +28,8 @@ export default function App() {
             <Route path="/jobs" element={<Jobs />} />
             <Route path="/jobs/:id" element={<JobDetail />} />
             <Route path="/export" element={<Export />} />
-            <Route path="/calibrate" element={<Calibrate />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/calibrate" element={<Navigate to="/settings" replace />} />
           </Route>
         </Routes>
       </BrowserRouter>

@@ -181,7 +181,7 @@ UI: https://photosort.adoah.dev (internal ingress, LAN/tailscale only). API heal
   the API is the bottleneck (its CPU, or reading the photos); the API logs `analyzer pool` with the pods and
   slots it sees whenever that changes.
 - A local-stage error saying a pose model "is not installed": the configured `detect_model` (or a job's
-  override) isn't in the image's seed or on the models volume. Pick an installed one on the Calibrate page,
+  override) isn't in the image's seed or on the models volume. Pick an installed one on the Settings page,
   or add it to `POSE_MODELS` and rebuild the analyzer.
 
 ## Gotchas

@@ -382,7 +382,7 @@ export const api = {
   overrideJob: (id: number) => request<Job>(`/api/jobs/${id}/override`, { method: 'POST' }),
   config: () => request<Record<string, unknown>>('/api/config'),
   configDefaults: () => request<Record<string, unknown>>('/api/config/defaults'),
-  /** `source` names the save in the change history (Calibrate → history). */
+  /** `source` names the save in the change history (Settings → history). */
   putConfig: (values: Record<string, unknown>, source = 'edit') =>
     request<Record<string, unknown>>('/api/config', { method: 'PUT', body: JSON.stringify({ values, source }) }),
   rescore: (source = '') => request<RescoreResult>('/api/rescore', { method: 'POST', body: JSON.stringify({ source }) }),

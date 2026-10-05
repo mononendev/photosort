@@ -19,7 +19,7 @@ const PAGE = 500;   // the API's per-request cap; stepping past either end loads
 const NUM_KEYS = ['local_tier', 'vlm_tier', 'rating', 'group', 'lr_rating', 'truth_tier', 'people_min', 'people_max', 'score_min', 'score_max',
   'eye_min', 'eye_max', 'iso_min', 'iso_max', 'f_min', 'f_max', 'focal_min', 'focal_max'] as const;
 const BOOL_KEYS = ['keeper', 'stale', 'lifted', 'split', 'overridden', 'noted', 'truth_mismatch'] as const;
-const STR_KEYS = ['stages', 'composition', 'eye_src', 'primary_by', 'camera', 'lens', 'lr_label', 'taken_from', 'taken_to'] as const;
+const STR_KEYS = ['stages', 'composition', 'eye_src', 'primary_by', 'local_reason', 'camera', 'lens', 'lr_label', 'taken_from', 'taken_to'] as const;
 
 const SORTS = [
   ['path', 'by path'], ['name', 'by file name'], ['newest', 'newest added'], ['taken', 'capture time, oldest first'],
@@ -223,12 +223,13 @@ export default function Review() {
       </>,
     },
     {
-      key: 'focus', title: 'Focus', keys: ['tier', 'local_tier', 'vlm_tier', 'stages', 'stale', 'split', 'eye_src', 'primary_by', 'eye_min', 'eye_max', 'lifted'], body: () => <>
+      key: 'focus', title: 'Focus', keys: ['tier', 'local_tier', 'vlm_tier', 'stages', 'stale', 'split', 'local_reason', 'eye_src', 'primary_by', 'eye_min', 'eye_max', 'lifted'], body: () => <>
         {pick('tier', 'any final focus', tierOpts)}
         <div className="grid grid-cols-2 gap-1">{pick('local_tier', 'any local tier', tierOpts)}{pick('vlm_tier', 'any model tier', tierOpts)}</div>
         {pick('stages', 'local and model: either', [['disagree', 'local and model disagree'], ['agree', 'local and model agree']])}
         {tri('stale', 'model saw an older exposure', 'stale', 'current')}
         {tri('split', 'local metrics disagree', 'split', 'agree')}
+        {facet('local_reason', 'any local reason', facets?.local_reasons)}
         {pick('eye_src', 'eyes found any way', [['face', 'eyes from face landmarks'], ['pose', 'eyes from pose keypoints'], ['none', 'eyes not located']])}
         {pick('primary_by', 'subject picked any way', [['af', 'subject picked by camera AF'], ['priority', 'subject picked by prominence']])}
         {range('eye sharpness', 'eye_min', 'eye_max', rg?.eye)}

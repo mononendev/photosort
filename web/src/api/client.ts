@@ -297,7 +297,7 @@ export interface ImageFilters {
   review?: boolean; split?: boolean; lr_rating?: number; lr_label?: string; truth_tier?: number; truth_mismatch?: boolean;
   rating?: number; reviewed?: boolean; group?: number;   // group 0: in none
   local_tier?: number; vlm_tier?: number; stages?: 'agree' | 'disagree'; stale?: boolean; composition?: string;
-  eye_src?: 'face' | 'pose' | 'none'; primary_by?: 'af' | 'priority'; lifted?: boolean; overridden?: boolean; noted?: boolean;
+  eye_src?: 'face' | 'pose' | 'none'; primary_by?: 'af' | 'priority'; local_reason?: string; lifted?: boolean; overridden?: boolean; noted?: boolean;
   camera?: string; lens?: string;
   people_min?: number; people_max?: number; score_min?: number; score_max?: number; eye_min?: number; eye_max?: number;
   iso_min?: number; iso_max?: number; f_min?: number; f_max?: number; shutter_min?: number; shutter_max?: number;
@@ -310,6 +310,7 @@ export interface ImageFilters {
 export interface ImageFacets {
   cameras: { value: string; n: number }[]; lenses: { value: string; n: number }[];
   compositions: { value: string; n: number }[]; subjects: { value: string; n: number }[]; lr_labels: { value: string; n: number }[];
+  local_reasons: { value: string; n: number }[];
   /** [min, max] over the library, null when no photo has the value; taken is an EXIF date string */
   ranges: Record<'iso' | 'f' | 'shutter' | 'focal' | 'people' | 'score' | 'eye', [number | null, number | null]> & { taken: [string | null, string | null] };
 }

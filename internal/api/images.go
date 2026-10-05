@@ -488,6 +488,9 @@ func (s *Server) imageFilter(r *http.Request) (string, []any, error) {
 	if v := q.Get("primary_by"); v != "" {
 		f.add(d.JText("local_json", "primary_by")+" = ?", v)
 	}
+	if v := q.Get("local_reason"); v != "" { // why the local rules gave their tier, e.g. sharper_around_subject
+		f.add(d.JText("local_json", "local_reason")+" = ?", v)
+	}
 	if v := q.Get("detector"); v != "" { // which pose model found the people
 		f.add("COALESCE("+d.JText("local_json", "detector")+", '"+local.LegacyModel+"') = ?", v)
 	}
@@ -681,7 +684,7 @@ func (s *Server) facets(*http.Request) (any, error) {
 	out := pj.Obj{"ranges": ranges}
 	for _, kv := range [][2]string{{"cameras", d.JText("local_json", "exif", "camera")}, {"lenses", d.JText("local_json", "exif", "lens")},
 		{"compositions", d.JText("vlm_json", "composition")}, {"subjects", d.JText("vlm_json", "primary_subject")},
-		{"lr_labels", d.JText("lr_json", "label")}} {
+		{"lr_labels", d.JText("lr_json", "label")}, {"local_reasons", d.JText("local_json", "local_reason")}} {
 		c, err := counts(kv[1])
 		if err != nil {
 			return nil, err

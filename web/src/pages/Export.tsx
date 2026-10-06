@@ -53,7 +53,7 @@ export default function Export() {
         <span className="text-gray-500">tree files</span>
         <select value={link} onChange={(e) => setLink(e.target.value)} className={sel}><option value="symlink">symlink</option><option value="copy">copy (full-size duplicates on the data volume)</option><option value="hardlink">hardlink (same filesystem only)</option></select>
         <span className="text-gray-500">focus source</span>
-        <select value={source} onChange={(e) => setSource(e.target.value)} className={sel}><option value="vlm">vision model (your overrides win)</option><option value="local">local sharpness only</option><option value="strict">strict: lower of both</option></select>
+        <select value={source} onChange={(e) => setSource(e.target.value)} className={sel}><option value="vlm">vision model (your overrides win)</option><option value="local">local sharpness (your overrides win)</option><option value="strict">strict: lower of both (your overrides win)</option></select>
         <span className="text-gray-500">options</span>
         <span className="flex flex-wrap gap-4"><label className="flex items-center gap-1"><input type="checkbox" checked={xmp} onChange={(e) => setXmp(e.target.checked)} /> XMP sidecars</label><label className="flex items-center gap-1"><input type="checkbox" checked={tree} onChange={(e) => setTree(e.target.checked)} /> sorted tree</label></span>
       </div>

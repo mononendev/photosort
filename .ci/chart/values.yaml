@@ -4,7 +4,7 @@
 # leaves on the cluster (see docs/DEPLOY.md to copy its models over).
 modelsVolume:
   name: photosort-models-fs
-  storageClass: csi-fs-sc
+  storageClass: ceph-fs
   accessMode: ReadWriteMany
   size: 20Gi
 
@@ -22,7 +22,7 @@ mononen-library-chart:
       enabled: false
     imageDefaults:
       pullSecrets:
-        - name: harbor
+        - name: harbor-pull   # robot$k8s-pull, from the homelab repo (kubernetes/apps/production/photosort)
 
   components:
     photosort:
@@ -53,13 +53,12 @@ mononen-library-chart:
         port: 80
         targetPort: 80
       ingress:
-        className: nginx
+        # Homelab conventions: class `internal` (LAN/tailnet); `lan-public` makes external-dns-internal publish the
+        # public A record -> the internal ingress IP.
+        className: internal
         annotations:
           cert-manager.io/cluster-issuer: letsencrypt-production
-          nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10"
-          external-dns.alpha.kubernetes.io/target: "lb.adoah.dev"
-          external-dns.alpha.kubernetes.io/cloudflare-proxied: "false"
-          external-dns/is-public: "true"
+          external-dns.home.arpa/lan-public: "true"
         internal:
           tls:
             - secretName: photosort-tls

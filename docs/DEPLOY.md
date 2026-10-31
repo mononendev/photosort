@@ -74,10 +74,10 @@ only).
   cache (~0.5 MB/image), `config.json` and its history, and exports. ReadWriteOnce, which is why the API runs
   one replica.
 - `photosort-models-fs` at `/models`, created by the chart ([`templates/pvc-models.yaml`](../.ci/chart/templates/pvc-models.yaml),
-  kept on uninstall): CephFS (`csi-fs-sc`), ReadWriteMany, mounted by the API and every analyzer pod. It holds
+  kept on uninstall): CephFS (`ceph-fs`), ReadWriteMany, mounted by the API and every analyzer pod. It holds
   weights only: the face model and the pose store in `/models/pose` (`manifest.json` plus one `.onnx` per
   model), on top of the seed baked into the analyzer image. A model installed onto it is there for the whole pool
-  at once; writes go through a temp file and a rename, so a pod never loads a half-written model. `csi-fs-sc`
+  at once; writes go through a temp file and a rename, so a pod never loads a half-written model. `ceph-fs`
   needs the Ceph filesystem `fs` to have a `csi` subvolume group (`ceph fs subvolumegroup create fs csi`).
 
   It replaced `photosort-models` (Ceph RBD, ReadWriteOnce), which the chart no longer manages but leaves on the

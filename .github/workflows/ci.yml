@@ -4,6 +4,10 @@ on:
   push:
     branches: ["**"]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_name != 'master' }}
+
 env:
   REGISTRY: registry.adoah.dev
 
@@ -16,9 +20,6 @@ jobs:
       PHOTOSORT_TEST_PG: ${{ vars.PHOTOSORT_TEST_PG }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
       - name: Vet
         run: go vet ./...
       - name: Test
@@ -75,7 +76,9 @@ jobs:
       version: ${{ steps.v.outputs.version }}
     steps:
       - id: v
-        run: echo "version=${{ github.ref_name }}-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: echo "version=${REF_NAME//[^a-zA-Z0-9_.-]/-}-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
 
   build:
     needs: [version, test-go, test-analyzer, test-web]

@@ -297,3 +297,25 @@ func TestGoldenFixtures(t *testing.T) {
 		})
 	}
 }
+
+func TestSubSecTimeOriginal(t *testing.T) {
+	tiff := buildTIFF([]tiffEntry{ascii(0x0110, "Canon EOS-1D X Mark II")}, []tiffEntry{
+		ascii(0x9003, "2026:04:23 09:03:23"), ascii(0x9291, "94"),
+	})
+	app1 := append([]byte{0xFF, 0xE1}, binary.BigEndian.AppendUint16(nil, uint16(len(tiff)+8))...)
+	app1 = append(append(app1, "Exif\x00\x00"...), tiff...)
+	img := plainJPEG(t, 16, 16)
+	p := filepath.Join(t.TempDir(), "a.jpg")
+	if err := os.WriteFile(p, append(append(append([]byte{}, img[:2]...), app1...), img[2:]...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := SubSecTimeOriginal(p); got != "94" {
+		t.Fatalf("SubSecTimeOriginal = %q", got)
+	}
+	if got := SubSecTimeOriginal(exifJPEG(t, [2]uint32{7, 5}, [2]uint32{1, 30}, 85, 800)); got != "" {
+		t.Fatalf("no tag: %q", got)
+	}
+	if got := SubSecTimeOriginal(filepath.Join(t.TempDir(), "missing.jpg")); got != "" {
+		t.Fatalf("missing file: %q", got)
+	}
+}

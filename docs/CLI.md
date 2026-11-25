@@ -146,6 +146,25 @@ Stage 3. Writes into `OUT`:
 | `--xmp sidecar\|outdir\|none` | Next to the originals (default), under `OUT/xmp/`, or not at all |
 | `--xmp-overwrite` | Replace existing sidecars (they are skipped by default) |
 
+### `publish`
+Sends the analyzed photos under a folder to the gallery's admin API and starts its Google Photos album sync. Per photo
+it sends the final rating, focus tier, model score, keeper flag, subject, composition, action, description,
+keywords, adjectives, camera EXIF, the capture time (`taken`, plus `taken_ms` from `SubSecTimeOriginal` when the
+camera writes it; Canon does, Sony does not), and a 64-bit dHash of the cached thumbnail (null when the thumbnail
+is missing). The gallery uses time and hash to match its album photos to these rows. Photos go in batches of 500.
+Then it waits for the sync (at most 10 minutes) and prints the match counts.
+
+| Flag | |
+|---|---|
+| `--event SLUG` | The gallery event (required; create it in the gallery admin first) |
+| `--folder DIR` | Folder of analyzed photos (required); relative paths are joined to `$PHOTOSORT_PHOTOS` |
+| `--gallery URL` | Gallery admin API base URL (default `$PHOTOSORT_GALLERY`) |
+| `--no-sync` | Send the photos without starting the sync |
+
+```bash
+photosort publish --event ocsf6 --folder "RAW/Oak City Shred Fest/2026"
+```
+
 ### `status`
 The workdir and database kind; counts of tracked, analyzed, in-flight, tagged, and errored images; batch
 jobs; the local tier breakdown; and the first few errors.

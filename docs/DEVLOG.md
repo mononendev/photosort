@@ -326,3 +326,17 @@ treat subject/composition as hints until calibrated; keywords/remarks are usable
   Tailwind 4.3, Node 24, pnpm 12.
 - The golden and apidiff tools need the old code: a checkout of a8ba797 (the last Python commit) via
   `PHOTOSORT_LEGACY`.
+
+### `publish`: photosort feeds the photo gallery (2026-11-25, pho-5fz1)
+
+- `photosort publish --event SLUG --folder DIR` posts every analyzed photo under DIR to the gallery admin API in
+  batches of 500, then starts the album sync and polls it every 2 s (10 min at most). The gallery matches its
+  Google Photos album items to these rows by capture time and, for ties, by dHash.
+- Capture time alone is ambiguous in bursts, so the command also sends `taken_ms` from EXIF `SubSecTimeOriginal`
+  (tag 0x9291, added to the EXIF reader but not to the `exif` object stored in `local_json`). The value is the text
+  after the decimal point: `"94"` is 940 ms, `"5"` is 500, `"05"` is 50, so it is padded on the right and never
+  parsed as an integer. Canon CR2 has the tag; Sony ARW does not.
+- `internal/dhash` is copied byte for byte from the gallery repo (golden hash `f3ce3c73cf9c73e7`), so both sides
+  hash a thumbnail the same way. The hash is taken from the cached `<id>_thumb.jpg`; a missing thumbnail sends null.
+- The API pod gets `PHOTOSORT_GALLERY` (the gallery's in-cluster admin port 8081) so the command runs with
+  `kubectl exec`.

@@ -676,7 +676,7 @@ var wanted = map[string]map[int64]string{
 	"Image": {0x0110: "Image Model", 0x0132: "Image DateTime", 0x8769: "Image ExifOffset"},
 	"EXIF": {0x829A: "EXIF ExposureTime", 0x829D: "EXIF FNumber", 0x8827: "EXIF ISOSpeedRatings",
 		0x920A: "EXIF FocalLength", 0xA405: "EXIF FocalLengthIn35mmFilm", 0xA434: "EXIF LensModel",
-		0x9003: "EXIF DateTimeOriginal"},
+		0x9003: "EXIF DateTimeOriginal", 0x9291: "EXIF SubSecTimeOriginal"},
 }
 
 // ignored are the tags exifread skips when details=False.

@@ -120,7 +120,7 @@ func main() {
 	root.PersistentFlags().StringVar(&workdir, "workdir", envOr("PHOTOSORT_WORKDIR", "photosort_work"),
 		"state, cache and batch files (default ./photosort_work or $PHOTOSORT_WORKDIR)")
 	root.AddCommand(webCmd(), scanCmd(), localCmd(), calibrateCmd(), rescoreCmd(), estimateCmd(), submitCmd(), pollCmd(),
-		sortCmd(), statusCmd(), dbCmd(), modelsCmd())
+		sortCmd(), publishCmd(), statusCmd(), dbCmd(), modelsCmd())
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := root.ExecuteContext(ctx); err != nil {

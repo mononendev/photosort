@@ -108,6 +108,8 @@ mononen-library-chart:
               value: "/photos"
             - name: PHOTOSORT_MODELS
               value: "/models"
+            - name: PHOTOSORT_GALLERY
+              value: "http://photo-gallery-api.production.svc.cluster.local:8081"
             - name: PHOTOSORT_ANALYZER
               value: "dns+http://photosort-analyzer-pool.production.svc.cluster.local:8090"
             - name: OLLAMA_HOST

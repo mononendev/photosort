@@ -210,7 +210,7 @@ func pillowExif(blob []byte, tiffFile bool) map[string]*tagVal {
 	ex.load(off)
 	for tag, key := range map[int]string{0x829D: "EXIF FNumber", 0x829A: "EXIF ExposureTime",
 		0x8827: "EXIF ISOSpeedRatings", 0x920A: "EXIF FocalLength", 0xA405: "EXIF FocalLengthIn35mmFilm",
-		0xA434: "EXIF LensModel", 0x9003: "EXIF DateTimeOriginal"} {
+		0xA434: "EXIF LensModel", 0x9003: "EXIF DateTimeOriginal", 0x9291: "EXIF SubSecTimeOriginal"} {
 		if tv, ok := ex.value(tag); ok {
 			out[key] = tv
 		}

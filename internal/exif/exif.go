@@ -39,20 +39,7 @@ var fields = []struct {
 // rounded to 6 places; "taken" is the EXIF text as stored ("2024:09:12 15:24:19").
 func Read(path string) pj.Obj {
 	out := pj.Obj{}
-	fh, err := os.Open(path)
-	if err != nil {
-		return out
-	}
-	defer fh.Close()
-	st, err := fh.Stat()
-	if err != nil || st.IsDir() {
-		return out
-	}
-	f := &file{r: fh, size: st.Size()}
-	tags, err := exifreadTags(f)
-	if err != nil {
-		tags = pillowTags(f)
-	}
+	tags := readTags(path)
 	for _, fd := range fields {
 		for _, name := range fd.names {
 			t := tags[name]
@@ -71,6 +58,35 @@ func Read(path string) pj.Obj {
 		}
 	}
 	return out
+}
+
+// readTags opens path and reads its tags with exifread, falling back to Pillow's reader. Nil when the file can't be
+// opened.
+func readTags(path string) map[string]*tagVal {
+	fh, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer fh.Close()
+	st, err := fh.Stat()
+	if err != nil || st.IsDir() {
+		return nil
+	}
+	f := &file{r: fh, size: st.Size()}
+	tags, err := exifreadTags(f)
+	if err != nil {
+		tags = pillowTags(f)
+	}
+	return tags
+}
+
+// SubSecTimeOriginal is the EXIF SubSecTimeOriginal text (the digits after the decimal point of DateTimeOriginal),
+// or "" when the file has none. Canon writes hundredths ("94" is .94 s); Sony raws have no such tag.
+func SubSecTimeOriginal(path string) string {
+	if t := readTags(path)["EXIF SubSecTimeOriginal"]; t != nil {
+		return py.Strip(t.str)
+	}
+	return ""
 }
 
 // FmtShutter renders an exposure time: "1/500 s" below half a second, "2 s" above, "?" when unknown (0).

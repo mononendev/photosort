@@ -133,6 +133,8 @@ func TestPublish(t *testing.T) {
 			RelPath string  `json:"rel_path"`
 			Taken   string  `json:"taken"`
 			DHash   *string `json:"dhash"`
+			Subject *string `json:"subject"`
+			Comp    *string `json:"composition"`
 		} `json:"photos"`
 	}
 	if err := json.Unmarshal(bodies[0], &req); err != nil {
@@ -149,6 +151,9 @@ func TestPublish(t *testing.T) {
 			if !hex.MatchString(*p.DHash) {
 				t.Errorf("dhash %q", *p.DHash)
 			}
+		}
+		if p.Subject != nil && *p.Subject == "unknown" || p.Comp != nil && *p.Comp == "unknown" {
+			t.Errorf("unknown sent for %s: %v %v", p.RelPath, p.Subject, p.Comp)
 		}
 		want := map[string]string{"RAW/event/a.jpg": taken[0], "RAW/event/b.jpg": taken[1]}[p.RelPath]
 		if want == "" || p.Taken != want {

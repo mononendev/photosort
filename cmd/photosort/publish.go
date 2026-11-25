@@ -86,7 +86,7 @@ func publishCmd() *cobra.Command {
 				return fmt.Errorf("no analyzed photos under %s", folder)
 			}
 			source := pj.Str(a.cfg.Get()["focus_source"])
-			g := &galleryClient{base: strings.TrimRight(gallery, "/") + "/admin-api/events/" + url.PathEscape(event), http: http.DefaultClient}
+			g := &galleryClient{base: strings.TrimRight(gallery, "/") + "/admin-api/events/" + url.PathEscape(event), http: &http.Client{Timeout: 2 * time.Minute}}
 			ctx := cmd.Context()
 			if ctx == nil {
 				ctx = context.Background()
@@ -142,8 +142,8 @@ func wireRow(r db.Image, source, photos, cacheDir string) (sourceWire, error) {
 		Rating:       wireInt(rec.Rating),
 		FocusTier:    wireInt(rec.FocusTier),
 		QualityScore: wireInt(rec.QualityScore),
-		Subject:      wireStr(rec.Subject),
-		Composition:  wireStr(rec.Composition),
+		Subject:      wireKnown(rec.Subject),
+		Composition:  wireKnown(rec.Composition),
 		Action:       wireStr(rec.Action),
 		Description:  wireStr(rec.Description),
 		Keywords:     wireStrings(rec.Keywords),
@@ -205,6 +205,14 @@ func thumbHash(path string) *string {
 func wireStr(v any) *string {
 	if s, ok := v.(string); ok {
 		return &s
+	}
+	return nil
+}
+
+// wireKnown is wireStr, but "unknown" (what FinalRecord fills in without a model result) is null.
+func wireKnown(v any) *string {
+	if s := wireStr(v); s != nil && *s != "unknown" {
+		return s
 	}
 	return nil
 }
